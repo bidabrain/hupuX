@@ -69,7 +69,7 @@ fun HomeScreen(
                 if (state.bannerPosts.isNotEmpty()) {
                     NewsBanner(state.bannerPosts, onPostClick)
                 } else if (state.isLoading) {
-                    Box(Modifier.fillMaxWidth().height(160.dp)
+                    Box(Modifier.fillMaxWidth().height(220.dp)
                         .background(Color.White.copy(alpha = 0.1f)))
                 }
 
@@ -125,7 +125,7 @@ private fun NewsBanner(posts: List<Post>, onPostClick: (String) -> Unit) {
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
-            .height(160.dp)
+            .height(220.dp)
             .clip(RoundedCornerShape(16.dp))
     ) {
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
