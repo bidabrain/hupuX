@@ -9,6 +9,7 @@
 ### 首页
 - **推荐**：从虎扑首页聚合热门帖子，顶部轮播图展示图文内容
 - **关注**：汇总所有已关注专区的最新动态，按时间排序
+- 右上角设置入口
 
 ### 发现
 - 浏览全部专区分类（篮球、足球、综合等）
@@ -27,6 +28,19 @@
 - 子回复支持**无限递归展开**，可层层深入查看嵌套回复，并可逐层返回
 - 收藏 / 取消收藏
 
+### 我的（需要登录）
+- 头像、昵称、等级、地区、注册时长
+- 关注 / 粉丝 / 帖子 / 推荐 / 赞 / 声望 统计
+- **我的帖子（回帖列表）**：显示本人所有回帖内容，含引用块，触底自动加��
+- **我的推荐**：显示本人推荐过的帖子列表，含专区标签，触底自动加载
+- **我关注的专区**：横滑展示关注的专区，点击直接进入专区帖子列表
+- 点击帖子、回帖、推荐均可跳转到帖子详情页
+
+### 登录与设置
+- **WebView 登录**��内嵌浏览器打开虎扑登录页，登录成功后自动提取 Cookie
+- **���动 Cookie**：在设置中直接粘贴从浏览器复制的 Cookie 字符串，优先级高于 WebView 登录
+- 清除登录一键退出
+
 ---
 
 ## 技术栈
@@ -42,10 +56,18 @@
 | 数据解析 | Gson（JSON API）、Jsoup（HTML） |
 | 图片加载 | Coil |
 | 导航 | Navigation Compose |
+| Cookie 持久化 | SharedPreferences |
 
 ### 数据来源
 
-通过解析虎扑移动端页面的 `__NEXT_DATA__` JSON 以及 REST API 获取数据，无需登录即可浏览。
+| 接口类型 | 说明 |
+|---|---|
+| 移动端 SSR（`m.hupu.com`） | 首页、专区列表、专区详���、帖子详情，解析页面内 `__NEXT_DATA__` JSON |
+| 移���端 REST API（`m.hupu.com/api/v2/`） | 子回复列表 |
+| 桌面端 REST API（`my.hupu.com/pcmapi/`） | 个人资料、我的回帖、我的推荐、我关注的专区（需 Cookie） |
+| 桌面端 HTML（`my.hupu.com`） | 关注专区列表，用 Jsoup 解析 DOM |
+
+桌面端 slug 与移动端 topicId 的对应关系���254 个专区）通过解析 `www.hupu.com` 的 `hotSearchData` 生成并硬编码，无需运行时额外请求。
 
 ---
 
@@ -54,10 +76,13 @@
 ```
 app/src/main/java/com/hupux/
 ├── data/
-│   ├── local/          # Room 数据库（收藏、已关注专区）
-│   ├── model/          # 数据模型（Post、Comment、Zone 等）
-│   ├── repository/     # 数据仓库层
-│   └── scraper/        # HupuScraper：网页 / API 数据抓取
+│   ├── local/          # Room 数据库（收藏、关注专区）+ CookiePreferences
+│   ├── model/          # 数据模型（Post、Zone、Comment、UserProfile 等）
+│   ├── repository/     # 数据仓库层（Home / Post / Zone / Profile / Favorites）
+│   └── scraper/
+│       ├── HupuScraper.kt          # 移动端数据抓取
+│       ├── HupuDesktopScraper.kt   # 桌面端数据抓取（需 Cookie）
+│       └── ZoneSlugMap.kt          # 桌面 slug → 移动 topicId 映射表
 ├── di/
 │   └── AppModule.kt    # Hilt 依赖注入模块
 └── ui/
@@ -66,6 +91,8 @@ app/src/main/java/com/hupux/
     ├── post/           # 帖子详情 + 评论
     ├── search/         # 搜索
     ├── favorites/      # 收藏
+    ├── profile/        # 我的（个人资��� + 回帖 + 推荐 + 关注专区 + WebView 登录）
+    ├── settings/       # 设置（手动 Cookie）
     ├── navigation/     # 底部导航 + 路由
     └── theme/          # 颜色、主题（支持深色模式）
 ```
