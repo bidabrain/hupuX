@@ -3,7 +3,6 @@ package com.hupux.ui.navigation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -25,7 +24,12 @@ import androidx.navigation.navArgument
 import com.hupux.ui.favorites.FavoritesScreen
 import com.hupux.ui.home.HomeScreen
 import com.hupux.ui.post.PostDetailScreen
+import com.hupux.ui.profile.LoginWebViewScreen
+import com.hupux.ui.profile.ProfileScreen
+import com.hupux.ui.profile.UserRecommendListScreen
+import com.hupux.ui.profile.UserReplyListScreen
 import com.hupux.ui.search.SearchScreen
+import com.hupux.ui.settings.SettingsScreen
 import com.hupux.ui.theme.*
 import com.hupux.ui.zone.ZoneDetailScreen
 import com.hupux.ui.zone.ZoneListScreen
@@ -41,7 +45,8 @@ private val navItems = listOf(
     NavItem("home",      "首页", Icons.Filled.Home,      Icons.Outlined.Home),
     NavItem("zone_list", "发现", Icons.Filled.GridView,  Icons.Outlined.GridView),
     NavItem("search",    "搜索", Icons.Filled.Search,    Icons.Outlined.Search),
-    NavItem("favorites", "收藏", Icons.Filled.Bookmark,  Icons.Outlined.BookmarkBorder)
+    NavItem("favorites", "收藏", Icons.Filled.Bookmark,  Icons.Outlined.BookmarkBorder),
+    NavItem("profile",   "我的", Icons.Filled.Person,    Icons.Outlined.Person)
 )
 
 @Composable
@@ -83,7 +88,6 @@ fun AppNavigation() {
                                     restoreState    = true
                                 }
                             }
-                            // 每个 tab 是一个横排胶囊，和推荐/关注一样的浮雕感
                             Box(
                                 contentAlignment = Alignment.Center,
                                 modifier = Modifier
@@ -141,7 +145,10 @@ fun AppNavigation() {
             modifier         = Modifier.padding(innerPadding)
         ) {
             composable("home") {
-                HomeScreen(onPostClick = { tid -> navController.navigate("post/$tid") })
+                HomeScreen(
+                    onPostClick     = { tid -> navController.navigate("post/$tid") },
+                    onSettingsClick = { navController.navigate("settings") }
+                )
             }
             composable("zone_list") {
                 ZoneListScreen(onZoneClick = { id, name -> navController.navigate("zone/$id/$name") })
@@ -151,6 +158,41 @@ fun AppNavigation() {
             }
             composable("favorites") {
                 FavoritesScreen(onPostClick = { tid -> navController.navigate("post/$tid") })
+            }
+            composable("profile") {
+                ProfileScreen(
+                    onNavigateToLogin  = { navController.navigate("login_webview") },
+                    onPostsClick       = { uid -> navController.navigate("user_posts/$uid") },
+                    onRecommendClick   = { uid -> navController.navigate("user_recommend/$uid") },
+                    onZoneClick        = { id, name -> navController.navigate("zone/$id/${java.net.URLEncoder.encode(name, "UTF-8")}") }
+                )
+            }
+            composable(
+                "user_posts/{uid}",
+                arguments = listOf(navArgument("uid") { type = NavType.StringType })
+            ) {
+                UserReplyListScreen(
+                    onPostClick = { tid -> navController.navigate("post/$tid") },
+                    onBack      = { navController.popBackStack() }
+                )
+            }
+            composable(
+                "user_recommend/{uid}",
+                arguments = listOf(navArgument("uid") { type = NavType.StringType })
+            ) {
+                UserRecommendListScreen(
+                    onPostClick = { tid -> navController.navigate("post/$tid") },
+                    onBack      = { navController.popBackStack() }
+                )
+            }
+            composable("settings") {
+                SettingsScreen(onBack = { navController.popBackStack() })
+            }
+            composable("login_webview") {
+                LoginWebViewScreen(
+                    onLoginSuccess = { navController.popBackStack() },
+                    onBack         = { navController.popBackStack() }
+                )
             }
             composable(
                 "zone/{topicId}/{topicName}",

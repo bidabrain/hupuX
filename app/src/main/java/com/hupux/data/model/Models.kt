@@ -73,6 +73,54 @@ data class HotItem(
     val icon: String = ""
 )
 
+data class UserReply(
+    val pid: Long,
+    val tid: Long,
+    val content: String,
+    val lightCount: Int = 0,
+    val createTime: Long = 0,
+    val threadTitle: String = "",
+    val quoteContent: String? = null,
+    val quoteUsername: String? = null
+)
+
+data class UserReplyPage(
+    val replies: List<UserReply>,
+    val hasMore: Boolean,
+    val maxTime: Long
+)
+
+data class UserRecommendPost(
+    val tid: Long,
+    val title: String,
+    val forumName: String = "",
+    val topicName: String = "",
+    val topicLogo: String = "",
+    val replies: Int = 0,
+    val lights: Int = 0,
+    val recommendNum: Int = 0,
+    val createTime: Long = 0,
+    val nickname: String = "",
+    val summary: String = ""
+)
+
+data class UserProfile(
+    val uid: String,
+    val nickname: String,
+    val avatar: String,
+    val headerBack: String = "",
+    val levelDesc: String = "",
+    val levelIcon: String = "",
+    val followCount: Int = 0,
+    val beFollowCount: Int = 0,
+    val postCount: Int = 0,
+    val beRecommendCount: Int = 0,
+    val beLightCount: Int = 0,
+    val location: String = "",
+    val regTimeStr: String = "",
+    val reputation: Int = 0
+)
+
 data class Comment(
     val pid: String,
     val username: String,

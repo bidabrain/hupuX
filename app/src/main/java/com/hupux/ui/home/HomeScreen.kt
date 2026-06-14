@@ -12,6 +12,8 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import androidx.compose.material.icons.outlined.Settings
 import com.hupux.data.model.Post
 import com.hupux.ui.theme.*
 import kotlinx.coroutines.delay
@@ -35,6 +38,7 @@ import kotlinx.coroutines.delay
 @Composable
 fun HomeScreen(
     onPostClick: (String) -> Unit,
+    onSettingsClick: () -> Unit = {},
     vm: HomeViewModel = hiltViewModel()
 ) {
     val state         by vm.state.collectAsState()
@@ -63,6 +67,10 @@ fun HomeScreen(
                 ) {
                     Text("虎扑", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold,
                         color = Color.White)
+                    Spacer(Modifier.weight(1f))
+                    IconButton(onClick = onSettingsClick) {
+                        Icon(Icons.Outlined.Settings, contentDescription = "设置", tint = Color.White)
+                    }
                 }
 
                 // Banner
