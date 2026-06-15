@@ -31,9 +31,11 @@ import com.hupux.ui.home.HomeScreen
 import com.hupux.ui.post.PostDetailScreen
 import com.hupux.ui.profile.LoginWebViewScreen
 import com.hupux.ui.profile.MessageScreen
+import com.hupux.ui.profile.NewPostScreen
 import com.hupux.ui.profile.ProfileScreen
 import com.hupux.ui.profile.UserRecommendListScreen
 import com.hupux.ui.profile.UserReplyListScreen
+import com.hupux.ui.profile.UserThreadListScreen
 import com.hupux.ui.search.SearchScreen
 import com.hupux.ui.settings.SettingsScreen
 import com.hupux.ui.theme.*
@@ -204,6 +206,7 @@ fun AppNavigation() {
                 ProfileScreen(
                     onNavigateToLogin  = { navController.navigate("login_webview") },
                     onPostsClick       = { uid -> navController.navigate("user_posts/$uid") },
+                    onThreadsClick     = { uid -> navController.navigate("user_threads/$uid") },
                     onRecommendClick   = { uid -> navController.navigate("user_recommend/$uid") },
                     onZoneClick        = { id, name -> navController.navigate("zone/$id/${java.net.URLEncoder.encode(name, "UTF-8")}") },
                     onMessagesClick    = { navController.navigate("messages") }
@@ -220,6 +223,15 @@ fun AppNavigation() {
                 arguments = listOf(navArgument("uid") { type = NavType.StringType })
             ) {
                 UserReplyListScreen(
+                    onPostClick = { tid -> navController.navigate("post/$tid") },
+                    onBack      = { navController.popBackStack() }
+                )
+            }
+            composable(
+                "user_threads/{uid}",
+                arguments = listOf(navArgument("uid") { type = NavType.StringType })
+            ) {
+                UserThreadListScreen(
                     onPostClick = { tid -> navController.navigate("post/$tid") },
                     onBack      = { navController.popBackStack() }
                 )
@@ -243,17 +255,43 @@ fun AppNavigation() {
                 )
             }
             composable(
+                "new_post/{topicId}/{zoneName}",
+                arguments = listOf(
+                    navArgument("topicId")  { type = NavType.IntType },
+                    navArgument("zoneName") { type = NavType.StringType }
+                )
+            ) { back ->
+                NewPostScreen(
+                    topicId       = back.arguments!!.getInt("topicId"),
+                    zoneName      = java.net.URLDecoder.decode(
+                        back.arguments!!.getString("zoneName") ?: "", "UTF-8"
+                    ),
+                    onBack        = { navController.popBackStack() },
+                    onPostSuccess = { tid ->
+                        navController.popBackStack()
+                        navController.navigate("post/$tid")
+                    }
+                )
+            }
+            composable(
                 "zone/{topicId}/{topicName}",
                 arguments = listOf(
                     navArgument("topicId")   { type = NavType.IntType },
                     navArgument("topicName") { type = NavType.StringType }
                 )
             ) { back ->
+                val topicId   = back.arguments!!.getInt("topicId")
+                val topicName = back.arguments!!.getString("topicName") ?: ""
                 ZoneDetailScreen(
-                    topicId   = back.arguments!!.getInt("topicId"),
-                    topicName = back.arguments!!.getString("topicName") ?: "",
-                    onPostClick = { tid -> navController.navigate("post/$tid") },
-                    onBack      = { navController.popBackStack() }
+                    topicId        = topicId,
+                    topicName      = topicName,
+                    onPostClick    = { tid -> navController.navigate("post/$tid") },
+                    onBack         = { navController.popBackStack() },
+                    onNewPostClick = {
+                        navController.navigate(
+                            "new_post/$topicId/${java.net.URLEncoder.encode(topicName, "UTF-8")}"
+                        )
+                    }
                 )
             }
             composable(

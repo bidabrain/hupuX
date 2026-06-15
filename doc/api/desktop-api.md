@@ -91,7 +91,54 @@ Referer: https://bbs.hupu.com/{tid}.html
 
 ---
 
-### 3. 提交回复
+### 3. 发帖（创建新帖子）
+
+**URL：** `POST https://bbs.hupu.com/pcmapi/pc/bbs/v1/createThread`
+
+**Headers：**
+```
+Content-Type: application/json
+Origin: https://bbs.hupu.com
+Referer: https://bbs.hupu.com/newpost?tabkey=1
+Cookie: <登录 Cookie>
+```
+
+**Request Body：**
+```json
+{
+  "title":   "帖子标题（4-40字）",
+  "content": "<p>正文内容</p>",   // HTML 格式，多段落用多个 <p>
+  "topicId": 482,                  // 专区 ID（Long）；传 0 则服务端自动分配默认专区
+  "fid":     0                     // 版块 ID（Long）；传 0 服务端根据 topicId 自动推断
+}
+```
+
+**成功 Response：**
+```json
+{
+  "code": 1,
+  "msg": "success",
+  "data": {
+    "tid": 640042088,
+    "fid": 2557,
+    "username": "Ayumi224",
+    "suggestedTopicDto": {
+      "id": 1,
+      "name": "步行街主干道"
+    }
+  }
+}
+```
+
+**常见错误码：**
+| code | internalCode | 说明 |
+|------|-------------|------|
+| 0 | PC022002 | 帖子内容为空 |
+| 0 | PC022003 | 未登录 |
+
+---
+
+### 4. 提交回复
 
 **URL：** `POST https://bbs.hupu.com/pcmapi/pc/bbs/v1/createReply`
 
@@ -150,7 +197,8 @@ Cookie: <登录 Cookie>
 | bbsUserLevelDesc | String | 等级描述 |
 | follow_count | Int | 关注数 |
 | be_follow_count | Int | 粉丝数 |
-| bbs_post_count | Int | 发帖数 |
+| bbs_msg_count | Int | 发帖总数（我的发帖列表中展示的数量）|
+| bbs_post_count | Int | 总活跃数（发帖 + 回帖合计，字段名具有误导性）|
 | be_recommend_count | Int | 被推荐数 |
 | be_light_count | Int | 被亮了数 |
 | location | String | 归属地 |
@@ -159,7 +207,35 @@ Cookie: <登录 Cookie>
 
 ---
 
-### 2. 我的回帖列表
+### 2. 我的发帖列表
+
+**URL：** `GET https://my.hupu.com/pcmapi/pc/space/v1/getThreadList?euid={uid}&maxTime={maxTime}&page=1&pageSize=10`
+
+| 参数 | 说明 |
+|------|------|
+| euid | 用户 euid |
+| maxTime | 分页游标时间戳（秒），首次传 `0`，翻页传上一页最后一条的 `create_time` |
+
+**Response `data[]` 字段（直接为数组，无嵌套）：**
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| tid | Long | 帖子 ID |
+| title | String | 标题 |
+| topic_name | String | 专区名 |
+| topic_logo | String | 专区图标 URL |
+| forum_name | String | 版块名 |
+| replies | Int | 回复数 |
+| lights | Int | 亮了数 |
+| recommend_num | Int | 推荐数 |
+| create_time | Long | 发帖时间戳（秒）|
+| summary | String | 正文摘要 |
+
+> **分页说明：** 返回 `data` 直接为列表（无 `nextPage`/`maxTime` 字段）。
+> 若返回条数 ≥ pageSize（10），视为还有更多；下次请求用上页最后一条的 `create_time` 作为 `maxTime`。
+
+---
+
+### 3. 我的回帖列表
 
 **URL：** `GET https://my.hupu.com/pcmapi/pc/space/v1/getReplyList?euid={uid}&maxTime={maxTime}&page=1&pageSize=10`
 

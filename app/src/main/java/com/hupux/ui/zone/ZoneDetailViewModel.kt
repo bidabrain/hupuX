@@ -2,6 +2,7 @@ package com.hupux.ui.zone
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hupux.data.local.CookiePreferences
 import com.hupux.data.model.Post
 import com.hupux.data.model.ZoneDetail
 import com.hupux.data.repository.ZoneRepository
@@ -20,7 +21,8 @@ data class ZoneDetailUiState(
     val isLoading:     Boolean     = false,
     val isLoadingMore: Boolean     = false,
     val error:         String?     = null,
-    val nextCursor:    String?     = null
+    val nextCursor:    String?     = null,
+    val isLoggedIn:    Boolean     = false
 ) {
     // 精华 = recommendNum ≥ 阈值
     val posts: List<Post> get() = if (selectedTab == 0) allPosts
@@ -28,9 +30,12 @@ data class ZoneDetailUiState(
 }
 
 @HiltViewModel
-class ZoneDetailViewModel @Inject constructor(private val repo: ZoneRepository) : ViewModel() {
+class ZoneDetailViewModel @Inject constructor(
+    private val repo: ZoneRepository,
+    private val cookiePrefs: CookiePreferences
+) : ViewModel() {
 
-    private val _state = MutableStateFlow(ZoneDetailUiState(isLoading = true))
+    private val _state = MutableStateFlow(ZoneDetailUiState(isLoading = true, isLoggedIn = cookiePrefs.isLoggedIn))
     val state = _state.asStateFlow()
 
     private var topicId: Int = 0

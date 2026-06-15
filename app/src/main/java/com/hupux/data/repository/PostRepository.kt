@@ -36,6 +36,11 @@ class PostRepository @Inject constructor(
         }
     }
 
+    suspend fun createThread(topicId: Int, title: String, content: String): Long =
+        withContext(Dispatchers.IO) {
+            desktopScraper.createThread(topicId, title, content)
+        }
+
     suspend fun submitReply(
         tid: String, fid: String, topicId: String,
         quoteId: String, content: String

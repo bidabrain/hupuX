@@ -11,6 +11,8 @@ import com.hupux.data.model.UserProfile
 import com.hupux.data.model.UserReply
 import com.hupux.data.model.UserReplyPage
 import com.hupux.data.model.UserRecommendPost
+import com.hupux.data.model.UserThread
+import com.hupux.data.model.UserThreadPage
 import com.hupux.data.model.Zone
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -146,6 +148,32 @@ class HupuDesktopScraper @Inject constructor(
             .apply { if (cookie.isNotEmpty()) header("Cookie", cookie) }
             .build()
         return client.newCall(req).execute().use { it.body!!.string() }
+    }
+
+    // tabKey=1：发帖列表，maxTime=0 表示首页，分页用上页最后一项的 create_time
+    fun fetchThreadList(uid: String, maxTime: Long = 0): UserThreadPage {
+        val body = fetch("$MY_BASE/pcmapi/pc/space/v1/getThreadList?euid=$uid&maxTime=$maxTime&page=1&pageSize=10")
+        val root = JsonParser.parseString(body).asJsonObject
+        check(root.int_("code") == 1) { root.str("msg") ?: "API error" }
+        val list = root.arr("data") ?: return UserThreadPage(emptyList(), false, 0)
+        val threads = list.map { el ->
+            val o = el.asJsonObject
+            UserThread(
+                tid         = o.long_("tid") ?: 0L,
+                title       = o.str("title") ?: "",
+                topicName   = o.str("topic_name") ?: "",
+                topicLogo   = o.str("topic_logo") ?: "",
+                forumName   = o.str("forum_name") ?: "",
+                replies     = o.int_("replies") ?: 0,
+                lights      = o.int_("lights") ?: 0,
+                recommendNum= o.int_("recommend_num") ?: 0,
+                createTime  = o.long_("create_time") ?: 0L,
+                summary     = o.str("summary") ?: ""
+            )
+        }
+        val hasMore = threads.size >= 10
+        val nextMaxTime = threads.lastOrNull()?.createTime ?: 0L
+        return UserThreadPage(threads, hasMore, nextMaxTime)
     }
 
     // tabKey=2：回帖列表，maxTime=0 表示首页，分页用返回的 maxTime
@@ -323,13 +351,44 @@ class HupuDesktopScraper @Inject constructor(
             levelIcon        = d.str("bbsUserIcon") ?: "",
             followCount      = d.int_("follow_count") ?: 0,
             beFollowCount    = d.int_("be_follow_count") ?: 0,
-            postCount        = d.int_("bbs_post_count") ?: 0,
+            postCount        = d.int_("bbs_msg_count") ?: 0,
+            replyCount       = d.int_("bbs_post_count") ?: 0,
             beRecommendCount = d.int_("be_recommend_count") ?: 0,
             beLightCount     = d.int_("be_light_count") ?: 0,
             location         = d.str("location") ?: "",
             regTimeStr       = d.str("reg_time_str") ?: "",
             reputation       = d.obj("reputation")?.int_("value") ?: 0
         )
+    }
+
+    /**
+     * 发帖：POST /pcmapi/pc/bbs/v1/createThread
+     * 返回新帖子 tid，失败抛异常
+     */
+    fun createThread(topicId: Int, title: String, content: String): Long {
+        val body = com.google.gson.JsonObject().apply {
+            addProperty("title",   title)
+            addProperty("content", content)
+            addProperty("topicId", topicId.toLong())
+            addProperty("fid",     0L)
+        }.toString()
+
+        val cookie = cookiePrefs.effectiveCookie
+        val req = Request.Builder()
+            .url("$BBS_BASE/pcmapi/pc/bbs/v1/createThread")
+            .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+            .header("Content-Type", "application/json")
+            .header("Origin", BBS_BASE)
+            .header("Referer", "$BBS_BASE/newpost?tabkey=1")
+            .apply { if (cookie.isNotEmpty()) header("Cookie", cookie) }
+            .post(body.toRequestBody("application/json".toMediaType()))
+            .build()
+
+        val resp = client.newCall(req).execute().use { it.body!!.string() }
+        val root = JsonParser.parseString(resp).asJsonObject
+        val code = root.get("code")?.asInt ?: 0
+        if (code != 1) error(root.str("msg") ?: "发帖失败")
+        return root.obj("data")?.long_("tid") ?: 0L
     }
 
     /**

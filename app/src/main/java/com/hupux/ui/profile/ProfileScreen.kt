@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,6 +35,7 @@ import com.hupux.ui.theme.*
 fun ProfileScreen(
     onNavigateToLogin: () -> Unit,
     onPostsClick: (uid: String) -> Unit = {},
+    onThreadsClick: (uid: String) -> Unit = {},
     onRecommendClick: (uid: String) -> Unit = {},
     onZoneClick: (topicId: Int, topicName: String) -> Unit = { _, _ -> },
     onMessagesClick: () -> Unit = {},
@@ -70,7 +72,7 @@ fun ProfileScreen(
                     PillButton("重试", onClick = vm::loadProfile)
                 }
             }
-            is ProfileViewModel.State.Success     -> ProfileContent(s.profile, s.followedZones, onPostsClick, onRecommendClick, onZoneClick, onMessagesClick)
+            is ProfileViewModel.State.Success     -> ProfileContent(s.profile, s.followedZones, onPostsClick, onThreadsClick, onRecommendClick, onZoneClick, onMessagesClick)
         }
     }
 }
@@ -95,6 +97,7 @@ private fun ProfileContent(
     profile: UserProfile,
     followedZones: List<Zone>,
     onPostsClick: (uid: String) -> Unit,
+    onThreadsClick: (uid: String) -> Unit,
     onRecommendClick: (uid: String) -> Unit,
     onZoneClick: (Int, String) -> Unit,
     onMessagesClick: () -> Unit
@@ -176,7 +179,10 @@ private fun ProfileContent(
                 Box(Modifier.width(1.dp).height(36.dp).background(Color.Gray.copy(0.2f)))
                 StatItem("粉丝", profile.beFollowCount.toString())
                 Box(Modifier.width(1.dp).height(36.dp).background(Color.Gray.copy(0.2f)))
-                StatItem("帖子", profile.postCount.toString(),
+                StatItem("发帖", profile.postCount.toString(),
+                    onClick = { onThreadsClick(profile.uid) })
+                Box(Modifier.width(1.dp).height(36.dp).background(Color.Gray.copy(0.2f)))
+                StatItem("回帖", profile.replyCount.toString(),
                     onClick = { onPostsClick(profile.uid) })
                 Box(Modifier.width(1.dp).height(36.dp).background(Color.Gray.copy(0.2f)))
                 StatItem("推荐", profile.beRecommendCount.toString(),
@@ -197,26 +203,15 @@ private fun ProfileContent(
         }
 
         Spacer(Modifier.height(12.dp))
-        // 消息入口
         Surface(
             Modifier.fillMaxWidth().padding(horizontal = 14.dp),
             shape = RoundedCornerShape(16.dp), color = CardBg, shadowElevation = 4.dp
         ) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onMessagesClick)
-                    .padding(horizontal = 16.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Outlined.Notifications, contentDescription = null,
-                    tint = HupuRed, modifier = Modifier.size(22.dp))
-                Spacer(Modifier.width(12.dp))
-                Text("消息", fontSize = 15.sp, fontWeight = FontWeight.Medium,
-                    color = TextPrimary, modifier = Modifier.weight(1f))
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null,
-                    tint = TextTertiary, modifier = Modifier.size(20.dp))
-            }
+            ProfileMenuRow(
+                icon  = Icons.Outlined.Notifications,
+                label = "消息",
+                onClick = onMessagesClick
+            )
         }
 
         if (followedZones.isNotEmpty()) {
@@ -266,6 +261,24 @@ private fun ZoneChip(zone: Zone, onClick: () -> Unit) {
             maxLines = 1,
             modifier = Modifier.widthIn(max = 56.dp)
         )
+    }
+}
+
+@Composable
+private fun ProfileMenuRow(icon: ImageVector, label: String, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = HupuRed, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(12.dp))
+        Text(label, fontSize = 15.sp, fontWeight = FontWeight.Medium,
+            color = TextPrimary, modifier = Modifier.weight(1f))
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null,
+            tint = TextTertiary, modifier = Modifier.size(20.dp))
     }
 }
 

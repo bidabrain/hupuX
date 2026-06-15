@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
@@ -34,6 +35,7 @@ import com.hupux.ui.theme.*
 fun ZoneDetailScreen(
     topicId: Int, topicName: String,
     onPostClick: (String) -> Unit, onBack: () -> Unit,
+    onNewPostClick: () -> Unit = {},
     vm: ZoneDetailViewModel = hiltViewModel()
 ) {
     LaunchedEffect(topicId) { vm.init(topicId) }
@@ -47,6 +49,7 @@ fun ZoneDetailScreen(
     }
     val onHeader = if (headerBg.luminance() > 0.4f) TextPrimary else Color.White
 
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().background(AppBg)) {
         // ── Header (colored zone banner) ─────────────────────────
         Box(
@@ -149,6 +152,19 @@ fun ZoneDetailScreen(
                 }
             }
         }
+    }
+    if (state.isLoggedIn) {
+        FloatingActionButton(
+            onClick          = onNewPostClick,
+            modifier         = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 20.dp, bottom = 20.dp),
+            containerColor   = HupuRed,
+            contentColor     = Color.White
+        ) {
+            Icon(Icons.Filled.Edit, contentDescription = "发帖")
+        }
+    }
     }
 }
 
