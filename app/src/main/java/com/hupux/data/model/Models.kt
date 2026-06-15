@@ -61,7 +61,11 @@ data class PostDetail(
     val location: String = "",
     val comments: List<Comment>,
     val hasMoreComments: Boolean,
-    val initialNextPid: String? = null
+    val initialNextPid: String? = null,
+    val desktopBaseUrl: String = "",     // 桌面版分页 base，如 /tid_euid.html
+    val desktopTotalPages: Int = 0,
+    val fid: String = "",               // 版块 ID（桌面版回复需要）
+    val topicId: String = ""            // 专区 ID（桌面版回复需要）
 )
 
 data class HotItem(
@@ -133,5 +137,29 @@ data class Comment(
     val isAuthor: Boolean,
     val quoteUsername: String? = null,
     val quoteContent: String? = null,
-    val quotePid: String? = null         // 被引用的父评论 pid
+    val quotePid: String? = null,        // 被引用的父评论 pid
+    val desktopPage: Int = 0             // 0 = 移动端来源；>0 = 桌面版第几页
+)
+
+data class MessageItem(
+    val msgType: Int,
+    val puid: Long,
+    val username: String,
+    val headerUrl: String,
+    val postContent: String,
+    val threadTitle: String,
+    val tid: Long,
+    val pid: Long,
+    val pics: List<String>,
+    val quoteContent: String?,
+    val publishTime: String,
+    val updateTime: Long,
+    val lightNum: Int = 0,
+    val directUrl: String? = null   // tab3 直接给出桌面版链接
+)
+
+data class MessagePage(
+    val items: List<MessageItem>,
+    val hasNextPage: Boolean,
+    val nextPageStr: String
 )

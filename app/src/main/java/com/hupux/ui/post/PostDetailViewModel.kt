@@ -21,7 +21,14 @@ sealed class PostDetailUiState {
         val subRepliesMap: Map<String, List<Comment>> = emptyMap(),
         // 回复层级栈：每次点击"X 条回复"压栈，返回键弹栈
         val replyStack: List<String> = emptyList(),
-        val isLoadingSubReplies: Boolean = false
+        val isLoadingSubReplies: Boolean = false,
+        // 原生回复 sheet
+        val replyingTo: Comment? = null,     // null = 回复主贴
+        val showReplySheet: Boolean = false,
+        val replyContent: String = "",
+        val isSubmittingReply: Boolean = false,
+        val replyError: String? = null,
+        val replySuccess: Boolean = false
     ) : PostDetailUiState() {
         val expandedPid: String? get() = replyStack.lastOrNull()
     }
@@ -97,6 +104,56 @@ class PostDetailViewModel @Inject constructor(
     fun dismissReplies() {
         val s = _state.value as? PostDetailUiState.Success ?: return
         _state.value = s.copy(replyStack = emptyList())
+    }
+
+    fun startReply(comment: Comment) {
+        val s = _state.value as? PostDetailUiState.Success ?: return
+        _state.value = s.copy(showReplySheet = true, replyingTo = comment, replyContent = "", replyError = null, replySuccess = false)
+    }
+
+    fun startMainPostReply() {
+        val s = _state.value as? PostDetailUiState.Success ?: return
+        _state.value = s.copy(showReplySheet = true, replyingTo = null, replyContent = "", replyError = null, replySuccess = false)
+    }
+
+    fun dismissReply() {
+        val s = _state.value as? PostDetailUiState.Success ?: return
+        _state.value = s.copy(showReplySheet = false, replyingTo = null, replyContent = "", replyError = null)
+    }
+
+    fun updateReplyContent(text: String) {
+        val s = _state.value as? PostDetailUiState.Success ?: return
+        _state.value = s.copy(replyContent = text, replyError = null)
+    }
+
+    fun submitReply() {
+        val s = _state.value as? PostDetailUiState.Success ?: return
+        val comment = s.replyingTo   // null = 回复主贴
+        val content = s.replyContent.trim()
+        if (content.isEmpty()) {
+            _state.value = s.copy(replyError = "请输入回复内容")
+            return
+        }
+        _state.value = s.copy(isSubmittingReply = true, replyError = null)
+        viewModelScope.launch {
+            runCatching {
+                postRepo.submitReply(
+                    tid     = currentTid,
+                    fid     = s.post.fid,
+                    topicId = s.post.topicId,
+                    quoteId = comment?.pid ?: "0",
+                    content = "<p>$content</p>"
+                )
+            }.onSuccess {
+                _state.value = (_state.value as? PostDetailUiState.Success)
+                    ?.copy(isSubmittingReply = false, replySuccess = true)
+                    ?: _state.value
+            }.onFailure { e ->
+                _state.value = (_state.value as? PostDetailUiState.Success)
+                    ?.copy(isSubmittingReply = false, replyError = e.message ?: "回复失败")
+                    ?: _state.value
+            }
+        }
     }
 
     fun toggleFavorite() {

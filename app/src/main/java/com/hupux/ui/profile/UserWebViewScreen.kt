@@ -46,7 +46,7 @@ fun UserWebViewScreen(
                 // 预置 cookie，让 SPA 页面以登录态加载
                 val cookie = vm.effectiveCookie
                 if (cookie.isNotEmpty()) {
-                    listOf("hupu.com", "my.hupu.com").forEach { domain ->
+                    listOf("hupu.com", "my.hupu.com", "bbs.hupu.com").forEach { domain ->
                         cookie.split(";").forEach { pair ->
                             cookieManager.setCookie(domain, pair.trim())
                         }
@@ -56,6 +56,10 @@ fun UserWebViewScreen(
                 WebView(ctx).apply {
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
+                    settings.userAgentString =
+                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
+                        "AppleWebKit/537.36 (KHTML, like Gecko) " +
+                        "Chrome/124.0.0.0 Safari/537.36"
                     CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
                     webViewClient = WebViewClient()
                     loadUrl(url)

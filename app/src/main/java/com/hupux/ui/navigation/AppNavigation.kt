@@ -30,6 +30,7 @@ import com.hupux.ui.favorites.FavoritesScreen
 import com.hupux.ui.home.HomeScreen
 import com.hupux.ui.post.PostDetailScreen
 import com.hupux.ui.profile.LoginWebViewScreen
+import com.hupux.ui.profile.MessageScreen
 import com.hupux.ui.profile.ProfileScreen
 import com.hupux.ui.profile.UserRecommendListScreen
 import com.hupux.ui.profile.UserReplyListScreen
@@ -204,7 +205,14 @@ fun AppNavigation() {
                     onNavigateToLogin  = { navController.navigate("login_webview") },
                     onPostsClick       = { uid -> navController.navigate("user_posts/$uid") },
                     onRecommendClick   = { uid -> navController.navigate("user_recommend/$uid") },
-                    onZoneClick        = { id, name -> navController.navigate("zone/$id/${java.net.URLEncoder.encode(name, "UTF-8")}") }
+                    onZoneClick        = { id, name -> navController.navigate("zone/$id/${java.net.URLEncoder.encode(name, "UTF-8")}") },
+                    onMessagesClick    = { navController.navigate("messages") }
+                )
+            }
+            composable("messages") {
+                MessageScreen(
+                    onPostClick = { tid -> navController.navigate("post/$tid") },
+                    onBack      = { navController.popBackStack() }
                 )
             }
             composable(

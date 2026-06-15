@@ -4,18 +4,38 @@ import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.hupux.data.local.CookiePreferences
+import com.hupux.data.model.Comment
+import com.hupux.data.model.MessageItem
+import com.hupux.data.model.MessagePage
 import com.hupux.data.model.UserProfile
 import com.hupux.data.model.UserReply
 import com.hupux.data.model.UserReplyPage
 import com.hupux.data.model.UserRecommendPost
 import com.hupux.data.model.Zone
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.jsoup.Jsoup
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private const val MY_BASE = "https://my.hupu.com"
+private const val MY_BASE  = "https://my.hupu.com"
+private const val BBS_BASE = "https://bbs.hupu.com"
+
+private val BBS_NEXT_DATA_REGEX = Regex(
+    """<script id="__NEXT_DATA__" type="application/json">(.*?)</script>""",
+    RegexOption.DOT_MATCHES_ALL
+)
+
+data class DesktopRepliesPage(
+    val comments: List<Comment>,
+    val baseUrl: String,
+    val currentPage: Int,
+    val totalPages: Int,
+    val fid: String = "",
+    val topicId: String = ""
+)
 
 private fun JsonObject.obj(key: String): JsonObject? = get(key)?.takeIf { !it.isJsonNull }?.asJsonObject
 private fun JsonObject.arr(key: String): JsonArray?  = get(key)?.takeIf { !it.isJsonNull }?.asJsonArray
@@ -29,6 +49,93 @@ class HupuDesktopScraper @Inject constructor(
     private val client: OkHttpClient,
     private val cookiePrefs: CookiePreferences
 ) {
+    private fun fetchBbs(url: String): String {
+        val cookie = cookiePrefs.effectiveCookie
+        val req = Request.Builder()
+            .url(url)
+            .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+            .header("Referer", "$BBS_BASE/")
+            .header("Accept-Language", "zh-CN,zh;q=0.9")
+            .apply { if (cookie.isNotEmpty()) header("Cookie", cookie) }
+            .build()
+        return client.newCall(req).execute().use { it.body!!.string() }
+    }
+
+    /** 桌面版子回复 API：/api/v2/reply/reply?tid=&pid=&maxpid= */
+    fun fetchDesktopSubReplies(tid: String, parentPid: String, maxPid: String = "0"): List<Comment> {
+        val url = "$BBS_BASE/api/v2/reply/reply?tid=$tid&pid=$parentPid&maxpid=$maxPid"
+        val body = fetchBbs(url)
+        val root = JsonParser.parseString(body).asJsonObject
+        val list = root.obj("data")?.arr("list") ?: return emptyList()
+        return list.mapNotNull { el ->
+            val o = el.asJsonObject
+            if (o.bool_("isHidden") == true || o.bool_("isDelete") == true) return@mapNotNull null
+            val author = o.obj("author")
+            Comment(
+                pid         = o.str("pid") ?: return@mapNotNull null,
+                username    = author?.str("puname") ?: "",
+                avatar      = author?.str("header") ?: "",
+                content     = o.str("content") ?: "",
+                lights      = o.int_("count") ?: 0,
+                replyCount  = o.int_("replyNum") ?: 0,
+                time        = o.str("createdAtFormat") ?: "",
+                location    = o.str("location") ?: "",
+                isAuthor    = o.bool_("isStarter") ?: false,
+                desktopPage = 1   // 标记为桌面版数据，允许显示回复按钮
+            )
+        }
+    }
+
+    /** 登录状态下从桌面版拉取帖子评论，page=1 对应 /{tid}.html */
+    fun fetchPostReplies(tid: String, page: Int = 1, baseUrl: String = ""): DesktopRepliesPage {
+        val url = when {
+            page <= 1 -> "$BBS_BASE/$tid.html"
+            baseUrl.isNotEmpty() -> {
+                val slug = baseUrl.removePrefix("/").removeSuffix(".html")
+                "$BBS_BASE/post-$slug-$page.html"
+            }
+            else -> "$BBS_BASE/post-$tid-$page.html"
+        }
+        val html = fetchBbs(url)
+        return parseDesktopReplies(html, page)
+    }
+
+    private fun parseDesktopReplies(html: String, fetchedPage: Int): DesktopRepliesPage {
+        val json = BBS_NEXT_DATA_REGEX.find(html)?.groupValues?.get(1)
+            ?: error("__NEXT_DATA__ not found in BBS page")
+        val root = JsonParser.parseString(json).asJsonObject
+            .getAsJsonObject("props").getAsJsonObject("pageProps")
+        val replies = root.obj("detail")?.obj("replies")
+            ?: return DesktopRepliesPage(emptyList(), "", fetchedPage, 1)
+
+        val baseUrl     = replies.str("baseUrl") ?: ""
+        val totalPages  = replies.int_("total") ?: 1
+        val currentPage = replies.int_("current") ?: fetchedPage
+        val thread      = root.obj("detail")?.obj("thread")
+        val fid         = thread?.str("fid") ?: ""
+        val topicId     = thread?.str("topicId") ?: ""
+
+        val list = replies.arr("list") ?: JsonArray()
+        val comments = list.mapNotNull { el ->
+            val o = el.asJsonObject
+            if (o.bool_("isHidden") == true || o.bool_("isDelete") == true) return@mapNotNull null
+            val author = o.obj("author")
+            Comment(
+                pid         = o.str("pid") ?: return@mapNotNull null,
+                username    = author?.str("puname") ?: "",
+                avatar      = author?.str("header") ?: "",
+                content     = o.str("content") ?: "",
+                lights      = o.int_("count") ?: 0,
+                replyCount  = o.int_("replyNum") ?: 0,
+                time        = o.str("createdAtFormat") ?: "",
+                location    = o.str("location") ?: "",
+                isAuthor    = o.bool_("isStarter") ?: false,
+                desktopPage = currentPage
+            )
+        }
+        return DesktopRepliesPage(comments, baseUrl, currentPage, totalPages, fid, topicId)
+    }
+
     private fun fetch(url: String): String {
         val cookie = cookiePrefs.effectiveCookie
         val req = Request.Builder()
@@ -106,6 +213,102 @@ class HupuDesktopScraper @Inject constructor(
         }
     }
 
+    /**
+     * tabKey: 1=提到我的, 2=评论, 3=亮了/推荐
+     * pageStr=null 时从页面 SSR 读取初始数据，否则调 API 分页
+     */
+    fun fetchMessages(tabKey: Int, pageStr: String? = null): MessagePage {
+        return if (pageStr == null) {
+            val html = fetch("$MY_BASE/message?tabKey=$tabKey")
+            parseMessageHtml(html, tabKey)
+        } else {
+            val param = if (tabKey == 1) "plate=2" else "plat=2"
+            val endpoint = when (tabKey) {
+                1 -> "getMentionedRemindList"
+                3 -> "getLightRemindList"
+                else -> "getReplyRemindList"
+            }
+            val body = fetch("$MY_BASE/pcmapi/pc/space/v1/$endpoint?$param&pageStr=$pageStr")
+            parseMessageApi(body, tabKey)
+        }
+    }
+
+    private fun parseMessageHtml(html: String, tabKey: Int): MessagePage {
+        val marker = "window.\$\$data="
+        val start = html.indexOf(marker).takeIf { it >= 0 }?.plus(marker.length)
+            ?: error("window.\$\$data not found in page")
+        val end = html.indexOf("</script>", start).takeIf { it >= 0 }
+            ?: error("window.\$\$data end not found")
+        val raw = html.substring(start, end).trimEnd(';', ' ', '\n', '\r')
+        val root = JsonParser.parseString(raw).asJsonObject
+        val data = root.obj("data") ?: return MessagePage(emptyList(), false, "1")
+        val parser = if (tabKey == 3) ::parseLightItem else ::parseReplyMentionItem
+        val newItems  = data.arr("newList")?.map  { parser(it.asJsonObject) } ?: emptyList()
+        val histItems = data.arr("hisList")?.map  { parser(it.asJsonObject) } ?: emptyList()
+        return MessagePage(
+            items       = newItems + histItems,
+            hasNextPage = data.bool_("hasNextPage") ?: false,
+            nextPageStr = data.str("pageStr") ?: ""
+        )
+    }
+
+    private fun parseMessageApi(body: String, tabKey: Int): MessagePage {
+        val root = JsonParser.parseString(body).asJsonObject
+        check(root.int_("code") == 1) { root.str("msg") ?: "API error" }
+        val data = root.obj("data") ?: return MessagePage(emptyList(), false, "")
+        val parser = if (tabKey == 3) ::parseLightItem else ::parseReplyMentionItem
+        val newItems  = data.arr("newList")?.map  { parser(it.asJsonObject) } ?: emptyList()
+        val histItems = data.arr("hisList")?.map  { parser(it.asJsonObject) } ?: emptyList()
+        return MessagePage(
+            items       = newItems + histItems,
+            hasNextPage = data.bool_("hasNextPage") ?: false,
+            nextPageStr = data.str("pageStr") ?: ""
+        )
+    }
+
+    // tab1(提到我的) / tab2(评论)：pics 是对象数组 [{url, is_gif, ...}]
+    private fun parseReplyMentionItem(o: JsonObject): MessageItem {
+        val pics = o.arr("pics")?.mapNotNull { el ->
+            if (el.isJsonObject) el.asJsonObject.str("url") else el.asString
+        } ?: emptyList()
+        return MessageItem(
+            msgType      = o.int_("msgType") ?: 0,
+            puid         = o.get("puid")?.takeIf { !it.isJsonNull }?.asLong ?: 0L,
+            username     = o.str("username") ?: "",
+            headerUrl    = o.str("headerUrl") ?: "",
+            postContent  = o.str("postContent") ?: "",
+            threadTitle  = o.str("threadTitle") ?: "",
+            tid          = o.get("tid")?.takeIf { !it.isJsonNull }?.asLong ?: 0L,
+            pid          = o.get("pid")?.takeIf { !it.isJsonNull }?.asLong ?: 0L,
+            pics         = pics,
+            quoteContent = o.str("quoteContent"),
+            publishTime  = o.str("publishTime") ?: "",
+            updateTime   = o.long_("updateTime") ?: 0L
+        )
+    }
+
+    // tab3(亮了/推荐)：tid=operateId，用户信息在 post 子对象
+    private fun parseLightItem(o: JsonObject): MessageItem {
+        val post = o.obj("post")
+        val tid = o.get("operateId")?.takeIf { !it.isJsonNull }?.asLong ?: 0L
+        return MessageItem(
+            msgType      = o.int_("type") ?: 0,
+            puid         = o.get("puid")?.takeIf { !it.isJsonNull }?.asLong ?: 0L,
+            username     = post?.str("username") ?: "",
+            headerUrl    = post?.str("header") ?: "",
+            postContent  = post?.str("content") ?: "",
+            threadTitle  = o.str("title") ?: "",
+            tid          = tid,
+            pid          = o.get("pid")?.takeIf { !it.isJsonNull }?.asLong ?: 0L,
+            pics         = emptyList(),
+            quoteContent = null,
+            publishTime  = "",
+            updateTime   = o.long_("updateTime") ?: 0L,
+            lightNum     = o.int_("lightNum") ?: 0,
+            directUrl    = o.str("url")
+        )
+    }
+
     fun fetchUserProfile(uid: String): UserProfile {
         val body = fetch("$MY_BASE/pcmapi/pc/space/v1/getUserInfo?euid=$uid")
         val root = JsonParser.parseString(body).asJsonObject
@@ -127,5 +330,42 @@ class HupuDesktopScraper @Inject constructor(
             regTimeStr       = d.str("reg_time_str") ?: "",
             reputation       = d.obj("reputation")?.int_("value") ?: 0
         )
+    }
+
+    /**
+     * 提交回复：POST /pcmapi/pc/bbs/v1/createReply
+     * 成功返回 true，失败抛异常（message 为服务器返回的 msg）
+     */
+    fun createReply(
+        tid: String, fid: String, topicId: String,
+        quoteId: String, content: String
+    ) {
+        val body = com.google.gson.JsonObject().apply {
+            addProperty("tid",      tid.toLongOrNull() ?: 0L)
+            addProperty("fid",      fid.toLongOrNull() ?: 0L)
+            addProperty("topicId",  topicId.toLongOrNull() ?: 0L)
+            addProperty("quoteId",  quoteId.toLongOrNull() ?: 0L)
+            addProperty("content",  content)
+            addProperty("shumeiId", "")
+            addProperty("deviceid", "")
+        }.toString()
+
+        val cookie = cookiePrefs.effectiveCookie
+        val req = Request.Builder()
+            .url("$BBS_BASE/pcmapi/pc/bbs/v1/createReply")
+            .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+            .header("Content-Type", "application/json")
+            .header("Origin", BBS_BASE)
+            .header("Referer", "$BBS_BASE/$tid.html")
+            .apply { if (cookie.isNotEmpty()) header("Cookie", cookie) }
+            .post(body.toRequestBody("application/json".toMediaType()))
+            .build()
+
+        val resp = client.newCall(req).execute().use { it.body!!.string() }
+        val root = JsonParser.parseString(resp).asJsonObject
+        val code = root.get("code")?.asInt ?: 0
+        if (code != 1 && code != 200) {
+            error(root.get("msg")?.asString ?: "回复失败")
+        }
     }
 }

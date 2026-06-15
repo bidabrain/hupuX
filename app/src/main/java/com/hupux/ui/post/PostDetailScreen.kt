@@ -78,7 +78,8 @@ private val LocalImageClick = staticCompositionLocalOf<(String) -> Unit> { {} }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PostDetailScreen(
-    tid: String, onBack: () -> Unit,
+    tid: String,
+    onBack: () -> Unit,
     vm: PostDetailViewModel = hiltViewModel()
 ) {
     LaunchedEffect(tid) { vm.load(tid) }
@@ -167,12 +168,33 @@ fun PostDetailScreen(
             sheetState       = sheetState
         ) {
             SubRepliesSheet(
-                subReplies    = subReplies,
-                totalCount    = parent?.replyCount ?: subReplies.size,
-                isLoading     = success.isLoadingSubReplies,
-                canGoBack     = success.replyStack.size > 1,
-                onBack        = vm::popReplies,
-                onReplyClick  = vm::showReplies
+                subReplies       = subReplies,
+                totalCount       = parent?.replyCount ?: subReplies.size,
+                isLoading        = success.isLoadingSubReplies,
+                canGoBack        = success.replyStack.size > 1,
+                onBack           = vm::popReplies,
+                onReplyClick     = vm::showReplies,
+                onReplyToComment = vm::startReply
+            )
+        }
+    }
+
+    // ── 原生回复 BottomSheet ──────────────────────────────────────
+    val successState = state as? PostDetailUiState.Success
+    if (successState?.showReplySheet == true) {
+        ModalBottomSheet(
+            onDismissRequest = vm::dismissReply,
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ) {
+            ReplySheet(
+                replyingTo    = successState.replyingTo,
+                content       = successState.replyContent,
+                isSubmitting  = successState.isSubmittingReply,
+                error         = successState.replyError,
+                success       = successState.replySuccess,
+                onContentChange = vm::updateReplyContent,
+                onSubmit      = vm::submitReply,
+                onDismiss     = vm::dismissReply
             )
         }
     }
@@ -188,9 +210,15 @@ fun PostDetailScreen(
 // ─── Post content list ────────────────────────────────────────────────────────
 
 @Composable
-private fun PostContent(s: PostDetailUiState.Success, vm: PostDetailViewModel) {
+private fun PostContent(
+    s: PostDetailUiState.Success,
+    vm: PostDetailViewModel
+) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
-        item { PostBodyCard(s.post) }
+        item { PostBodyCard(
+            post = s.post,
+            onReplyMain = if (s.post.fid.isNotEmpty()) vm::startMainPostReply else null
+        ) }
         item {
             Spacer(Modifier.height(8.dp))
             Surface(
@@ -208,8 +236,11 @@ private fun PostContent(s: PostDetailUiState.Success, vm: PostDetailViewModel) {
         }
         items(s.post.comments) { comment ->
             CommentCard(
-                comment       = comment,
-                onReplyClick  = { vm.showReplies(comment.pid) }
+                comment          = comment,
+                onReplyClick     = { vm.showReplies(comment.pid) },
+                onReplyToComment = if (comment.desktopPage > 0) {
+                    { vm.startReply(comment) }
+                } else null
             )
         }
     }
@@ -218,7 +249,7 @@ private fun PostContent(s: PostDetailUiState.Success, vm: PostDetailViewModel) {
 // ─── Post body card ───────────────────────────────────────────────────────────
 
 @Composable
-private fun PostBodyCard(post: PostDetail) {
+private fun PostBodyCard(post: PostDetail, onReplyMain: (() -> Unit)? = null) {
     Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp),
         shape = RoundedCornerShape(16.dp), color = CardBg, shadowElevation = 4.dp) {
         Column(Modifier.padding(16.dp)) {
@@ -255,6 +286,17 @@ private fun PostBodyCard(post: PostDetail) {
             HorizontalDivider(thickness = 0.5.dp, color = DividerColor)
             Spacer(Modifier.height(12.dp))
             PostBodyWebView(html = post.content)
+            if (onReplyMain != null) {
+                Spacer(Modifier.height(8.dp))
+                HorizontalDivider(thickness = 0.5.dp, color = DividerColor)
+                Spacer(Modifier.height(4.dp))
+                TextButton(
+                    onClick = onReplyMain,
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text("回复主贴", fontSize = 13.sp, color = HupuRed, fontWeight = FontWeight.Medium)
+                }
+            }
             Spacer(Modifier.height(4.dp))
         }
     }
@@ -263,7 +305,11 @@ private fun PostBodyCard(post: PostDetail) {
 // ─── Comment card ─────────────────────────────────────────────────────────────
 
 @Composable
-fun CommentCard(comment: Comment, onReplyClick: (() -> Unit)? = null) {
+fun CommentCard(
+    comment: Comment,
+    onReplyClick: (() -> Unit)? = null,
+    onReplyToComment: (() -> Unit)? = null
+) {
     Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp),
         shape = RoundedCornerShape(12.dp), color = CardBg, shadowElevation = 2.dp) {
         Column(Modifier.padding(12.dp)) {
@@ -306,6 +352,27 @@ fun CommentCard(comment: Comment, onReplyClick: (() -> Unit)? = null) {
                         if (comment.location.isNotEmpty())
                             Text("  ·  ${comment.location}", fontSize = 11.sp, color = TextTertiary)
                         Spacer(Modifier.weight(1f))
+                        if (onReplyToComment != null) {
+                            val dark = isSystemInDarkTheme()
+                            val pillBg = if (dark)
+                                Brush.verticalGradient(listOf(Color(0xFF2A2D3A), Color(0xFF1D2028)))
+                            else
+                                Brush.verticalGradient(listOf(Color.White, Color(0xFFE0E0E0)))
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .shadow(2.dp, RoundedCornerShape(14.dp),
+                                        ambientColor = Color.Black.copy(.12f),
+                                        spotColor    = Color.Black.copy(.12f))
+                                    .background(pillBg, RoundedCornerShape(14.dp))
+                                    .clickable { onReplyToComment() }
+                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text("回复", fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                                    color = TextSecondary)
+                            }
+                            Spacer(Modifier.width(6.dp))
+                        }
                         if (comment.replyCount > 0) {
                             val dark = isSystemInDarkTheme()
                             val pillBg = if (dark)
@@ -346,7 +413,8 @@ private fun SubRepliesSheet(
     isLoading: Boolean,
     canGoBack: Boolean,
     onBack: () -> Unit,
-    onReplyClick: (String) -> Unit
+    onReplyClick: (String) -> Unit,
+    onReplyToComment: ((Comment) -> Unit)? = null
 ) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
         Row(
@@ -381,8 +449,9 @@ private fun SubRepliesSheet(
             ) {
                 items(subReplies) { reply ->
                     CommentCard(
-                        comment      = reply,
-                        onReplyClick = if (reply.replyCount > 0) ({ onReplyClick(reply.pid) }) else null
+                        comment          = reply,
+                        onReplyClick     = if (reply.replyCount > 0) ({ onReplyClick(reply.pid) }) else null,
+                        onReplyToComment = if (reply.desktopPage > 0) onReplyToComment?.let { { it(reply) } } else null
                     )
                 }
                 if (subReplies.size < totalCount) {
@@ -649,5 +718,102 @@ private fun ImageViewerDialog(url: String, onDismiss: () -> Unit) {
                     tint = Color.White, modifier = Modifier.size(20.dp))
             }
         }
+    }
+}
+
+@Composable
+private fun ReplySheet(
+    replyingTo: Comment?,   // null = 回复主贴
+    content: String,
+    isSubmitting: Boolean,
+    error: String?,
+    success: Boolean,
+    onContentChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    LaunchedEffect(success) {
+        if (success) {
+            android.widget.Toast.makeText(context, "回复成功", android.widget.Toast.LENGTH_SHORT).show()
+            onDismiss()
+        }
+    }
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .navigationBarsPadding()
+    ) {
+        Text(
+            if (replyingTo != null) "回复 @${replyingTo.username}" else "回复主贴",
+            fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary
+        )
+        Spacer(Modifier.height(8.dp))
+        // 引用原评论（回复主贴时不显示）
+        if (replyingTo != null) {
+            Surface(color = BgGray, shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    android.text.Html.fromHtml(replyingTo.content, android.text.Html.FROM_HTML_MODE_COMPACT).toString().trim(),
+                    fontSize = 13.sp, color = TextSecondary,
+                    maxLines = 3, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(10.dp)
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+        }
+        OutlinedTextField(
+            value = content,
+            onValueChange = onContentChange,
+            placeholder = { Text("输入回复内容...", color = TextTertiary, fontSize = 14.sp) },
+            modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp),
+            shape = RoundedCornerShape(10.dp),
+            minLines = 3,
+            enabled = !isSubmitting,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = HupuRed,
+                unfocusedBorderColor = DividerColor
+            )
+        )
+        if (error != null) {
+            Spacer(Modifier.height(6.dp))
+            Text(error, fontSize = 12.sp, color = HupuRed)
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            TextButton(onClick = onDismiss, enabled = !isSubmitting) {
+                Text("取消", color = TextSecondary)
+            }
+            Spacer(Modifier.width(8.dp))
+            Button(
+                onClick = onSubmit,
+                enabled = !isSubmitting && content.trim().isNotEmpty(),
+                colors = ButtonDefaults.buttonColors(containerColor = HupuRed),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                if (isSubmitting) {
+                    CircularProgressIndicator(Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                } else {
+                    Text("提交", color = Color.White)
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+    }
+}
+
+private fun buildDesktopReplyUrl(post: PostDetail, comment: Comment): String {
+    val page = comment.desktopPage
+    val pid  = comment.pid
+    return if (page > 0 && post.desktopBaseUrl.isNotEmpty()) {
+        if (page <= 1) {
+            "https://bbs.hupu.com${post.desktopBaseUrl}#$pid"
+        } else {
+            val slug = post.desktopBaseUrl.removePrefix("/").removeSuffix(".html")
+            "https://bbs.hupu.com/post-$slug-$page.html#$pid"
+        }
+    } else {
+        "https://bbs.hupu.com/post-${post.tid}.html"
     }
 }

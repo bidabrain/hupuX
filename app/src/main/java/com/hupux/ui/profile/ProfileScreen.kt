@@ -9,7 +9,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,6 +36,7 @@ fun ProfileScreen(
     onPostsClick: (uid: String) -> Unit = {},
     onRecommendClick: (uid: String) -> Unit = {},
     onZoneClick: (topicId: Int, topicName: String) -> Unit = { _, _ -> },
+    onMessagesClick: () -> Unit = {},
     vm: ProfileViewModel = hiltViewModel()
 ) {
     val state by vm.state.collectAsState()
@@ -67,7 +70,7 @@ fun ProfileScreen(
                     PillButton("重试", onClick = vm::loadProfile)
                 }
             }
-            is ProfileViewModel.State.Success     -> ProfileContent(s.profile, s.followedZones, onPostsClick, onRecommendClick, onZoneClick)
+            is ProfileViewModel.State.Success     -> ProfileContent(s.profile, s.followedZones, onPostsClick, onRecommendClick, onZoneClick, onMessagesClick)
         }
     }
 }
@@ -93,7 +96,8 @@ private fun ProfileContent(
     followedZones: List<Zone>,
     onPostsClick: (uid: String) -> Unit,
     onRecommendClick: (uid: String) -> Unit,
-    onZoneClick: (Int, String) -> Unit
+    onZoneClick: (Int, String) -> Unit,
+    onMessagesClick: () -> Unit
 ) {
     Column(
         Modifier
@@ -189,6 +193,29 @@ private fun ProfileContent(
             Row(Modifier.fillMaxWidth().padding(20.dp), horizontalArrangement = Arrangement.spacedBy(28.dp)) {
                 StatItem("赞", profile.beLightCount.toString())
                 StatItem("声望", profile.reputation.toString())
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+        // 消息入口
+        Surface(
+            Modifier.fillMaxWidth().padding(horizontal = 14.dp),
+            shape = RoundedCornerShape(16.dp), color = CardBg, shadowElevation = 4.dp
+        ) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onMessagesClick)
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Outlined.Notifications, contentDescription = null,
+                    tint = HupuRed, modifier = Modifier.size(22.dp))
+                Spacer(Modifier.width(12.dp))
+                Text("消息", fontSize = 15.sp, fontWeight = FontWeight.Medium,
+                    color = TextPrimary, modifier = Modifier.weight(1f))
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null,
+                    tint = TextTertiary, modifier = Modifier.size(20.dp))
             }
         }
 
