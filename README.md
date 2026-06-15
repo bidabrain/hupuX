@@ -15,7 +15,7 @@
 ### 发现
 - 浏览全部专区分类（篮球、足球、综合等）
 - 进入专区查看帖子列表，支持下拉加载更多
-- **发帖（需要登录）**：进入任意专区后右下角显示发帖按钮，填写标题（4-40字）和正文即可发布到当前专区
+- **发帖（需要登录）**：进入任意专区后右下角显示发帖按钮，填写标题（4-40字）和正文即可发布；支持插图——选图后立即上传（显示进度），上传完成前"发布"按钮保持禁用；可随时点 × 取消
 
 ### 搜索
 - 关键词搜索帖子
@@ -83,6 +83,7 @@
 | 桌面端 SSR（`bbs.hupu.com`） | 登录后帖子评论列表（解析 `__NEXT_DATA__`，每页 20 条） |
 | 桌面端 REST API（`bbs.hupu.com/api/v2/`） | 子回复列表 |
 | 桌面端 REST API（`bbs.hupu.com/pcmapi/`） | 提交回复、发帖 |
+| 虎扑图床 + 阿里云 OSS（`hss.hupu.com` + `*.oss-cn-hangzhou.aliyuncs.com`） | 发帖插图上传（STS 临时凭证直传） |
 | 桌面端 REST API（`my.hupu.com/pcmapi/`） | 个人资料、我的发帖、我的回帖、我的推荐、消息中心（需 Cookie） |
 | 桌面端 HTML（`my.hupu.com`） | 关注专区列表（Jsoup 解析）、消息中心初始数据（解析 `window.$$data`） |
 
@@ -103,6 +104,7 @@ app/src/main/java/com/hupux/
 │   └── scraper/
 │       ├── HupuScraper.kt          # 移动端数据抓取
 │       ├── HupuDesktopScraper.kt   # 桌面端数据抓取（需 Cookie）
+│       ├── HupuImageUploader.kt    # 发帖插图上传（HSS 签名 + OSS 直传）
 │       └── ZoneSlugMap.kt          # 桌面 slug → 移动 topicId 映射表
 ├── di/
 │   └── AppModule.kt    # Hilt 依赖注入模块

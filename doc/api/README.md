@@ -24,6 +24,7 @@ doc/api/
 | 子回复列表 | `/api/v2/reply/reply` | [desktop-api.md §2](desktop-api.md#2-子回复列表) |
 | 点亮/取消点亮回复 | `/pcmapi/pc/bbs/v1/reply/light` | [desktop-api.md §3](desktop-api.md#3-点亮取消点亮回复) |
 | 提交回复 | `/pcmapi/pc/bbs/v1/createReply` | [desktop-api.md §4](desktop-api.md#4-提交回复) |
+| 发帖 | `/pcmapi/pc/bbs/v1/createThread` | [desktop-api.md](desktop-api.md) |
 | 发帖插图（本地图片上传） | `hss.hupu.com/kaleido/hss/*` + 阿里云 OSS | [image-upload.md](image-upload.md) |
 | 转存外链图片 | `/pcapi/all/upload/img` | [image-upload.md](image-upload.md#验证记录) |
 | 用户资料 | `/pcmapi/pc/space/v1/getUserInfo` | [desktop-api.md §1](desktop-api.md#1-用户资料) |
@@ -56,6 +57,12 @@ doc/api/
 → 检查 `/pcmapi/pc/bbs/v1/createReply` 的请求 Body 字段  
 → 重点：`fid`/`topicId` 从 `detail.thread` 获取，确认字段名
 → 在 Chrome DevTools → Network 过滤 `createReply` 查看实际请求
+
+**症状：发帖插图上传失败（三角警告图标）**  
+→ 检查 `hss.hupu.com/kaleido/hss/app/file/credentials` 的响应 code 是否为 `"0"`  
+→ `code:"481"` = 签名非法，通常因为 `sk`/`appId` 常量变了或签名字段排序有误  
+→ `code:"0"` 但 OSS PUT 返回 403 = OSS V1 签名错误，检查 `StringToSign` 格式  
+→ 详见 [image-upload.md](image-upload.md)，`HupuImageUpload` logcat tag 有各步骤日志
 
 **症状：消息页面无数据**  
 → 检查 `window.$$data=` 是否仍然嵌在 HTML 中（页面可能已改为 SPA 不再 SSR）  

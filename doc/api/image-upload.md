@@ -123,17 +123,35 @@ Header: x-oss-security-token: <token>
 Body:   <图片二进制>
 ```
 
-这是**标准阿里云 OSS PutObject**。Android 端**直接用官方 SDK** 即可，不用手写签名：
+这是**标准阿里云 OSS PutObject**。可以用 OkHttp 手动构造请求，**不需要额外引入阿里云 SDK**：
 
-```gradle
-implementation("com.aliyun.dpa:oss-android-sdk:2.9.19")
+OSS V1 签名格式（`PutObject` 仅需以下几个字段）：
+
 ```
+StringToSign = "PUT\n\n<Content-Type>\n<Date>\nx-oss-security-token:<token>\n/<bucket>/<objectKey>"
+Authorization = "OSS <accessKey>:" + Base64(HmacSHA1(StringToSign, secretKey))
+```
+
+- `Date`：RFC 1123 格式 GMT 时间，与请求 `Date` header 保持一致
+- `x-oss-security-token` 是唯一的 `x-oss-*` header，排在 CanonicalizedOSSHeaders 里
+- `HmacSHA1` 和 `Base64` 均复用 `hss_sign` 里的工具函数，无需新依赖
+
 ```kotlin
-val cred = OSSStsTokenCredentialProvider(accessKey, secretKey, token)
-val oss = OSSClient(ctx, "https://oss-cn-hangzhou.aliyuncs.com", cred)
-oss.putObject(PutObjectRequest(bucket, objectKey, imageBytes).apply {
-    metadata = ObjectMetadata().apply { contentType = "image/jpeg" }
-})
+// OkHttp PUT，不依赖阿里云 SDK
+val date = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss 'GMT'", Locale.US)
+    .also { it.timeZone = TimeZone.getTimeZone("GMT") }.format(Date())
+val stringToSign = "PUT\n\n$contentType\n$date\nx-oss-security-token:$token\n/$bucket/$objectKey"
+val auth = "OSS $accessKey:${hmacSha1Base64(stringToSign, secretKey)}"
+
+client.newCall(Request.Builder()
+    .url("https://$bucket.oss-cn-hangzhou.aliyuncs.com/$objectKey")
+    .header("Date", date)
+    .header("Content-Type", contentType)
+    .header("x-oss-security-token", token)
+    .header("Authorization", auth)
+    .put(bytes.toRequestBody(contentType.toMediaType()))
+    .build()
+).execute().close()
 ```
 
 > 若凭证响应 `status != "processing"`，说明该 MD5 已被上传过（服务端去重），跳过 PUT，直接用响应里的 `fileSrc`。
@@ -148,7 +166,7 @@ Header: Content-Type: application/json
         Cookie: <登录cookie>
 Body:   {"fileHash":"<md5>"}
 ```
-响应里取 `data.data.fileSrc`，即最终图片地址：
+响应里取 `data.fileSrc`，即最终图片地址：
 ```
 https://i6.hoopchina.com.cn/editor/<md5>_w_<W>_h_<H>_.jpeg
 ```
@@ -172,6 +190,19 @@ PC 编辑器把图片节点序列化为（`renderHTML`）：
 发帖接口见 [desktop-api.md](desktop-api.md) / `HupuDesktopScraper.createThread`。
 
 ---
+
+## Android 实现说明
+
+完整实现见 `app/src/main/java/com/hupux/data/scraper/HupuImageUploader.kt`。
+
+- **图片读取**：通过 `ContentResolver.openInputStream(uri)` 读取字节；`BitmapFactory.Options.inJustDecodeBounds` 仅解码头部取宽高，不加载全图
+- **MD5**：`java.security.MessageDigest.getInstance("MD5")`
+- **HMAC-SHA1**：`javax.crypto.Mac`（复用于 `hss_sign` 和 OSS V1 签名）
+- **Base64**：`android.util.Base64`
+- **OSS PUT**：OkHttp，无额外依赖
+- **图片选择**：`ActivityResultContracts.PickVisualMedia`（Android 13+ 系统相册，无需 READ 权限）
+- **上传时机**：用户选图后立即开始上传（eager），完成前"发布"按钮保持禁用
+- **取消**：ViewModel 持有每张图的 `Job`，删除缩略图时调用 `Job.cancel()`
 
 ## 验证记录
 

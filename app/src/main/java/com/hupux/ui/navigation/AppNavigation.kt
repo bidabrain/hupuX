@@ -267,10 +267,7 @@ fun AppNavigation() {
                         back.arguments!!.getString("zoneName") ?: "", "UTF-8"
                     ),
                     onBack        = { navController.popBackStack() },
-                    onPostSuccess = { tid ->
-                        navController.popBackStack()
-                        navController.navigate("post/$tid")
-                    }
+                    onPostSuccess = { navController.popBackStack() }
                 )
             }
             composable(

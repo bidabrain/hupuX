@@ -1,9 +1,11 @@
 package com.hupux.data.repository
 
+import android.net.Uri
 import com.hupux.data.local.CookiePreferences
 import com.hupux.data.model.Comment
 import com.hupux.data.model.PostDetail
 import com.hupux.data.scraper.HupuDesktopScraper
+import com.hupux.data.scraper.HupuImageUploader
 import com.hupux.data.scraper.HupuScraper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -14,7 +16,8 @@ import javax.inject.Singleton
 class PostRepository @Inject constructor(
     private val scraper: HupuScraper,
     private val desktopScraper: HupuDesktopScraper,
-    private val cookiePrefs: CookiePreferences
+    private val cookiePrefs: CookiePreferences,
+    private val imageUploader: HupuImageUploader
 ) {
     suspend fun getPost(tid: String): PostDetail = withContext(Dispatchers.IO) {
         val post = scraper.fetchPost(tid)
@@ -51,6 +54,9 @@ class PostRepository @Inject constructor(
         withContext(Dispatchers.IO) {
             desktopScraper.createThread(topicId, title, content)
         }
+
+    suspend fun uploadImage(uri: Uri): String =
+        withContext(Dispatchers.IO) { imageUploader.upload(uri) }
 
     suspend fun submitReply(
         tid: String, fid: String, topicId: String,
