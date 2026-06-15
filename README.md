@@ -2,7 +2,7 @@
 
 一个用 Jetpack Compose 编写的虎扑第三方 Android 客户端，界面简洁、无广告、无推送骚扰。
 ---
-![截图](screenshot.png)
+<img src="screenshot.png" width="600" alt="首页截图">
 ---
 
 ## 功能
