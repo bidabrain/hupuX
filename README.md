@@ -1,7 +1,8 @@
 # 虎扑 X
 
 一个用 Jetpack Compose 编写的虎扑第三方 Android 客户端，界面简洁、无广告、无推送骚扰。
-
+---
+![截图](screenshot.png)
 ---
 
 ## 功能
