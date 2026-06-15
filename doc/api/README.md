@@ -8,7 +8,8 @@
 doc/api/
 ├── README.md          本文件，索引和维护指南
 ├── mobile-api.md      移动版 API（m.hupu.com）
-└── desktop-api.md     桌面版 API（bbs.hupu.com + my.hupu.com）
+├── desktop-api.md     桌面版 API（bbs.hupu.com + my.hupu.com）
+└── image-upload.md    发帖插图 / 图片上传（hss.hupu.com + 阿里云 OSS）
 ```
 
 ## 快速索引
@@ -23,6 +24,8 @@ doc/api/
 | 子回复列表 | `/api/v2/reply/reply` | [desktop-api.md §2](desktop-api.md#2-子回复列表) |
 | 点亮/取消点亮回复 | `/pcmapi/pc/bbs/v1/reply/light` | [desktop-api.md §3](desktop-api.md#3-点亮取消点亮回复) |
 | 提交回复 | `/pcmapi/pc/bbs/v1/createReply` | [desktop-api.md §4](desktop-api.md#4-提交回复) |
+| 发帖插图（本地图片上传） | `hss.hupu.com/kaleido/hss/*` + 阿里云 OSS | [image-upload.md](image-upload.md) |
+| 转存外链图片 | `/pcapi/all/upload/img` | [image-upload.md](image-upload.md#验证记录) |
 | 用户资料 | `/pcmapi/pc/space/v1/getUserInfo` | [desktop-api.md §1](desktop-api.md#1-用户资料) |
 | 我的回帖 | `/pcmapi/pc/space/v1/getReplyList` | [desktop-api.md §2](desktop-api.md#2-我的回帖列表) |
 | 我的推荐 | `/pcmapi/pc/space/v1/getRecommendList` | [desktop-api.md §3](desktop-api.md#3-我的推荐帖列表) |
