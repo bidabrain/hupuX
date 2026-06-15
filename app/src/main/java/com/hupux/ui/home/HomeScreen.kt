@@ -1,5 +1,8 @@
 package com.hupux.ui.home
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -50,6 +53,14 @@ fun HomeScreen(
     val recommendListState = rememberLazyListState()
     val followedListState  = rememberLazyListState()
 
+    // 当前 tab 对应的列表滚动到顶附近时才显示 header
+    val headerVisible by remember {
+        derivedStateOf {
+            val listState = if (state.selectedTab == 0) recommendListState else followedListState
+            listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset < 150
+        }
+    }
+
     // 触发器递增时滚到当前分页面顶部
     LaunchedEffect(scrollToTopTrigger) {
         if (scrollToTopTrigger > 0) {
@@ -61,43 +72,49 @@ fun HomeScreen(
     Column(Modifier.fillMaxSize().background(AppBg)) {
 
         // ── Header card ───────────────────────────────────────────
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(listOf(HupuRed, Color(0xFFCC000E))),
-                    RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
-                )
-                .statusBarsPadding()
+        AnimatedVisibility(
+            visible = headerVisible,
+            enter = expandVertically(animationSpec = tween(700)),
+            exit  = shrinkVertically(animationSpec = tween(700))
         ) {
-            Column {
-                // Logo row
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(52.dp)
-                        .padding(horizontal = 20.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("虎扑", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold,
-                        color = Color.White)
-                    Spacer(Modifier.weight(1f))
-                    IconButton(onClick = onSettingsClick) {
-                        Icon(Icons.Outlined.Settings, contentDescription = "设置", tint = Color.White)
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(listOf(HupuRed, Color(0xFFCC000E))),
+                        RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
+                    )
+                    .statusBarsPadding()
+            ) {
+                Column {
+                    // Logo row
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(52.dp)
+                            .padding(horizontal = 20.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("虎扑", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold,
+                            color = Color.White)
+                        Spacer(Modifier.weight(1f))
+                        IconButton(onClick = onSettingsClick) {
+                            Icon(Icons.Outlined.Settings, contentDescription = "设置", tint = Color.White)
+                        }
                     }
-                }
 
-                // Banner
-                if (state.bannerPosts.isNotEmpty()) {
-                    NewsBanner(state.bannerPosts, onPostClick)
-                } else if (state.isLoading) {
-                    Box(Modifier.fillMaxWidth().height(220.dp)
-                        .background(Color.White.copy(alpha = 0.1f)))
-                }
+                    // Banner
+                    if (state.bannerPosts.isNotEmpty()) {
+                        NewsBanner(state.bannerPosts, onPostClick)
+                    } else if (state.isLoading) {
+                        Box(Modifier.fillMaxWidth().height(220.dp)
+                            .background(Color.White.copy(alpha = 0.1f)))
+                    }
 
-                // Plastic tabs
-                PlasticTabRow(state.selectedTab, followedCount, vm::selectTab)
-                Spacer(Modifier.height(12.dp))
+                    // Plastic tabs
+                    PlasticTabRow(state.selectedTab, followedCount, vm::selectTab)
+                    Spacer(Modifier.height(12.dp))
+                }
             }
         }
 
