@@ -7,11 +7,37 @@ import android.graphics.PixelFormat
 import android.graphics.drawable.Drawable
 import android.text.Html
 import android.text.method.LinkMovementMethod
+import android.content.Intent
+import android.os.Handler
+import android.os.Looper
+import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.TextPaint
+import android.text.style.ClickableSpan
+import android.text.style.ImageSpan
+import android.view.View
+import android.webkit.JavascriptInterface
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.TextView
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import coil.imageLoader
 import coil.request.ImageRequest
 import java.lang.ref.WeakReference
+import org.jsoup.Jsoup
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -46,6 +72,9 @@ import com.hupux.data.model.PostDetail
 import com.hupux.ui.home.PillButton
 import com.hupux.ui.theme.*
 
+// 图片点击回调，由 PostDetailScreen 提供，HtmlText 和 PostBodyWebView 消费
+private val LocalImageClick = staticCompositionLocalOf<(String) -> Unit> { {} }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PostDetailScreen(
@@ -55,6 +84,13 @@ fun PostDetailScreen(
     LaunchedEffect(tid) { vm.load(tid) }
     val state by vm.state.collectAsState()
     val s = state as? PostDetailUiState.Success
+
+    var viewerUrl by remember { mutableStateOf<String?>(null) }
+
+    CompositionLocalProvider(LocalImageClick provides { url ->
+        val full = if (url.startsWith("//")) "https:$url" else url
+        viewerUrl = full
+    }) {
 
     Column(Modifier.fillMaxSize().background(AppBg)) {
         // ── Top bar ───────────────────────────────────────────────
@@ -76,6 +112,18 @@ fun PostDetailScreen(
                     color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f))
                 if (s != null) {
+                    val context = LocalContext.current
+                    IconButton(onClick = {
+                        val url = "https://m.hupu.com/bbs/${s.post.tid}.html"
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TITLE, s.post.title)
+                            putExtra(Intent.EXTRA_TEXT, "${s.post.title}\n$url")
+                        }
+                        context.startActivity(Intent.createChooser(intent, "分享到"))
+                    }) {
+                        Icon(Icons.Default.Share, contentDescription = "分享", tint = Color.White)
+                    }
                     IconButton(onClick = vm::toggleFavorite) {
                         Icon(
                             if (s.isFavorite) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
@@ -127,6 +175,13 @@ fun PostDetailScreen(
                 onReplyClick  = vm::showReplies
             )
         }
+    }
+
+    } // end CompositionLocalProvider
+
+    // ── 全屏图片查看器 ────────────────────────────────────────────
+    viewerUrl?.let { url ->
+        ImageViewerDialog(url = url, onDismiss = { viewerUrl = null })
     }
 }
 
@@ -199,7 +254,7 @@ private fun PostBodyCard(post: PostDetail) {
             Spacer(Modifier.height(14.dp))
             HorizontalDivider(thickness = 0.5.dp, color = DividerColor)
             Spacer(Modifier.height(12.dp))
-            HtmlText(html = post.content)
+            PostBodyWebView(html = post.content)
             Spacer(Modifier.height(4.dp))
         }
     }
@@ -239,12 +294,12 @@ fun CommentCard(comment: Comment, onReplyClick: (() -> Unit)? = null) {
                                 Text("@${comment.quoteUsername}", fontSize = 12.sp,
                                     color = HupuRed, fontWeight = FontWeight.Medium)
                                 Spacer(Modifier.height(2.dp))
-                                HtmlText(html = quote)
+                                HtmlText(html = quote, imageScale = 0.125f)
                             }
                         }
                         Spacer(Modifier.height(6.dp))
                     }
-                    HtmlText(html = comment.content)
+                    HtmlText(html = comment.content, imageScale = 0.125f)
                     Spacer(Modifier.height(6.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(comment.time, fontSize = 11.sp, color = TextTertiary)
@@ -349,9 +404,10 @@ private fun SubRepliesSheet(
 // ─── HtmlText ─────────────────────────────────────────────────────────────────
 
 @Composable
-fun HtmlText(html: String, modifier: Modifier = Modifier) {
-    val textColor = TextPrimary.toArgb()
-    val context   = LocalContext.current
+fun HtmlText(html: String, imageScale: Float = 1.0f, modifier: Modifier = Modifier) {
+    val textColor    = TextPrimary.toArgb()
+    val context      = LocalContext.current
+    val onImageClick = LocalImageClick.current
     AndroidView(
         factory = { ctx ->
             TextView(ctx).apply {
@@ -362,11 +418,42 @@ fun HtmlText(html: String, modifier: Modifier = Modifier) {
             }
         },
         update = { tv ->
-            val getter = CoilImageGetter(context, WeakReference(tv), (tv.textSize * 1.3f).toInt())
-            tv.text = Html.fromHtml(html, Html.FROM_HTML_MODE_COMPACT, getter, null)
+            val processedHtml = fixLazyImages(html)
+            val getter  = CoilImageGetter(context, WeakReference(tv), imageScale)
+            val spanned = Html.fromHtml(processedHtml, Html.FROM_HTML_MODE_COMPACT, getter, null)
+            // 给每个 ImageSpan 叠加 ClickableSpan，实现点击大图
+            val sb = SpannableStringBuilder(spanned)
+            sb.getSpans(0, sb.length, ImageSpan::class.java).forEach { imgSpan ->
+                val start = sb.getSpanStart(imgSpan)
+                val end   = sb.getSpanEnd(imgSpan)
+                val src   = imgSpan.source?.let { if (it.startsWith("//")) "https:$it" else it }
+                    ?: return@forEach
+                sb.setSpan(object : ClickableSpan() {
+                    override fun onClick(widget: View) { onImageClick(src) }
+                    override fun updateDrawState(ds: TextPaint) {} // 不改变样式
+                }, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+            tv.text = sb
         },
         modifier = modifier.fillMaxWidth()
     )
+}
+
+// 将懒加载属性 data-src / data-original 替换为 src，使 Html.fromHtml 能找到图片 URL
+private fun fixLazyImages(html: String): String {
+    if (!html.contains("<img", ignoreCase = true)) return html
+    return try {
+        val doc = Jsoup.parseBodyFragment(html)
+        doc.select("img").forEach { img ->
+            val actual = img.attr("data-src").takeIf { it.isNotEmpty() }
+                ?: img.attr("data-original").takeIf { it.isNotEmpty() }
+                ?: img.attr("data-lazy-src").takeIf { it.isNotEmpty() }
+            if (actual != null) img.attr("src", actual)
+        }
+        doc.body().html()
+    } catch (_: Exception) {
+        html
+    }
 }
 
 // ─── Coil-backed ImageGetter for inline <img> in HTML ────────────────────────
@@ -374,22 +461,31 @@ fun HtmlText(html: String, modifier: Modifier = Modifier) {
 private class CoilImageGetter(
     private val context: Context,
     private val tvRef: WeakReference<TextView>,
-    private val sizePx: Int
+    private val imageScale: Float = 1.0f
 ) : Html.ImageGetter {
 
     override fun getDrawable(source: String): Drawable {
         val url = if (source.startsWith("//")) "https:$source" else source
         val wrap = WrapDrawable()
-        wrap.setBounds(0, 0, sizePx, sizePx)
+        wrap.setBounds(0, 0, 1, 1)
 
         context.imageLoader.enqueue(
             ImageRequest.Builder(context)
                 .data(url)
+                .allowHardware(false) // hardware bitmap 无法在 TextView 软件 Canvas 上绘制
                 .target { result ->
-                    result.setBounds(0, 0, sizePx, sizePx)
+                    val tv = tvRef.get() ?: return@target
+                    val availW = tv.width - tv.paddingLeft - tv.paddingRight
+                    val baseW = if (availW > 0) availW
+                                else context.resources.displayMetrics.widthPixels - 64
+                    val maxW = (baseW * imageScale).toInt().coerceAtLeast(1)
+                    val iw = result.intrinsicWidth.coerceAtLeast(1)
+                    val ih = result.intrinsicHeight.coerceAtLeast(1)
+                    val dh = (ih.toFloat() / iw * maxW).toInt().coerceAtLeast(1)
+                    result.setBounds(0, 0, maxW, dh)
                     wrap.inner = result
-                    // 重新赋值触发 TextView 重绘
-                    tvRef.get()?.let { tv -> tv.text = tv.text }
+                    wrap.setBounds(0, 0, maxW, dh)
+                    tv.text = tv.text
                 }
                 .build()
         )
@@ -403,5 +499,155 @@ private class CoilImageGetter(
         override fun setColorFilter(cf: ColorFilter?)    { inner?.colorFilter = cf }
         @Deprecated("Deprecated in Java")
         override fun getOpacity() = PixelFormat.TRANSPARENT
+        override fun getIntrinsicWidth()  = bounds.width()
+        override fun getIntrinsicHeight() = bounds.height()
+    }
+}
+
+// ─── WebView renderer for post body (handles images + <video>) ────────────────
+
+@Composable
+private fun PostBodyWebView(html: String, modifier: Modifier = Modifier) {
+    // heightState 作为稳定引用供 JS 接口捕获
+    val heightState  = remember { mutableStateOf(200.dp) }
+    var heightDp by heightState
+    val isDark       = isSystemInDarkTheme()
+    val textHex      = if (isDark) "#EBEBF0" else "#1A1A2E"
+    val bgColor      = CardBg.toArgb()
+    val onImageClick = LocalImageClick.current
+    // 用 holder 稳定引用最新的回调（factory 只运行一次）
+    val clickRef = remember { object { var fn: (String) -> Unit = {} } }
+    clickRef.fn  = onImageClick
+
+    AndroidView(
+        factory = { ctx ->
+            WebView(ctx).apply {
+                setBackgroundColor(bgColor)
+                isScrollContainer = false
+                isVerticalScrollBarEnabled = false
+                settings.apply {
+                    javaScriptEnabled = true
+                    useWideViewPort = true
+                    loadWithOverviewMode = true
+                    setSupportZoom(false)
+                    displayZoomControls = false
+                    mediaPlaybackRequiresUserGesture = true
+                }
+                // JS → Kotlin 回调
+                addJavascriptInterface(object : Any() {
+                    @JavascriptInterface
+                    fun onHeight(cssPx: Int) {
+                        Handler(Looper.getMainLooper()).post {
+                            val h = cssPx.dp + 24.dp
+                            if (h > heightState.value) heightState.value = h
+                        }
+                    }
+                    @JavascriptInterface
+                    fun onImgClick(rawUrl: String) {
+                        val url = if (rawUrl.startsWith("//")) "https:$rawUrl" else rawUrl
+                        if (url.isNotEmpty()) Handler(Looper.getMainLooper()).post { clickRef.fn(url) }
+                    }
+                }, "App")
+                // 阻止 WebView 内部跳转
+                webViewClient = object : WebViewClient() {
+                    override fun shouldOverrideUrlLoading(view: WebView, url: String) = true
+                }
+            }
+        },
+        update = { wv ->
+            // 注入 JS：ResizeObserver + 每张图片 load/error 事件 → 精准上报高度
+            val heightScript = """<script>
+(function(){
+  function report(){
+    var h=Math.max(document.body.scrollHeight||0,
+                   document.documentElement.scrollHeight||0,
+                   document.body.offsetHeight||0);
+    if(h>10) App.onHeight(h);
+  }
+  if(typeof ResizeObserver!=='undefined'){
+    new ResizeObserver(report).observe(document.body);
+  }
+  document.querySelectorAll('img').forEach(function(img){
+    img.addEventListener('load', report);
+    img.addEventListener('error', report);
+    img.style.cursor='pointer';
+    img.addEventListener('click', function(e){
+      e.stopPropagation();
+      var url=img.getAttribute('src')||img.getAttribute('data-src')||'';
+      if(url) App.onImgClick(url);
+    });
+  });
+  [0,200,600,1500,3500].forEach(function(t){ setTimeout(report,t); });
+})();
+</script>"""
+            val page = """<!DOCTYPE html><html><head>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<style>
+body{background:transparent;color:$textHex;font-size:15px;line-height:1.65;
+     margin:0;padding:0;word-break:break-word}
+p{margin:6px 0}a{color:#EA0E20}
+img{max-width:100%;height:auto;display:block;margin:8px 0;border-radius:4px}
+.img-grid{display:flex;flex-wrap:wrap;gap:4px;margin:8px 0}
+.img-grid img{width:calc(33.33% - 3px);height:auto;border-radius:4px;
+              display:block;flex-shrink:0;object-fit:contain;max-width:none;margin:0}
+video{width:100%;height:auto;border-radius:4px;margin:8px 0;display:block}
+</style></head><body>$html$heightScript</body></html>"""
+            wv.loadDataWithBaseURL("https://m.hupu.com/", page, "text/html", "UTF-8", null)
+        },
+        modifier = modifier.fillMaxWidth().height(heightDp)
+    )
+}
+
+// ─── 全屏图片查看器 ───────────────────────────────────────────────────────────
+
+@Composable
+private fun ImageViewerDialog(url: String, onDismiss: () -> Unit) {
+    var scale  by remember { mutableStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+    val transformState = rememberTransformableState { zoomChange, panChange, _ ->
+        scale = (scale * zoomChange).coerceIn(1f, 8f)
+        offset = if (scale > 1f) offset + panChange else Offset.Zero
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+        ) {
+            AsyncImage(
+                model = coil.request.ImageRequest.Builder(LocalContext.current)
+                    .data(url)
+                    .crossfade(false)
+                    .build(),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { scaleX = scale; scaleY = scale
+                                     translationX = offset.x; translationY = offset.y }
+                    .transformable(state = transformState)
+                    // 未放大时单击关闭
+                    .clickable(enabled = scale <= 1.05f, onClick = onDismiss)
+            )
+
+            // 关闭按钮
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(12.dp)
+                    .size(36.dp)
+                    .background(Color.Black.copy(0.55f), CircleShape)
+                    .clickable(onClick = onDismiss),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Filled.Close, contentDescription = "关闭",
+                    tint = Color.White, modifier = Modifier.size(20.dp))
+            }
+        }
     }
 }

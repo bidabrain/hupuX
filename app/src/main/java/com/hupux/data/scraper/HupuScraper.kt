@@ -6,6 +6,7 @@ import com.google.gson.JsonParser
 import com.hupux.data.model.*
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.jsoup.Jsoup
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -150,7 +151,14 @@ class HupuScraper @Inject constructor(private val client: OkHttpClient) {
         val modules = threadData.obj("moduleConfigList")
 
         val title = modules?.obj("title")?.obj("moduleContent")?.str("title") ?: ""
-        val content = modules?.obj("content")?.obj("moduleContent")?.str("content") ?: ""
+        val rawText = modules?.obj("content")?.obj("moduleContent")?.str("content") ?: ""
+        // 先把 JSON 正文里的懒加载属性 data-src/data-original 修复为 src
+        val textContent = fixLazyImages(rawText)
+        // 若 JSON 正文已含图片，直接用（精确）；否则才从整页 HTML 提取（兜底，可能有杂图）
+        val content = if (textContent.contains("<img", ignoreCase = true))
+            textContent
+        else
+            textContent + extractMediaHtml(html)
 
         val userMod = modules?.obj("user")?.obj("moduleContent")
         val author = userMod?.str("name") ?: ""
@@ -217,6 +225,88 @@ class HupuScraper @Inject constructor(private val client: OkHttpClient) {
             )
         }
     }
+
+    /**
+     * 修复 JSON content 字段里的图片格式：
+     * 1. 懒加载属性 data-src / data-original → src
+     * 2. hupu 自定义格式 <center class="hupu-img" src="..."> → 标准 <img src="...">
+     */
+    private fun fixLazyImages(html: String): String {
+        if (!html.contains("img", ignoreCase = true)) return html
+        return try {
+            val doc = Jsoup.parseBodyFragment(html)
+            // 标准懒加载
+            doc.select("img").forEach { img ->
+                val actual = img.attr("data-src").takeIf { it.isNotEmpty() }
+                    ?: img.attr("data-original").takeIf { it.isNotEmpty() }
+                    ?: img.attr("data-lazy-src").takeIf { it.isNotEmpty() }
+                if (actual != null) img.attr("src", actual)
+            }
+            // hupu 自定义图片节点：<center class="hupu-img" src="..."> → <img src="...">
+            doc.select("center.hupu-img, [data-hupu-node='image'] center").forEach { center ->
+                val src = center.attr("src").takeIf { it.isNotEmpty() }
+                    ?: center.attr("data_url").takeIf { it.isNotEmpty() }
+                    ?: center.attr("data-origin").takeIf { it.isNotEmpty() }
+                    ?: return@forEach
+                center.before("""<img src="${src.replace("\"", "&quot;")}">""")
+                center.remove()
+            }
+            doc.body().html()
+        } catch (_: Exception) { html }
+    }
+
+    /**
+     * 兜底：从整页 HTML 提取正文图片/视频。
+     * 只取带 data-src/data-original 的懒加载图片——静态 UI 图（logo、icon）不用懒加载，
+     * 这样能大幅减少误抓推荐区、热榜区等无关图片。
+     */
+    private fun extractMediaHtml(pageHtml: String): String = try {
+        val doc = Jsoup.parse(pageHtml)
+        // 移除已知非正文区块
+        doc.select("header, nav, footer, script, style, noscript").remove()
+        doc.select("[class*='reply' i],[class*='comment' i],[class*='Reply' i],[class*='Comment' i]").remove()
+        doc.select("[class*='tab' i],[class*='toolbar' i],[class*='Toolbar' i]").remove()
+        doc.select("[class*='relate' i],[class*='recommend' i],[class*='hot' i]").remove()
+        doc.select("[class*='aside' i],[class*='sidebar' i],[class*='banner' i]").remove()
+
+        val imgUrls = mutableListOf<String>()
+        val videoUrls = mutableListOf<String>()
+
+        // 选所有 img，但跳过在 <li>/<ul> 里的（相关推荐缩略图通常在列表结构中）
+        doc.select("img").forEach { img ->
+            if (img.parents().any { it.tagName() in listOf("li", "ul") }) return@forEach
+            val src = img.attr("data-src").takeIf { it.isNotEmpty() }
+                ?: img.attr("data-original").takeIf { it.isNotEmpty() }
+                ?: img.attr("src").takeIf { it.isNotEmpty() }
+                ?: return@forEach
+            val url = if (src.startsWith("//")) "https:$src" else src
+            if (!url.startsWith("http") || url.startsWith("data:")) return@forEach
+            val lower = url.lowercase()
+            if (listOf("avatar", "head_img", "default_head", "logo", "placeholder", ".svg",
+                        "/user/")          // 用户头像 URL 路径
+                    .any { lower.contains(it) }) return@forEach
+            imgUrls.add(url)
+        }
+
+        // video 标签
+        doc.select("video").forEach { video ->
+            val src = video.attr("src").takeIf { it.isNotEmpty() }
+                ?: video.selectFirst("source")?.attr("src")
+                ?: return@forEach
+            videoUrls.add(if (src.startsWith("//")) "https:$src" else src)
+        }
+
+        val sb = StringBuilder()
+        if (imgUrls.isNotEmpty()) {
+            sb.append("""<div class="img-grid">""")
+            imgUrls.forEach { url -> sb.append("""<img src="$url">""") }
+            sb.append("</div>")
+        }
+        videoUrls.forEach { url ->
+            sb.append("""<video controls><source src="$url"></video>""")
+        }
+        sb.toString()
+    } catch (_: Exception) { "" }
 
     private fun parseComment(o: JsonObject): Comment {
         val user = o.obj("user")

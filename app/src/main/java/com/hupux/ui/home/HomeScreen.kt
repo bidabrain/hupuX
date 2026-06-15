@@ -7,7 +7,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -39,10 +41,22 @@ import kotlinx.coroutines.delay
 fun HomeScreen(
     onPostClick: (String) -> Unit,
     onSettingsClick: () -> Unit = {},
+    scrollToTopTrigger: Int = 0,
     vm: HomeViewModel = hiltViewModel()
 ) {
     val state         by vm.state.collectAsState()
     val followedCount by vm.followedCount.collectAsState()
+
+    val recommendListState = rememberLazyListState()
+    val followedListState  = rememberLazyListState()
+
+    // 触发器递增时滚到当前分页面顶部
+    LaunchedEffect(scrollToTopTrigger) {
+        if (scrollToTopTrigger > 0) {
+            if (state.selectedTab == 0) recommendListState.animateScrollToItem(0)
+            else                        followedListState.animateScrollToItem(0)
+        }
+    }
 
     Column(Modifier.fillMaxSize().background(AppBg)) {
 
@@ -101,7 +115,8 @@ fun HomeScreen(
                     PillButton("重试", onClick = vm::loadRecommend)
                 }
                 state.selectedTab == 0 -> LazyColumn(
-                    Modifier.fillMaxSize(),
+                    state = recommendListState,
+                    modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(top = 12.dp, bottom = 8.dp)
                 ) {
                     items(state.recommendPosts, key = { it.tid }) { post ->
@@ -109,7 +124,7 @@ fun HomeScreen(
                     }
                 }
                 else -> FollowedFeed(state.followedPosts, state.isLoadingFollow,
-                    vm::loadFollowedFeed, onPostClick)
+                    vm::loadFollowedFeed, onPostClick, listState = followedListState)
             }
         }
     }
@@ -198,13 +213,13 @@ private fun PlasticTabRow(selectedIndex: Int, followedCount: Int, onSelect: (Int
                     .shadow(if (sel) 6.dp else 2.dp, RoundedCornerShape(18.dp),
                         ambientColor = Color.Black.copy(.25f), spotColor = Color.Black.copy(.25f))
                     .background(
-                        if (sel) Brush.verticalGradient(listOf(Color(0xFFFF3B4C), Color(0xFFBB0012)))
-                        else unselectedBrush,
+                        if (sel) unselectedBrush
+                        else Brush.verticalGradient(listOf(Color(0xFFFF3B4C), Color(0xFFBB0012))),
                         RoundedCornerShape(18.dp))
                     .clickable { onSelect(i) }
             ) {
                 Text(label, fontSize = 14.sp, fontWeight = FontWeight.Bold,
-                    color = if (sel) Color.White else TextSecondary, letterSpacing = 0.5.sp)
+                    color = if (sel) TextSecondary else Color.White, letterSpacing = 0.5.sp)
             }
         }
     }
@@ -215,7 +230,8 @@ private fun PlasticTabRow(selectedIndex: Int, followedCount: Int, onSelect: (Int
 @Composable
 private fun FollowedFeed(
     posts: List<Post>, isLoading: Boolean,
-    onRefresh: () -> Unit, onPostClick: (String) -> Unit
+    onRefresh: () -> Unit, onPostClick: (String) -> Unit,
+    listState: LazyListState = rememberLazyListState()
 ) {
     when {
         isLoading -> Box(Modifier.fillMaxSize(), Alignment.Center) {
@@ -232,7 +248,7 @@ private fun FollowedFeed(
                 PillButton("刷新", onClick = onRefresh)
             }
         }
-        else -> LazyColumn(Modifier.fillMaxSize(),
+        else -> LazyColumn(state = listState, modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(top = 12.dp, bottom = 8.dp)) {
             item {
                 Row(Modifier.padding(horizontal = 18.dp, vertical = 4.dp),

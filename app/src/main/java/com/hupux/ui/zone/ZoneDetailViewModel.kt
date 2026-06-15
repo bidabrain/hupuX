@@ -71,12 +71,15 @@ class ZoneDetailViewModel @Inject constructor(private val repo: ZoneRepository) 
     fun loadMore() {
         val cursor = _state.value.nextCursor ?: return
         if (_state.value.isLoadingMore) return
+        // 同步置位，防止协程启动前多次调用都通过检查
+        _state.value = _state.value.copy(isLoadingMore = true)
         viewModelScope.launch {
-            _state.value = _state.value.copy(isLoadingMore = true)
             runCatching { repo.getZonePosts(topicId, cursor) }
                 .onSuccess { page ->
+                    val existing = _state.value.allPosts.map { it.tid }.toHashSet()
+                    val newPosts = page.posts.filter { it.tid !in existing }
                     _state.value = _state.value.copy(
-                        allPosts      = _state.value.allPosts + page.posts,
+                        allPosts      = _state.value.allPosts + newPosts,
                         nextCursor    = page.nextCursor,
                         isLoadingMore = false
                     )

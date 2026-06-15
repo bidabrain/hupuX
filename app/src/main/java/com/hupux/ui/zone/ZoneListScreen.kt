@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -33,11 +34,17 @@ import com.hupux.ui.theme.*
 @Composable
 fun ZoneListScreen(
     onZoneClick: (Int, String) -> Unit,
+    scrollToTopTrigger: Int = 0,
     vm: ZoneListViewModel = hiltViewModel()
 ) {
     val state       by vm.state.collectAsState()
     val followedIds by vm.followedIds.collectAsState()
     val followed    by vm.followedZones.collectAsState()
+
+    val listState = rememberLazyListState()
+    LaunchedEffect(scrollToTopTrigger) {
+        if (scrollToTopTrigger > 0) listState.animateScrollToItem(0)
+    }
 
     Column(Modifier.fillMaxSize().background(AppBg)) {
         // ── Header ───────────────────────────────────────────────
@@ -74,7 +81,7 @@ fun ZoneListScreen(
                     val hotCat   = s.categories.firstOrNull { it.categoryId == 0 }
                     val otherCat = s.categories.filter { it.categoryId != 0 }
 
-                    LazyColumn(Modifier.fillMaxSize(),
+                    LazyColumn(state = listState, modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(bottom = 16.dp)) {
 
                         // ── 我的关注 ─────────────────────────────

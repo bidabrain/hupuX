@@ -134,7 +134,7 @@ fun ZoneDetailScreen(
                 }
                 else -> LazyColumn(Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(bottom = 16.dp)) {
-                    itemsIndexed(state.posts) { index, post ->
+                    itemsIndexed(state.posts, key = { _, post -> post.tid }) { index, post ->
                         if (index == state.posts.size - 3 && state.nextCursor != null)
                             LaunchedEffect(state.nextCursor) { vm.loadMore() }
                         ZonePostCard(post = post, onClick = { onPostClick(post.tid) })

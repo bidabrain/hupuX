@@ -1,5 +1,8 @@
 package com.hupux.ui.navigation
 
+import android.app.Activity
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -15,12 +18,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
+import kotlinx.coroutines.delay
 import com.hupux.ui.favorites.FavoritesScreen
 import com.hupux.ui.home.HomeScreen
 import com.hupux.ui.post.PostDetailScreen
@@ -56,6 +61,29 @@ fun AppNavigation() {
     val currentRoute  = backStack?.destination?.route
     val showBottomBar = navItems.any { it.route == currentRoute }
 
+    // 双击同一 tab 时递增，触发对应页面滚到顶部
+    var homeScrollTrigger by remember { mutableStateOf(0) }
+    var zoneScrollTrigger by remember { mutableStateOf(0) }
+
+    // 二次返回退出
+    val context = LocalContext.current
+    var backPressedOnce by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = showBottomBar) {
+        if (backPressedOnce) {
+            (context as? Activity)?.finish()
+        } else {
+            backPressedOnce = true
+            Toast.makeText(context, "再按一次退出应用", Toast.LENGTH_SHORT).show()
+        }
+    }
+    LaunchedEffect(backPressedOnce) {
+        if (backPressedOnce) {
+            delay(2000)
+            backPressedOnce = false
+        }
+    }
+
     Scaffold(
         containerColor = AppBg,
         contentWindowInsets = WindowInsets(0),
@@ -82,10 +110,18 @@ fun AppNavigation() {
                         navItems.forEach { item ->
                             val selected = currentRoute == item.route
                             val navigate = {
-                                navController.navigate(item.route) {
-                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState    = true
+                                if (currentRoute == item.route) {
+                                    // 已在此 tab：触发滚顶
+                                    when (item.route) {
+                                        "home"      -> homeScrollTrigger++
+                                        "zone_list" -> zoneScrollTrigger++
+                                    }
+                                } else {
+                                    navController.navigate(item.route) {
+                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState    = true
+                                    }
                                 }
                             }
                             Box(
@@ -146,12 +182,16 @@ fun AppNavigation() {
         ) {
             composable("home") {
                 HomeScreen(
-                    onPostClick     = { tid -> navController.navigate("post/$tid") },
-                    onSettingsClick = { navController.navigate("settings") }
+                    onPostClick        = { tid -> navController.navigate("post/$tid") },
+                    onSettingsClick    = { navController.navigate("settings") },
+                    scrollToTopTrigger = homeScrollTrigger
                 )
             }
             composable("zone_list") {
-                ZoneListScreen(onZoneClick = { id, name -> navController.navigate("zone/$id/$name") })
+                ZoneListScreen(
+                    onZoneClick        = { id, name -> navController.navigate("zone/$id/$name") },
+                    scrollToTopTrigger = zoneScrollTrigger
+                )
             }
             composable("search") {
                 SearchScreen(onPostClick = { tid -> navController.navigate("post/$tid") })

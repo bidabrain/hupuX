@@ -57,6 +57,7 @@ dependencies {
     implementation(libs.jsoup)
     implementation(libs.gson)
     implementation(libs.coil.compose)
+    implementation(libs.coil.gif)
     implementation(libs.kotlinx.coroutines.android)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
