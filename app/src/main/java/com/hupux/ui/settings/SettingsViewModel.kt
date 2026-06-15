@@ -31,6 +31,12 @@ class SettingsViewModel @Inject constructor(
     private val _saved = MutableStateFlow(cookiePrefs.manualCookie.isNotEmpty())
     val saved: StateFlow<Boolean> = _saved.asStateFlow()
 
+    private val _signature = MutableStateFlow(cookiePrefs.replySignature)
+    val signature: StateFlow<String> = _signature.asStateFlow()
+
+    private val _signatureSaved = MutableStateFlow(false)
+    val signatureSaved: StateFlow<Boolean> = _signatureSaved.asStateFlow()
+
     fun updateInput(value: String) {
         _input.value = value
         _saved.value = false
@@ -45,6 +51,16 @@ class SettingsViewModel @Inject constructor(
         _input.value = ""
         cookiePrefs.clearAll()
         _saved.value = false
+    }
+
+    fun updateSignature(value: String) {
+        _signature.value = value
+        _signatureSaved.value = false
+    }
+
+    fun saveSignature() {
+        cookiePrefs.replySignature = _signature.value
+        _signatureSaved.value = true
     }
 
     val statusText: String get() = when {

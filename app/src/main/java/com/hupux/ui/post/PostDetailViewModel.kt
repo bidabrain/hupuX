@@ -2,6 +2,7 @@ package com.hupux.ui.post
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hupux.data.local.CookiePreferences
 import com.hupux.data.local.FavoriteEntity
 import com.hupux.data.model.Comment
 import com.hupux.data.model.PostDetail
@@ -42,7 +43,8 @@ sealed class PostDetailUiState {
 @HiltViewModel
 class PostDetailViewModel @Inject constructor(
     private val postRepo: PostRepository,
-    private val favRepo: FavoritesRepository
+    private val favRepo: FavoritesRepository,
+    private val cookiePrefs: CookiePreferences
 ) : ViewModel() {
 
     private val _state = MutableStateFlow<PostDetailUiState>(PostDetailUiState.Loading)
@@ -164,6 +166,8 @@ class PostDetailViewModel @Inject constructor(
             _state.value = s.copy(replyError = "请输入回复内容")
             return
         }
+        val sig = cookiePrefs.replySignature.trim()
+        val fullContent = if (sig.isNotEmpty()) "$content\n$sig" else content
         _state.value = s.copy(isSubmittingReply = true, replyError = null)
         viewModelScope.launch {
             runCatching {
@@ -172,7 +176,7 @@ class PostDetailViewModel @Inject constructor(
                     fid     = s.post.fid,
                     topicId = s.post.topicId,
                     quoteId = comment?.pid ?: "0",
-                    content = "<p>$content</p>"
+                    content = "<p>$fullContent</p>"
                 )
             }.onSuccess {
                 _state.value = (_state.value as? PostDetailUiState.Success)

@@ -31,6 +31,12 @@ class CookiePreferences @Inject constructor(@ApplicationContext ctx: Context) {
             _changeFlow.tryEmit(Unit)
         }
 
+    var replySignature: String
+        get() = prefs.getString(KEY_SIGNATURE, "") ?: ""
+        set(value) {
+            prefs.edit().putString(KEY_SIGNATURE, value).apply()
+        }
+
     val effectiveCookie: String
         get() = manualCookie.ifEmpty { webviewCookie }
 
@@ -54,7 +60,8 @@ class CookiePreferences @Inject constructor(@ApplicationContext ctx: Context) {
     }
 
     companion object {
-        private const val KEY_MANUAL  = "manual_cookie"
-        private const val KEY_WEBVIEW = "webview_cookie"
+        private const val KEY_MANUAL    = "manual_cookie"
+        private const val KEY_WEBVIEW   = "webview_cookie"
+        private const val KEY_SIGNATURE = "reply_signature"
     }
 }

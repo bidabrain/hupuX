@@ -42,8 +42,10 @@ fun SettingsScreen(
     onBack: () -> Unit,
     vm: SettingsViewModel = hiltViewModel()
 ) {
-    val input   by vm.input.collectAsState()
-    val saved   by vm.saved.collectAsState()
+    val input          by vm.input.collectAsState()
+    val saved          by vm.saved.collectAsState()
+    val signature      by vm.signature.collectAsState()
+    val signatureSaved by vm.signatureSaved.collectAsState()
     val context = LocalContext.current
 
     // 权限 launcher（仅 API 26-28 需要）
@@ -169,6 +171,44 @@ fun SettingsScreen(
                 fontSize = 11.sp, color = TextTertiary, lineHeight = 16.sp,
                 modifier = Modifier.padding(horizontal = 4.dp)
             )
+
+            Spacer(Modifier.height(24.dp))
+
+            // ── 回复签名 ────────────────────────────────────────────
+            Surface(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp), color = CardBg, shadowElevation = 4.dp
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("回复签名", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "保存后，每条回复末尾会自动追加签名内容",
+                        fontSize = 12.sp, color = TextTertiary
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = signature,
+                        onValueChange = vm::updateSignature,
+                        modifier = Modifier.fillMaxWidth().height(100.dp),
+                        placeholder = { Text("输入签名内容，留空则不追加签名...", fontSize = 12.sp, color = TextTertiary) },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor   = HupuRed,
+                            unfocusedBorderColor = Color.Gray.copy(0.3f)
+                        )
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Button(
+                        onClick    = vm::saveSignature,
+                        modifier   = Modifier.fillMaxWidth(),
+                        shape      = RoundedCornerShape(12.dp),
+                        colors     = ButtonDefaults.buttonColors(containerColor = HupuRed)
+                    ) {
+                        Text(if (signatureSaved) "已保存 ✓" else "保存签名", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
 
             Spacer(Modifier.height(24.dp))
 
