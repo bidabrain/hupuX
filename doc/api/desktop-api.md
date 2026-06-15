@@ -17,9 +17,9 @@ Cookie: <effectiveCookie>
 ### 1. 帖子评论列表（SSR）
 
 **URL：** `GET https://bbs.hupu.com/{tid}.html`（第1页）  
-**URL：** `GET https://bbs.hupu.com/post-{slug}-{N}.html`（第N页，N≥2）
+**URL：** `GET https://bbs.hupu.com/{tid}-{N}.html`（第N页，N≥2）
 
-其中 `slug` = `baseUrl` 字段去掉开头 `/` 和结尾 `.html`
+> ⚠️ 旧格式 `post-{slug}-{N}.html` 实测返回空数据，正确格式为 `{tid}-{N}.html`，无需 `baseUrl`。
 
 **数据格式：** Next.js SSR，解析 `__NEXT_DATA__`，路径 `props.pageProps`
 

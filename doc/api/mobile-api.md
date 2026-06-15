@@ -71,8 +71,11 @@ Accept-Language: zh-CN,zh;q=0.9
 
 ## 3. 专区帖子列表（含分页）
 
-**URL（首页）：** `GET https://m.hupu.com/zone/{topicId}`  
-**URL（翻页）：** `GET https://m.hupu.com/zone/{topicId}?cursor={cursor}`
+### 首页（SSR）
+
+**URL：** `GET https://m.hupu.com/zone/{topicId}`
+
+> ⚠️ SSR 页面的 `?cursor=` 参数被服务端忽略，每次都返回相同的初始10条，**不能用于翻页**。
 
 **数据路径：** `props.pageProps`
 
@@ -90,8 +93,25 @@ Accept-Language: zh-CN,zh;q=0.9
 **帖子列表路径：** `props.pageProps.postList`
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| topicThreads[] | Post[] | 帖子列表 |
-| nextCursor | String? | 下一页游标（null 表示最后一页） |
+| topicThreads[] | Post[] | 帖子列表（约10条） |
+| nextCursor | String | 翻页用的游标，传给下方 JSON API |
+
+### 翻页（JSON API）
+
+**URL：** `GET https://m.hupu.com/api/v2/bbs/topicThreads?topicId={topicId}&page={page}&cursor={cursor}`
+
+| 参数 | 说明 |
+|------|------|
+| topicId | 专区 ID |
+| page | 页码，从 2 开始（第1页数据已在 SSR 中） |
+| cursor | 上一页返回的 `nextCursor` 值 |
+
+**Response `data` 字段：**
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| topicThreads[] | Post[] | 帖子列表（10条/页） |
+| nextCursor | String | 下一页游标（空字符串表示最后一页） |
+| count | Int | 专区总帖子数 |
 
 **Post 字段：**
 | 字段 | 类型 | 说明 |
@@ -153,7 +173,25 @@ Accept-Language: zh-CN,zh;q=0.9
 
 ---
 
-## 5. 子回复列表（⚠️ 当前未使用，已被桌面版 API 替代）
+## 5. 评论列表翻页
+
+**URL：** `GET https://m.hupu.com/api/v2/reply/list/{tid}?page={page}`
+
+> 未登录时使用。第1页数据已由帖子详情 SSR 提供，翻页从 page=2 开始。
+
+**Response `data` 字段：**
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| list[] | Comment[] | 当前页评论（20条/页） |
+| current | Int | 当前页码 |
+| total | Int | 总页数 |
+| count | Int | 总评论数 |
+
+Comment 字段同「帖子详情」中的 Comment。
+
+---
+
+## 6. 子回复列表（⚠️ 当前未使用，已被桌面版 API 替代）
 
 **URL：** `GET https://m.hupu.com/api/v2/reply/sub_list/{tid}?pid={parentPid}&page=1&size=20`
 
@@ -161,7 +199,7 @@ Accept-Language: zh-CN,zh;q=0.9
 
 ---
 
-## 6. 热榜
+## 7. 热榜
 
 **URL：** `GET https://m.hupu.com/hot`
 
@@ -184,9 +222,9 @@ Accept-Language: zh-CN,zh;q=0.9
 
 | 版本 | URL 格式 |
 |------|---------|
-| 移动版（第1页） | `https://m.hupu.com/bbs/{tid}.html` |
+| 移动版 | `https://m.hupu.com/bbs/{tid}.html` |
 | 桌面版（第1页） | `https://bbs.hupu.com/{tid}.html` |
-| 桌面版（第N页） | `https://bbs.hupu.com/post-{baseUrl去掉/和.html}-{N}.html` |
-| 桌面版定位到具体楼层 | `https://bbs.hupu.com/{baseUrl}#{pid}` |
+| 桌面版（第N页，N≥2） | `https://bbs.hupu.com/{tid}-{N}.html` |
+| 桌面版定位到具体楼层 | `https://bbs.hupu.com/{tid}.html#{pid}` |
 
-`baseUrl` 从桌面版 `__NEXT_DATA__` 的 `detail.replies.baseUrl` 获取，格式为 `/{tid}_{authorEuid}.html`
+> ⚠️ 旧文档中的 `post-{slug}-{N}.html` 格式**无效**，实测返回空数据。正确格式为 `{tid}-{N}.html`。
