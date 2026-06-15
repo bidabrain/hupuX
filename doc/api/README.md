@@ -21,7 +21,8 @@ doc/api/
 | 帖子正文 | `__NEXT_DATA__` | [mobile-api.md §4](mobile-api.md#4-帖子详情) |
 | 帖子评论（登录） | `__NEXT_DATA__` | [desktop-api.md §1](desktop-api.md#1-帖子评论列表ssr) |
 | 子回复列表 | `/api/v2/reply/reply` | [desktop-api.md §2](desktop-api.md#2-子回复列表) |
-| 提交回复 | `/pcmapi/pc/bbs/v1/createReply` | [desktop-api.md §3](desktop-api.md#3-提交回复) |
+| 点亮/取消点亮回复 | `/pcmapi/pc/bbs/v1/reply/light` | [desktop-api.md §3](desktop-api.md#3-点亮取消点亮回复) |
+| 提交回复 | `/pcmapi/pc/bbs/v1/createReply` | [desktop-api.md §4](desktop-api.md#4-提交回复) |
 | 用户资料 | `/pcmapi/pc/space/v1/getUserInfo` | [desktop-api.md §1](desktop-api.md#1-用户资料) |
 | 我的回帖 | `/pcmapi/pc/space/v1/getReplyList` | [desktop-api.md §2](desktop-api.md#2-我的回帖列表) |
 | 我的推荐 | `/pcmapi/pc/space/v1/getRecommendList` | [desktop-api.md §3](desktop-api.md#3-我的推荐帖列表) |

@@ -59,6 +59,12 @@ Cookie: <effectiveCookie>
 | title | String | 帖子标题 |
 | lights | Int | 亮了数 |
 | replies | Int | 总回复数 |
+| recommend | Int | 推荐总数 |
+
+**帖子推荐状态路径：** `detail`（与 `detail.thread` 同级）
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| isRecommended | Boolean | 当前登录用户是否已推荐该帖 |
 
 ---
 
@@ -91,7 +97,73 @@ Referer: https://bbs.hupu.com/{tid}.html
 
 ---
 
-### 3. 发帖（创建新帖子）
+### 3. 点亮/取消点亮回复
+
+**点亮 URL：** `POST https://bbs.hupu.com/pcmapi/pc/bbs/v1/reply/light`  
+**取消 URL：** `POST https://bbs.hupu.com/pcmapi/pc/bbs/v1/reply/cancelLight`
+
+**Headers：**
+```
+Content-Type: application/json
+Origin: https://bbs.hupu.com
+Referer: https://bbs.hupu.com/{tid}.html
+Cookie: <登录 Cookie>
+```
+
+**Request Body：**
+```json
+{
+  "pid":      12345678,   // Long - 回复 pid
+  "tid":      639643715,  // Long - 帖子 tid
+  "puid":     98765,      // Long - 当前登录用户的 puid（从 Cookie "u=" 字段提取）
+  "fid":      4861,       // Long - 版块 fid（从 detail.thread.fid 获取）
+  "deviceId": ""          // 风控字段，传空字符串
+}
+```
+
+**成功 Response：**
+```json
+{ "code": 1, "msg": "success" }
+```
+
+**特殊错误码：**
+| code | 说明 |
+|------|------|
+| 5003 | 已经点亮过，视为成功（再次点亮时返回）|
+
+---
+
+### 4. 推荐/取消推荐主贴
+
+**URL：** `POST https://bbs.hupu.com/pcmapi/pc/bbs/v1/thread/recommend`
+
+**Headers：**
+```
+Content-Type: application/json
+Origin: https://bbs.hupu.com
+Referer: https://bbs.hupu.com/{tid}.html
+Cookie: <登录 Cookie>
+```
+
+**Request Body：**
+```json
+{
+  "tid":             640018616,  // Long - 帖子 tid
+  "fid":             118,        // Long - 版块 fid（从 detail.thread.fid 获取）
+  "recommendStatus": 1           // 1=推荐, 0=取消推荐
+}
+```
+
+**成功 Response：**
+```json
+{ "code": 1, "internalCode": "PC000000", "msg": "success", "data": null }
+```
+
+> 当前登录用户是否已推荐可通过 SSR 页面的 `detail.isRecommended` 字段获取。
+
+---
+
+### 5. 发帖（创建新帖子）
 
 **URL：** `POST https://bbs.hupu.com/pcmapi/pc/bbs/v1/createThread`
 
@@ -138,7 +210,7 @@ Cookie: <登录 Cookie>
 
 ---
 
-### 4. 提交回复
+### 6. 提交回复
 
 **URL：** `POST https://bbs.hupu.com/pcmapi/pc/bbs/v1/createReply`
 

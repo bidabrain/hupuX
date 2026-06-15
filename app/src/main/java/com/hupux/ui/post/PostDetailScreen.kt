@@ -173,6 +173,8 @@ fun PostDetailScreen(
                 totalCount       = parent?.replyCount ?: subReplies.size,
                 isLoading        = success.isLoadingSubReplies,
                 canGoBack        = success.replyStack.size > 1,
+                likedPids        = success.likedPids,
+                onLike           = if (success.post.fid.isNotEmpty()) vm::toggleLike else null,
                 onBack           = vm::popReplies,
                 onReplyClick     = vm::showReplies,
                 onReplyToComment = vm::startReply
@@ -217,8 +219,10 @@ private fun PostContent(
 ) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
         item { PostBodyCard(
-            post = s.post,
-            onReplyMain = if (s.post.fid.isNotEmpty()) vm::startMainPostReply else null
+            post          = s.post,
+            isRecommended = s.isRecommended,
+            onRecommend   = if (s.post.fid.isNotEmpty()) vm::recommendPost else null,
+            onReplyMain   = if (s.post.fid.isNotEmpty()) vm::startMainPostReply else null
         ) }
         item {
             Spacer(Modifier.height(8.dp))
@@ -240,6 +244,8 @@ private fun PostContent(
                 LaunchedEffect(s.post.comments.size) { vm.loadMoreComments() }
             CommentCard(
                 comment          = comment,
+                isLiked          = comment.pid in s.likedPids,
+                onLike           = if (s.post.fid.isNotEmpty()) {{ vm.toggleLike(comment) }} else null,
                 onReplyClick     = { vm.showReplies(comment.pid) },
                 onReplyToComment = if (comment.desktopPage > 0) {
                     { vm.startReply(comment) }
@@ -259,7 +265,12 @@ private fun PostContent(
 // ─── Post body card ───────────────────────────────────────────────────────────
 
 @Composable
-private fun PostBodyCard(post: PostDetail, onReplyMain: (() -> Unit)? = null) {
+private fun PostBodyCard(
+    post: PostDetail,
+    isRecommended: Boolean = false,
+    onRecommend: (() -> Unit)? = null,
+    onReplyMain: (() -> Unit)? = null
+) {
     Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp),
         shape = RoundedCornerShape(16.dp), color = CardBg, shadowElevation = 4.dp) {
         Column(Modifier.padding(16.dp)) {
@@ -296,15 +307,29 @@ private fun PostBodyCard(post: PostDetail, onReplyMain: (() -> Unit)? = null) {
             HorizontalDivider(thickness = 0.5.dp, color = DividerColor)
             Spacer(Modifier.height(12.dp))
             PostBodyWebView(html = post.content)
-            if (onReplyMain != null) {
+            if (onRecommend != null || onReplyMain != null) {
                 Spacer(Modifier.height(8.dp))
                 HorizontalDivider(thickness = 0.5.dp, color = DividerColor)
                 Spacer(Modifier.height(4.dp))
-                TextButton(
-                    onClick = onReplyMain,
-                    modifier = Modifier.align(Alignment.End)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Text("回复主贴", fontSize = 13.sp, color = HupuRed, fontWeight = FontWeight.Medium)
+                    if (onRecommend != null) {
+                        TextButton(onClick = onRecommend) {
+                            Text(
+                                if (isRecommended) "已推荐" else "推荐",
+                                fontSize = 13.sp,
+                                color = if (isRecommended) TextTertiary else HupuRed,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                    if (onReplyMain != null) {
+                        TextButton(onClick = onReplyMain) {
+                            Text("回复主贴", fontSize = 13.sp, color = HupuRed, fontWeight = FontWeight.Medium)
+                        }
+                    }
                 }
             }
             Spacer(Modifier.height(4.dp))
@@ -317,6 +342,8 @@ private fun PostBodyCard(post: PostDetail, onReplyMain: (() -> Unit)? = null) {
 @Composable
 fun CommentCard(
     comment: Comment,
+    isLiked: Boolean = false,
+    onLike: (() -> Unit)? = null,
     onReplyClick: (() -> Unit)? = null,
     onReplyToComment: (() -> Unit)? = null
 ) {
@@ -340,7 +367,14 @@ fun CommentCard(
                             }
                         }
                         Spacer(Modifier.weight(1f))
-                        Text("👍 ${comment.lights}", fontSize = 12.sp, color = TextTertiary)
+                        val likeCount = comment.lights + if (isLiked) 1 else 0
+                        val likeColor = if (isLiked) HupuRed else TextTertiary
+                        val likeMod = if (onLike != null)
+                            Modifier.clickable(onClick = onLike).padding(4.dp)
+                        else
+                            Modifier.padding(4.dp)
+                        Text("👍 $likeCount", fontSize = 12.sp, color = likeColor,
+                            modifier = likeMod)
                     }
                     Spacer(Modifier.height(5.dp))
                     comment.quoteContent?.let { quote ->
@@ -422,6 +456,8 @@ private fun SubRepliesSheet(
     totalCount: Int,
     isLoading: Boolean,
     canGoBack: Boolean,
+    likedPids: Set<String> = emptySet(),
+    onLike: ((Comment) -> Unit)? = null,
     onBack: () -> Unit,
     onReplyClick: (String) -> Unit,
     onReplyToComment: ((Comment) -> Unit)? = null
@@ -460,6 +496,8 @@ private fun SubRepliesSheet(
                 items(subReplies) { reply ->
                     CommentCard(
                         comment          = reply,
+                        isLiked          = reply.pid in likedPids,
+                        onLike           = onLike?.let { { it(reply) } },
                         onReplyClick     = if (reply.replyCount > 0) ({ onReplyClick(reply.pid) }) else null,
                         onReplyToComment = if (reply.desktopPage > 0) onReplyToComment?.let { { it(reply) } } else null
                     )

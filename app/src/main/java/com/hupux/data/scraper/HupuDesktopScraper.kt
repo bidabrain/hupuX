@@ -36,7 +36,8 @@ data class DesktopRepliesPage(
     val currentPage: Int,
     val totalPages: Int,
     val fid: String = "",
-    val topicId: String = ""
+    val topicId: String = "",
+    val isRecommended: Boolean = false
 )
 
 private fun JsonObject.obj(key: String): JsonObject? = get(key)?.takeIf { !it.isJsonNull }?.asJsonObject
@@ -106,9 +107,11 @@ class HupuDesktopScraper @Inject constructor(
         val baseUrl     = replies.str("baseUrl") ?: ""
         val totalPages  = replies.int_("total") ?: 1
         val currentPage = replies.int_("current") ?: fetchedPage
-        val thread      = root.obj("detail")?.obj("thread")
+        val detail      = root.obj("detail")
+        val thread      = detail?.obj("thread")
         val fid         = thread?.str("fid") ?: ""
         val topicId     = thread?.str("topicId") ?: ""
+        val isRecommended = detail?.bool_("isRecommended") ?: false
 
         val list = replies.arr("list") ?: JsonArray()
         val comments = list.mapNotNull { el ->
@@ -128,7 +131,7 @@ class HupuDesktopScraper @Inject constructor(
                 desktopPage = currentPage
             )
         }
-        return DesktopRepliesPage(comments, baseUrl, currentPage, totalPages, fid, topicId)
+        return DesktopRepliesPage(comments, baseUrl, currentPage, totalPages, fid, topicId, isRecommended)
     }
 
     private fun fetch(url: String): String {
@@ -382,6 +385,72 @@ class HupuDesktopScraper @Inject constructor(
         val code = root.get("code")?.asInt ?: 0
         if (code != 1) error(root.str("msg") ?: "发帖失败")
         return root.obj("data")?.long_("tid") ?: 0L
+    }
+
+    /**
+     * 点亮/取消点亮回复
+     * code 5003 = 已经点亮过，视为成功
+     */
+    fun lightReply(pid: Long, tid: Long, puid: Long, fid: Long) =
+        callLightApi("light", pid, tid, puid, fid)
+
+    fun cancelLightReply(pid: Long, tid: Long, puid: Long, fid: Long) =
+        callLightApi("cancelLight", pid, tid, puid, fid)
+
+    private fun callLightApi(action: String, pid: Long, tid: Long, puid: Long, fid: Long) {
+        val body = com.google.gson.JsonObject().apply {
+            addProperty("pid",      pid)
+            addProperty("tid",      tid)
+            addProperty("puid",     puid)
+            addProperty("fid",      fid)
+            addProperty("deviceId", "")
+        }.toString()
+
+        val cookie = cookiePrefs.effectiveCookie
+        val req = Request.Builder()
+            .url("$BBS_BASE/pcmapi/pc/bbs/v1/reply/$action")
+            .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+            .header("Content-Type", "application/json")
+            .header("Origin", BBS_BASE)
+            .header("Referer", "$BBS_BASE/$tid.html")
+            .apply { if (cookie.isNotEmpty()) header("Cookie", cookie) }
+            .post(body.toRequestBody("application/json".toMediaType()))
+            .build()
+
+        val resp = client.newCall(req).execute().use { it.body!!.string() }
+        val root = JsonParser.parseString(resp).asJsonObject
+        val code = root.get("code")?.asInt ?: 0
+        if (code != 1 && code != 5003) {
+            error(root.str("msg") ?: "${action}失败")
+        }
+    }
+
+    /**
+     * 推荐/取消推荐主贴：POST /pcmapi/pc/bbs/v1/thread/recommend
+     * recommendStatus: 1=推荐, 0=取消推荐
+     */
+    fun recommendThread(tid: Long, fid: Long, recommendStatus: Int) {
+        val body = com.google.gson.JsonObject().apply {
+            addProperty("tid",             tid)
+            addProperty("fid",             fid)
+            addProperty("recommendStatus", recommendStatus)
+        }.toString()
+
+        val cookie = cookiePrefs.effectiveCookie
+        val req = Request.Builder()
+            .url("$BBS_BASE/pcmapi/pc/bbs/v1/thread/recommend")
+            .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+            .header("Content-Type", "application/json")
+            .header("Origin", BBS_BASE)
+            .header("Referer", "$BBS_BASE/$tid.html")
+            .apply { if (cookie.isNotEmpty()) header("Cookie", cookie) }
+            .post(body.toRequestBody("application/json".toMediaType()))
+            .build()
+
+        val resp = client.newCall(req).execute().use { it.body!!.string() }
+        val root = JsonParser.parseString(resp).asJsonObject
+        val code = root.get("code")?.asInt ?: 0
+        if (code != 1) error(root.str("msg") ?: "推荐失败")
     }
 
     /**

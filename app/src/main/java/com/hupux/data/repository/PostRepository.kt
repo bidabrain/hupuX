@@ -26,7 +26,8 @@ class PostRepository @Inject constructor(
                     hasMoreComments   = desktop.currentPage < desktop.totalPages,
                     desktopTotalPages = desktop.totalPages,
                     fid               = desktop.fid,
-                    topicId           = desktop.topicId
+                    topicId           = desktop.topicId,
+                    isRecommended     = desktop.isRecommended
                 )
             } catch (_: Exception) {
                 post
@@ -57,6 +58,28 @@ class PostRepository @Inject constructor(
     ) = withContext(Dispatchers.IO) {
         desktopScraper.createReply(tid, fid, topicId, quoteId, content)
     }
+
+    suspend fun toggleLikeComment(
+        pid: String, tid: String, fid: String, isCurrentlyLiked: Boolean
+    ) = withContext(Dispatchers.IO) {
+        val puid = cookiePrefs.extractUid()?.toLongOrNull() ?: 0L
+        val pidL = pid.toLongOrNull() ?: 0L
+        val tidL = tid.toLongOrNull() ?: 0L
+        val fidL = fid.toLongOrNull() ?: 0L
+        if (isCurrentlyLiked) {
+            desktopScraper.cancelLightReply(pidL, tidL, puid, fidL)
+        } else {
+            desktopScraper.lightReply(pidL, tidL, puid, fidL)
+        }
+    }
+
+    suspend fun recommendPost(tid: String, fid: String, isCurrentlyRecommended: Boolean) =
+        withContext(Dispatchers.IO) {
+            val tidL = tid.toLongOrNull() ?: 0L
+            val fidL = fid.toLongOrNull() ?: 0L
+            val status = if (isCurrentlyRecommended) 0 else 1
+            desktopScraper.recommendThread(tidL, fidL, status)
+        }
 
     suspend fun getSubReplies(tid: String, parentPid: String) = withContext(Dispatchers.IO) {
         if (cookiePrefs.isLoggedIn) {

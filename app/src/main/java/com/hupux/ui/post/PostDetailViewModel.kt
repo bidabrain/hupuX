@@ -28,7 +28,11 @@ sealed class PostDetailUiState {
         val replyContent: String = "",
         val isSubmittingReply: Boolean = false,
         val replyError: String? = null,
-        val replySuccess: Boolean = false
+        val replySuccess: Boolean = false,
+        val likedPids: Set<String> = emptySet(),    // 本次会话内点亮的 pid 集合
+        val likingPids: Set<String> = emptySet(),   // 正在请求中的 pid，防止重复点击
+        val isRecommended: Boolean = false,
+        val isRecommending: Boolean = false
     ) : PostDetailUiState() {
         val expandedPid: String? get() = replyStack.lastOrNull()
     }
@@ -58,7 +62,8 @@ class PostDetailViewModel @Inject constructor(
                     _state.value = PostDetailUiState.Success(
                         post          = post,
                         isFavorite    = fav,
-                        subRepliesMap = initialMap
+                        subRepliesMap = initialMap,
+                        isRecommended = post.isRecommended
                     )
                 }
                 .onFailure { _state.value = PostDetailUiState.Error(it.message ?: "加载失败") }
@@ -177,6 +182,49 @@ class PostDetailViewModel @Inject constructor(
                 _state.value = (_state.value as? PostDetailUiState.Success)
                     ?.copy(isSubmittingReply = false, replyError = e.message ?: "回复失败")
                     ?: _state.value
+            }
+        }
+    }
+
+    fun toggleLike(comment: Comment) {
+        val s = _state.value as? PostDetailUiState.Success ?: return
+        val pid = comment.pid
+        if (pid in s.likingPids) return
+        val isCurrentlyLiked = pid in s.likedPids
+
+        // 乐观更新
+        val optimisticLiked = if (isCurrentlyLiked) s.likedPids - pid else s.likedPids + pid
+        _state.value = s.copy(likedPids = optimisticLiked, likingPids = s.likingPids + pid)
+
+        viewModelScope.launch {
+            runCatching {
+                postRepo.toggleLikeComment(pid, currentTid, s.post.fid, isCurrentlyLiked)
+            }.onSuccess {
+                val s2 = _state.value as? PostDetailUiState.Success ?: return@onSuccess
+                _state.value = s2.copy(likingPids = s2.likingPids - pid)
+            }.onFailure {
+                // 回滚
+                val s2 = _state.value as? PostDetailUiState.Success ?: return@onFailure
+                val reverted = if (isCurrentlyLiked) s2.likedPids + pid else s2.likedPids - pid
+                _state.value = s2.copy(likedPids = reverted, likingPids = s2.likingPids - pid)
+            }
+        }
+    }
+
+    fun recommendPost() {
+        val s = _state.value as? PostDetailUiState.Success ?: return
+        if (s.isRecommending) return
+        val newRecommended = !s.isRecommended
+        _state.value = s.copy(isRecommended = newRecommended, isRecommending = true)
+        viewModelScope.launch {
+            runCatching {
+                postRepo.recommendPost(currentTid, s.post.fid, s.isRecommended)
+            }.onSuccess {
+                val s2 = _state.value as? PostDetailUiState.Success ?: return@onSuccess
+                _state.value = s2.copy(isRecommending = false)
+            }.onFailure {
+                val s2 = _state.value as? PostDetailUiState.Success ?: return@onFailure
+                _state.value = s2.copy(isRecommended = !newRecommended, isRecommending = false)
             }
         }
     }

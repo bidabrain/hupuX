@@ -65,7 +65,8 @@ data class PostDetail(
     val desktopBaseUrl: String = "",     // 桌面版分页 base，如 /tid_euid.html
     val desktopTotalPages: Int = 0,
     val fid: String = "",               // 版块 ID（桌面版回复需要）
-    val topicId: String = ""            // 专区 ID（桌面版回复需要）
+    val topicId: String = "",           // 专区 ID（桌面版回复需要）
+    val isRecommended: Boolean = false  // 当前登录用户是否已推荐
 )
 
 data class HotItem(
