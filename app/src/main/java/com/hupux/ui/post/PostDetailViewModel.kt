@@ -19,11 +19,11 @@ sealed class PostDetailUiState {
         val post: PostDetail,
         val isFavorite: Boolean,
         val subRepliesMap: Map<String, List<Comment>> = emptyMap(),
-        // 回复层级栈：每次点击"X 条回复"压栈，返回键弹栈
         val replyStack: List<String> = emptyList(),
         val isLoadingSubReplies: Boolean = false,
-        // 原生回复 sheet
-        val replyingTo: Comment? = null,     // null = 回复主贴
+        val commentPage: Int = 1,
+        val isLoadingMoreComments: Boolean = false,
+        val replyingTo: Comment? = null,
         val showReplySheet: Boolean = false,
         val replyContent: String = "",
         val isSubmittingReply: Boolean = false,
@@ -87,6 +87,31 @@ class PostDetailViewModel @Inject constructor(
                 .onFailure {
                     val s2 = _state.value as? PostDetailUiState.Success ?: return@onFailure
                     _state.value = s2.copy(isLoadingSubReplies = false)
+                }
+        }
+    }
+
+    fun loadMoreComments() {
+        val s = _state.value as? PostDetailUiState.Success ?: return
+        if (s.isLoadingMoreComments || !s.post.hasMoreComments) return
+        _state.value = s.copy(isLoadingMoreComments = true)
+        val nextPage = s.commentPage + 1
+        viewModelScope.launch {
+            runCatching { postRepo.loadMoreComments(currentTid, nextPage) }
+                .onSuccess { result ->
+                    val s2 = _state.value as? PostDetailUiState.Success ?: return@onSuccess
+                    val seen = s2.post.comments.map { it.pid }.toHashSet()
+                    val fresh = result.first.filter { it.pid !in seen }
+                    _state.value = s2.copy(
+                        post = s2.post.copy(comments = s2.post.comments + fresh, hasMoreComments = result.second),
+                        commentPage = nextPage,
+                        isLoadingMoreComments = false
+                    )
+                }
+                .onFailure {
+                    (_state.value as? PostDetailUiState.Success)?.let {
+                        _state.value = it.copy(isLoadingMoreComments = false)
+                    }
                 }
         }
     }

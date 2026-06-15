@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -140,8 +141,16 @@ fun HomeScreen(
                         PostCard(post = post, onClick = { onPostClick(post.tid) })
                     }
                 }
-                else -> FollowedFeed(state.followedPosts, state.isLoadingFollow,
-                    vm::loadFollowedFeed, onPostClick, listState = followedListState)
+                else -> FollowedFeed(
+                    posts         = state.followedPosts,
+                    isLoading     = state.isLoadingFollow,
+                    isLoadingMore = state.isLoadingMoreFollow,
+                    hasMore       = state.followHasMore,
+                    onRefresh     = vm::loadFollowedFeed,
+                    onLoadMore    = vm::loadMoreFollowed,
+                    onPostClick   = onPostClick,
+                    listState     = followedListState
+                )
             }
         }
     }
@@ -246,8 +255,8 @@ private fun PlasticTabRow(selectedIndex: Int, followedCount: Int, onSelect: (Int
 
 @Composable
 private fun FollowedFeed(
-    posts: List<Post>, isLoading: Boolean,
-    onRefresh: () -> Unit, onPostClick: (String) -> Unit,
+    posts: List<Post>, isLoading: Boolean, isLoadingMore: Boolean, hasMore: Boolean,
+    onRefresh: () -> Unit, onLoadMore: () -> Unit, onPostClick: (String) -> Unit,
     listState: LazyListState = rememberLazyListState()
 ) {
     when {
@@ -277,8 +286,17 @@ private fun FollowedFeed(
                     }
                 }
             }
-            items(posts, key = { it.tid }) { post ->
+            itemsIndexed(posts, key = { _, post -> post.tid }) { index, post ->
+                if (index == posts.size - 3 && hasMore)
+                    LaunchedEffect(posts.size) { onLoadMore() }
                 FollowedPostCard(post, onClick = { onPostClick(post.tid) })
+            }
+            if (isLoadingMore) {
+                item {
+                    Box(Modifier.fillMaxWidth().padding(16.dp), Alignment.Center) {
+                        CircularProgressIndicator(Modifier.size(24.dp), color = HupuRed)
+                    }
+                }
             }
         }
     }

@@ -1,6 +1,7 @@
 package com.hupux.data.repository
 
 import com.hupux.data.local.CookiePreferences
+import com.hupux.data.model.Comment
 import com.hupux.data.model.PostDetail
 import com.hupux.data.scraper.HupuDesktopScraper
 import com.hupux.data.scraper.HupuScraper
@@ -23,18 +24,27 @@ class PostRepository @Inject constructor(
                 post.copy(
                     comments          = desktop.comments,
                     hasMoreComments   = desktop.currentPage < desktop.totalPages,
-                    desktopBaseUrl    = desktop.baseUrl,
                     desktopTotalPages = desktop.totalPages,
                     fid               = desktop.fid,
                     topicId           = desktop.topicId
                 )
             } catch (_: Exception) {
-                post  // 桌面 API 失败时回退移动版
+                post
             }
         } else {
             post
         }
     }
+
+    suspend fun loadMoreComments(tid: String, page: Int): Pair<List<Comment>, Boolean> =
+        withContext(Dispatchers.IO) {
+            if (cookiePrefs.isLoggedIn) {
+                val desktop = desktopScraper.fetchPostReplies(tid, page)
+                Pair(desktop.comments, desktop.currentPage < desktop.totalPages)
+            } else {
+                scraper.fetchReplyList(tid, page)
+            }
+        }
 
     suspend fun createThread(topicId: Int, title: String, content: String): Long =
         withContext(Dispatchers.IO) {

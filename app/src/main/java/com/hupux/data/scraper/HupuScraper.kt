@@ -103,11 +103,24 @@ class HupuScraper @Inject constructor(private val client: OkHttpClient) {
     }
 
     fun fetchZone(topicId: Int, cursor: String? = null): ZonePage {
-        val url = if (cursor != null) "$BASE_URL/zone/$topicId?cursor=$cursor"
-                  else "$BASE_URL/zone/$topicId"
-        val html = fetch(url)
-        val pp = parseNextData(html)
+        // cursor format: null = initial load; "page|rawCursor" for subsequent pages
+        if (cursor != null) {
+            val pipe = cursor.indexOf('|')
+            val page = cursor.substring(0, pipe).toIntOrNull() ?: 2
+            val rawCursor = cursor.substring(pipe + 1)
+            val url = "$BASE_URL/api/v2/bbs/topicThreads?topicId=$topicId&page=$page&cursor=$rawCursor"
+            val data = JsonParser.parseString(fetch(url)).asJsonObject.obj("data")
+                ?: return ZonePage(ZoneDetail(topicId, "", "", "", "", "", "#EA0E20"), emptyList(), null)
+            val threads = data.arr("topicThreads") ?: return ZonePage(ZoneDetail(topicId, "", "", "", "", "", "#EA0E20"), emptyList(), null)
+            val rawNext = data.str("nextCursor")
+            val nextCursor = rawNext?.takeIf { it.isNotEmpty() }?.let { "${page + 1}|$it" }
+            val posts = parseZoneThreads(threads, topicId)
+            return ZonePage(ZoneDetail(topicId, "", "", "", "", "", "#EA0E20"), posts, nextCursor)
+        }
 
+        // Initial load: SSR HTML for zoneDetail + first batch
+        val html = fetch("$BASE_URL/zone/$topicId")
+        val pp = parseNextData(html)
         val zd = pp.obj("zoneData") ?: error("zoneData not found")
         val zoneDetail = ZoneDetail(
             topicId = zd.int_("topicId") ?: topicId,
@@ -118,12 +131,16 @@ class HupuScraper @Inject constructor(private val client: OkHttpClient) {
             allThreadNum = zd.str("allThreadNum") ?: "",
             bgColor = zd.str("bgColor") ?: "#EA0E20"
         )
-
         val pl = pp.obj("postList") ?: return ZonePage(zoneDetail, emptyList(), null)
         val threads = pl.arr("topicThreads") ?: return ZonePage(zoneDetail, emptyList(), null)
-        val nextCursor = pl.str("nextCursor")
+        val rawCursor = pl.str("nextCursor")
+        val nextCursor = rawCursor?.takeIf { it.isNotEmpty() }?.let { "2|$it" }
+        val posts = parseZoneThreads(threads, topicId)
+        return ZonePage(zoneDetail, posts, nextCursor)
+    }
 
-        val posts = threads.mapNotNull { el ->
+    private fun parseZoneThreads(threads: JsonArray, topicId: Int): List<Post> =
+        threads.mapNotNull { el ->
             val o = el.asJsonObject
             val tid = o.int_("tid")?.toString() ?: return@mapNotNull null
             Post(
@@ -138,8 +155,6 @@ class HupuScraper @Inject constructor(private val client: OkHttpClient) {
                 isVote = o.bool_("isVote") ?: false
             )
         }
-        return ZonePage(zoneDetail, posts, nextCursor)
-    }
 
     fun fetchPost(tid: String): PostDetail {
         val html = fetch("$BASE_URL/bbs/$tid.html")
@@ -195,6 +210,17 @@ class HupuScraper @Inject constructor(private val client: OkHttpClient) {
             comments = allComments,
             hasMoreComments = hasMore
         )
+    }
+
+    /** 移动端评论列表翻页，返回 (评论列表, 是否还有更多) */
+    fun fetchReplyList(tid: String, page: Int): Pair<List<Comment>, Boolean> {
+        val url = "$BASE_URL/api/v2/reply/list/$tid?page=$page"
+        val data = JsonParser.parseString(fetch(url)).asJsonObject.obj("data")
+            ?: return Pair(emptyList(), false)
+        val list = data.arr("list") ?: return Pair(emptyList(), false)
+        val current = data.int_("current") ?: page
+        val total   = data.int_("total") ?: 1
+        return Pair(list.mapNotNull { parseComment(it.asJsonObject) }, current < total)
     }
 
     /** 获取指定评论的子回复列表 */

@@ -14,14 +14,20 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class HomeUiState(
-    val recommendPosts:   List<Post> = emptyList(),
-    val bannerPosts:      List<Post> = emptyList(),
-    val followedPosts:    List<Post> = emptyList(),
-    val selectedTab:      Int        = 0,
-    val isLoading:        Boolean    = true,
-    val isLoadingFollow:  Boolean    = false,
-    val error:            String?    = null
-)
+    val recommendPosts:      List<Post>       = emptyList(),
+    val bannerPosts:         List<Post>       = emptyList(),
+    val followedPool:        List<Post>       = emptyList(),
+    val followDisplayCount:  Int              = 10,
+    val followZoneCursors:   Map<Int, String> = emptyMap(),
+    val selectedTab:         Int              = 0,
+    val isLoading:           Boolean          = true,
+    val isLoadingFollow:     Boolean          = false,
+    val isLoadingMoreFollow: Boolean          = false,
+    val error:               String?          = null
+) {
+    val followedPosts: List<Post> get() = followedPool.take(followDisplayCount)
+    val followHasMore: Boolean    get() = followDisplayCount < followedPool.size || followZoneCursors.isNotEmpty()
+}
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -60,7 +66,7 @@ class HomeViewModel @Inject constructor(
 
     fun selectTab(index: Int) {
         _state.value = _state.value.copy(selectedTab = index)
-        if (index == 1) loadFollowedFeed()
+        if (index == 1 && _state.value.followedPool.isEmpty()) loadFollowedFeed()
     }
 
     fun loadFollowedFeed() {
@@ -68,21 +74,62 @@ class HomeViewModel @Inject constructor(
             _state.value = _state.value.copy(isLoadingFollow = true)
             val zones = followedRepo.getAll().first()
             if (zones.isEmpty()) {
-                _state.value = _state.value.copy(followedPosts = emptyList(), isLoadingFollow = false)
+                _state.value = _state.value.copy(
+                    followedPool = emptyList(), followZoneCursors = emptyMap(),
+                    followDisplayCount = 10, isLoadingFollow = false
+                )
                 return@launch
             }
-            // Fetch all followed zones concurrently
-            val posts = zones.map { zone ->
+            val results = zones.map { zone ->
                 async(Dispatchers.IO) {
-                    runCatching {
-                        zoneRepo.getZonePosts(zone.topicId).posts
-                            .map { it.copy(label = zone.topicName) }
-                    }.getOrDefault(emptyList())
+                    runCatching { zoneRepo.getZonePosts(zone.topicId) }.getOrNull()
+                        ?.let { page -> Triple(zone.topicId, page.posts.map { it.copy(label = zone.topicName) }, page.nextCursor) }
                 }
-            }.map { it.await() }.flatten()
+            }.mapNotNull { it.await() }
 
-            val sorted = posts.sortedBy { parseHupuTime(it.time) }
-            _state.value = _state.value.copy(followedPosts = sorted, isLoadingFollow = false)
+            val pool    = results.flatMap { it.second }.sortedBy { parseHupuTime(it.time) }
+            val cursors = results.mapNotNull { (id, _, c) -> c?.let { id to it } }.toMap()
+            _state.value = _state.value.copy(
+                followedPool = pool, followZoneCursors = cursors,
+                followDisplayCount = 10, isLoadingFollow = false
+            )
+        }
+    }
+
+    fun loadMoreFollowed() {
+        val s = _state.value
+        if (s.isLoadingMoreFollow) return
+
+        if (s.followDisplayCount < s.followedPool.size) {
+            _state.value = s.copy(followDisplayCount = s.followDisplayCount + 10)
+            return
+        }
+        if (s.followZoneCursors.isEmpty()) return
+
+        _state.value = s.copy(isLoadingMoreFollow = true)
+        viewModelScope.launch {
+            val zones   = followedRepo.getAll().first().associateBy { it.topicId }
+            val cursors = _state.value.followZoneCursors
+
+            val results = cursors.entries.map { (topicId, cursor) ->
+                async(Dispatchers.IO) {
+                    val name = zones[topicId]?.topicName ?: ""
+                    runCatching { zoneRepo.getZonePosts(topicId, cursor) }.getOrNull()
+                        ?.let { page -> Triple(topicId, page.posts.map { it.copy(label = name) }, page.nextCursor) }
+                }
+            }.mapNotNull { it.await() }
+
+            val cur     = _state.value
+            val seen    = cur.followedPool.map { it.tid }.toHashSet()
+            val newPool = (cur.followedPool + results.flatMap { it.second }.filter { it.tid !in seen })
+                .sortedBy { parseHupuTime(it.time) }
+            val newCursors = results.mapNotNull { (id, _, c) -> c?.let { id to it } }.toMap()
+            _state.value = cur.copy(
+                followedPool        = newPool,
+                followDisplayCount  = cur.followDisplayCount + 10,
+                followZoneCursors   = newCursors,
+                isLoadingMoreFollow = false
+            )
         }
     }
 }

@@ -44,6 +44,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -234,7 +235,9 @@ private fun PostContent(
                 }
             }
         }
-        items(s.post.comments) { comment ->
+        itemsIndexed(s.post.comments, key = { _, c -> c.pid }) { index, comment ->
+            if (index == s.post.comments.size - 3 && s.post.hasMoreComments)
+                LaunchedEffect(s.post.comments.size) { vm.loadMoreComments() }
             CommentCard(
                 comment          = comment,
                 onReplyClick     = { vm.showReplies(comment.pid) },
@@ -242,6 +245,13 @@ private fun PostContent(
                     { vm.startReply(comment) }
                 } else null
             )
+        }
+        if (s.isLoadingMoreComments) {
+            item {
+                Box(Modifier.fillMaxWidth().padding(16.dp), Alignment.Center) {
+                    CircularProgressIndicator(Modifier.size(24.dp), color = HupuRed)
+                }
+            }
         }
     }
 }

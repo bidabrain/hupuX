@@ -88,16 +88,9 @@ class HupuDesktopScraper @Inject constructor(
         }
     }
 
-    /** 登录状态下从桌面版拉取帖子评论，page=1 对应 /{tid}.html */
-    fun fetchPostReplies(tid: String, page: Int = 1, baseUrl: String = ""): DesktopRepliesPage {
-        val url = when {
-            page <= 1 -> "$BBS_BASE/$tid.html"
-            baseUrl.isNotEmpty() -> {
-                val slug = baseUrl.removePrefix("/").removeSuffix(".html")
-                "$BBS_BASE/post-$slug-$page.html"
-            }
-            else -> "$BBS_BASE/post-$tid-$page.html"
-        }
+    /** 登录状态下从桌面版拉取帖子评论，page=1 对应 /{tid}.html，page2+ 对应 /{tid}-{page}.html */
+    fun fetchPostReplies(tid: String, page: Int = 1): DesktopRepliesPage {
+        val url = if (page <= 1) "$BBS_BASE/$tid.html" else "$BBS_BASE/$tid-$page.html"
         val html = fetchBbs(url)
         return parseDesktopReplies(html, page)
     }
