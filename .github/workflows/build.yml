@@ -52,11 +52,14 @@ jobs:
       - name: Package DMG
         run: ./gradlew :desktopApp:packageDmg
 
+      - name: Rename DMG
+        run: mv desktopApp/build/compose/binaries/main/dmg/*.dmg desktopApp/build/compose/binaries/main/dmg/HupuX-arm64.dmg
+
       - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:
           name: macos-dmg-arm
-          path: desktopApp/build/compose/binaries/main/dmg/*.dmg
+          path: desktopApp/build/compose/binaries/main/dmg/HupuX-arm64.dmg
 
   # ── macOS Intel .dmg ──────────────────────────────────────────────────────────
   macos-intel:
@@ -77,11 +80,14 @@ jobs:
       - name: Package DMG
         run: ./gradlew :desktopApp:packageDmg
 
+      - name: Rename DMG
+        run: mv desktopApp/build/compose/binaries/main/dmg/*.dmg desktopApp/build/compose/binaries/main/dmg/HupuX-intel.dmg
+
       - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:
           name: macos-dmg-intel
-          path: desktopApp/build/compose/binaries/main/dmg/*.dmg
+          path: desktopApp/build/compose/binaries/main/dmg/HupuX-intel.dmg
 
   # ── Windows .msi ──────────────────────────────────────────────────────────────
   windows:
