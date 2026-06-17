@@ -1,14 +1,13 @@
 package com.hupux.di
 
 import androidx.lifecycle.SavedStateHandle
-import androidx.room.Room
+import app.cash.sqldelight.db.SqlDriver
+import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import com.hupux.data.CookieStorage
 import com.hupux.data.local.CookiePreferences
-import com.hupux.data.local.FavoriteDao
-import com.hupux.data.local.FavoriteDatabase
-import com.hupux.data.local.FollowedZoneDao
 import com.hupux.data.repository.FavoritesRepository
 import com.hupux.data.repository.FollowedZonesRepository
+import com.hupux.shared.db.HupuDatabase
 import com.hupux.data.repository.HomeRepository
 import com.hupux.data.repository.MessageRepository
 import com.hupux.data.repository.PostRepository
@@ -46,13 +45,10 @@ val appModule = module {
             .readTimeout(20, TimeUnit.SECONDS)
             .build()
     }
-    single<FavoriteDatabase> {
-        Room.databaseBuilder(androidContext(), FavoriteDatabase::class.java, "favorites.db")
-            .fallbackToDestructiveMigration()
-            .build()
+    single<SqlDriver> {
+        AndroidSqliteDriver(HupuDatabase.Schema, androidContext(), "favorites.db")
     }
-    single<FavoriteDao>     { get<FavoriteDatabase>().favoriteDao() }
-    single<FollowedZoneDao> { get<FavoriteDatabase>().followedZoneDao() }
+    single<HupuDatabase> { HupuDatabase(get()) }
 
     // ── Cookie ────────────────────────────────────────────────────────────────
     single<CookiePreferences> { CookiePreferences(androidContext()) }
@@ -68,8 +64,8 @@ val appModule = module {
     single { ZoneRepository(get()) }
     single { ProfileRepository(get(), get<CookieStorage>()) }
     single { MessageRepository(get()) }
-    single { FavoritesRepository(get()) }
-    single { FollowedZonesRepository(get()) }
+    single { FavoritesRepository(get<HupuDatabase>()) }
+    single { FollowedZonesRepository(get<HupuDatabase>()) }
     single { PostRepository(get(), get(), get<CookiePreferences>(), get()) }
 
     // ── ViewModels ────────────────────────────────────────────────────────────

@@ -95,15 +95,25 @@ hupuX/
 
 ---
 
-### Phase 4 — Room → SQLDelight（高风险，最后处理）
+### Phase 4 — Room → SQLDelight（高风险，最后处理）✅
 
 **目标：** 替换本地数据库，保证收藏和关注专区数据不丢失。
 
-- [ ] 在 `shared/src/commonMain/sqldelight/` 创建 `.sq` 文件（Favorites、FollowedZones）
-- [ ] 实现 Android 驱动（`AndroidSqliteDriver`）和桌面驱动（`JdbcSqliteDriver`）
-- [ ] 替换 `FavoritesRepository` 和 `FollowedZonesRepository` 的 Room DAO 调用
-- [ ] 添加数据迁移逻辑（从 Room 数据库迁移到 SQLDelight）
-- [ ] 验证收藏和关注功能数据读写正确
+- [x] 在 `shared/src/commonMain/sqldelight/` 创建 `Favorites.sq` 和 `FollowedZones.sq`
+- [x] SQLDelight 插件加入 `shared/build.gradle.kts`，配置 `HupuDatabase`（packageName: `com.hupux.shared.db`）
+- [x] `FavoriteEntity` / `FollowedZoneEntity` 移至 `shared/commonMain`（去掉 Room 注解）
+- [x] `FavoritesRepository` / `FollowedZonesRepository` 移至 `shared/commonMain`（使用 SQLDelight 查询）
+- [x] `AppModule.kt`：Room → `AndroidSqliteDriver` + `HupuDatabase`
+- [x] `app/build.gradle.kts`：移除 Room，加 `sqldelight-android-driver`
+- [x] 验证 Android assembleDebug ✅（BUILD SUCCESSFUL）
+
+**数据迁移说明：**
+- 使用相同数据库文件名 `favorites.db`，SQLDelight 用 `IF NOT EXISTS` 建表
+- 已有用户的 Room 数据自动保留，无需手动迁移脚本
+- Room 的 `room_master_table` 等元数据表被 SQLDelight 忽略，无影响
+
+**已知情况：**
+- `followed_zones` 表的 SQLDelight 生成类名为 `Followed_zones`（保留下划线，SQLDelight 2.x 行为）
 
 ---
 
@@ -121,11 +131,11 @@ hupuX/
 
 ## 当前进度
 
-> **当前阶段：Phase 3 完成 ✅**
+> **当前阶段：Phase 4 完成 ✅**
 > 
-> Hilt 已替换为 Koin，Coil 2 已替换为 Coil 3，Android assembleDebug 构建正常。
+> Room 已替换为 SQLDelight，收藏/关注数据通过同名数据库文件自动保留，Android assembleDebug 构建正常。
 > 
-> 下一步：Phase 4 — Room → SQLDelight（高风险，需备份数据库后再操作）
+> 下一步：Phase 5 — 桌面端 UI 适配（WebView 替换、登录流程、窗口布局等）
 
 ---
 

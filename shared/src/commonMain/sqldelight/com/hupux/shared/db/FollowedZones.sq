@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS followed_zones (
+    topicId INTEGER NOT NULL PRIMARY KEY,
+    topicName TEXT NOT NULL,
+    topicLogo TEXT NOT NULL,
+    followedAt INTEGER NOT NULL
+);
+
+selectAll:
+SELECT * FROM followed_zones ORDER BY followedAt DESC;
+
+selectAllIds:
+SELECT topicId FROM followed_zones;
+
+isFollowed:
+SELECT EXISTS(SELECT 1 FROM followed_zones WHERE topicId = :topicId);
+
+insert:
+INSERT OR REPLACE INTO followed_zones (topicId, topicName, topicLogo, followedAt)
+VALUES (:topicId, :topicName, :topicLogo, :followedAt);
+
+deleteById:
+DELETE FROM followed_zones WHERE topicId = :topicId;
