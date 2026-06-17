@@ -6,12 +6,10 @@ import com.hupux.data.model.Post
 import com.hupux.data.repository.FollowedZonesRepository
 import com.hupux.data.repository.HomeRepository
 import com.hupux.data.repository.ZoneRepository
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 data class HomeUiState(
     val recommendPosts:      List<Post>       = emptyList(),
@@ -29,8 +27,7 @@ data class HomeUiState(
     val followHasMore: Boolean    get() = followDisplayCount < followedPool.size || followZoneCursors.isNotEmpty()
 }
 
-@HiltViewModel
-class HomeViewModel @Inject constructor(
+class HomeViewModel constructor(
     private val homeRepo:     HomeRepository,
     private val zoneRepo:     ZoneRepository,
     private val followedRepo: FollowedZonesRepository

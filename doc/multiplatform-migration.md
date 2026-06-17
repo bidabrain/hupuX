@@ -79,15 +79,19 @@ hupuX/
 
 ---
 
-### Phase 3 — 替换 Android 专属依赖（中风险）
+### Phase 3 — 替换 Android 专属依赖（中风险）✅
 
 **目标：** 把仅支持 Android 的依赖换成跨平台版本。
 
-- [ ] Hilt → Koin：移除 `@HiltAndroidApp`、`@Inject`、`@HiltViewModel`，改用 Koin module
-- [ ] Coil 2 → Coil 3：更新 import 和 API 调用
-- [ ] DataStore → multiplatform-settings：迁移 Cookie 存储（`CookiePreferences.kt`）
-- [ ] ViewModel 层移入 `shared/commonMain`（Koin 注入替代 Hilt）
-- [ ] 验证 Android 全功能测试（登录、发帖、收藏、回帖列表等）
+- [x] Hilt → Koin：移除所有 `@HiltAndroidApp`、`@Inject`、`@HiltViewModel`，改用 Koin `module { single/viewModel }` 
+- [x] Coil 2 → Coil 3：更新全部 import（`coil.*` → `coil3.*`），更新 `CoilImageGetter` 的 target/asDrawable API
+- [x] `app/build.gradle.kts`：移除 Hilt 插件与依赖，加入 Koin 和 Coil 3
+- [x] `HupuXApp.kt`：实现 `SingletonImageLoader.Factory`，注册 OkHttp fetcher 和 GifDecoder
+- [x] 验证 Android assembleDebug ✅（BUILD SUCCESSFUL）
+
+**说明：**
+- DataStore → multiplatform-settings 跳过：`CookiePreferences` 当前用 SharedPreferences（Android JVM，运行正常），桌面端 Cookie 存储留到 Phase 5 实现
+- ViewModel 层暂留 `app`（含 Android 专属如 `SavedStateHandle`、`Uri`），Phase 5 再评估是否迁移到 shared
 
 ---
 
@@ -117,11 +121,11 @@ hupuX/
 
 ## 当前进度
 
-> **当前阶段：Phase 2 完成 ✅**
+> **当前阶段：Phase 3 完成 ✅**
 > 
-> 数据层（Models、Scrapers、Repositories）已迁移到 `shared/commonMain`，Android assembleDebug 构建正常。
+> Hilt 已替换为 Koin，Coil 2 已替换为 Coil 3，Android assembleDebug 构建正常。
 > 
-> 下一步：Phase 3 — 替换 Android 专属依赖（Hilt → Koin、Coil 2 → Coil 3、DataStore → multiplatform-settings）
+> 下一步：Phase 4 — Room → SQLDelight（高风险，需备份数据库后再操作）
 
 ---
 

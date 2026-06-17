@@ -8,11 +8,9 @@ import com.hupux.data.model.Comment
 import com.hupux.data.model.PostDetail
 import com.hupux.data.repository.FavoritesRepository
 import com.hupux.data.repository.PostRepository
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 sealed class PostDetailUiState {
     object Loading : PostDetailUiState()
@@ -40,8 +38,7 @@ sealed class PostDetailUiState {
     data class Error(val message: String) : PostDetailUiState()
 }
 
-@HiltViewModel
-class PostDetailViewModel @Inject constructor(
+class PostDetailViewModel constructor(
     private val postRepo: PostRepository,
     private val favRepo: FavoritesRepository,
     private val cookiePrefs: CookiePreferences

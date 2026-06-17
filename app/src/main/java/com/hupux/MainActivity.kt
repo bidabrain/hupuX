@@ -9,9 +9,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.core.view.WindowCompat
 import com.hupux.ui.navigation.AppNavigation
 import com.hupux.ui.theme.HupuXTheme
-import dagger.hilt.android.AndroidEntryPoint
-
-@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

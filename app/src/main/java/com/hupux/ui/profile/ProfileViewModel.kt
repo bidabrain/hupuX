@@ -6,16 +6,13 @@ import com.hupux.data.local.CookiePreferences
 import com.hupux.data.model.UserProfile
 import com.hupux.data.model.Zone
 import com.hupux.data.repository.ProfileRepository
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
-@HiltViewModel
-class ProfileViewModel @Inject constructor(
+class ProfileViewModel constructor(
     private val repo: ProfileRepository,
     private val cookiePrefs: CookiePreferences
 ) : ViewModel() {

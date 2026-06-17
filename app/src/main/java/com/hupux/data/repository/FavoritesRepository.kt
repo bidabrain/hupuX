@@ -3,11 +3,8 @@ package com.hupux.data.repository
 import com.hupux.data.local.FavoriteDao
 import com.hupux.data.local.FavoriteEntity
 import kotlinx.coroutines.flow.Flow
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class FavoritesRepository @Inject constructor(private val dao: FavoriteDao) {
+class FavoritesRepository constructor(private val dao: FavoriteDao) {
     fun getAll(): Flow<List<FavoriteEntity>> = dao.getAll()
 
     suspend fun isFavorite(tid: String): Boolean = dao.isFavorite(tid)

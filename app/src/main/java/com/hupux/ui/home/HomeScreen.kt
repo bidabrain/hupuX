@@ -33,8 +33,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
+import org.koin.androidx.compose.koinViewModel
+import coil3.compose.AsyncImage
 import androidx.compose.material.icons.outlined.Settings
 import com.hupux.data.model.Post
 import com.hupux.ui.theme.*
@@ -46,7 +46,7 @@ fun HomeScreen(
     onPostClick: (String) -> Unit,
     onSettingsClick: () -> Unit = {},
     scrollToTopTrigger: Int = 0,
-    vm: HomeViewModel = hiltViewModel()
+    vm: HomeViewModel = koinViewModel()
 ) {
     val state         by vm.state.collectAsState()
     val followedCount by vm.followedCount.collectAsState()

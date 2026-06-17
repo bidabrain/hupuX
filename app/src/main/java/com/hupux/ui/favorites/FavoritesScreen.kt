@@ -17,14 +17,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import com.hupux.data.local.FavoriteEntity
 import com.hupux.ui.theme.*
 
 @Composable
 fun FavoritesScreen(
     onPostClick: (String) -> Unit,
-    vm: FavoritesViewModel = hiltViewModel()
+    vm: FavoritesViewModel = koinViewModel()
 ) {
     val favorites by vm.favorites.collectAsState(initial = emptyList())
 

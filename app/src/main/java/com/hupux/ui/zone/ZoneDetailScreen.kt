@@ -24,8 +24,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
+import org.koin.androidx.compose.koinViewModel
+import coil3.compose.AsyncImage
 import com.hupux.data.model.Post
 import com.hupux.data.model.ZoneDetail
 import com.hupux.ui.home.PillButton
@@ -36,7 +36,7 @@ fun ZoneDetailScreen(
     topicId: Int, topicName: String,
     onPostClick: (String) -> Unit, onBack: () -> Unit,
     onNewPostClick: () -> Unit = {},
-    vm: ZoneDetailViewModel = hiltViewModel()
+    vm: ZoneDetailViewModel = koinViewModel()
 ) {
     LaunchedEffect(topicId) { vm.init(topicId) }
     val state by vm.state.collectAsState()

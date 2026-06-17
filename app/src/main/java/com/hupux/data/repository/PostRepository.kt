@@ -9,11 +9,8 @@ import com.hupux.data.scraper.HupuImageUploader
 import com.hupux.data.scraper.HupuScraper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class PostRepository @Inject constructor(
+class PostRepository constructor(
     private val scraper: HupuScraper,
     private val desktopScraper: HupuDesktopScraper,
     private val cookiePrefs: CookiePreferences,

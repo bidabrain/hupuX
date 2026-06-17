@@ -5,11 +5,8 @@ import com.hupux.data.local.FollowedZoneEntity
 import com.hupux.data.model.Zone
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class FollowedZonesRepository @Inject constructor(private val dao: FollowedZoneDao) {
+class FollowedZonesRepository constructor(private val dao: FollowedZoneDao) {
 
     fun getAll(): Flow<List<FollowedZoneEntity>> = dao.getAll()
 

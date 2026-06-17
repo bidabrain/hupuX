@@ -5,16 +5,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hupux.data.model.UserThread
 import com.hupux.data.scraper.HupuDesktopScraper
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
-@HiltViewModel
-class UserThreadListViewModel @Inject constructor(
+class UserThreadListViewModel constructor(
     private val scraper: HupuDesktopScraper,
     savedState: SavedStateHandle
 ) : ViewModel() {

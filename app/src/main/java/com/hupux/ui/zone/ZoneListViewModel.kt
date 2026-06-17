@@ -6,10 +6,8 @@ import com.hupux.data.model.ZoneCategory
 import com.hupux.data.repository.FollowedZonesRepository
 import com.hupux.data.repository.ZoneRepository
 import com.hupux.data.model.Zone
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 sealed class ZoneListUiState {
     object Loading : ZoneListUiState()
@@ -17,8 +15,7 @@ sealed class ZoneListUiState {
     data class Error(val message: String) : ZoneListUiState()
 }
 
-@HiltViewModel
-class ZoneListViewModel @Inject constructor(
+class ZoneListViewModel constructor(
     private val repo: ZoneRepository,
     private val followedRepo: FollowedZonesRepository
 ) : ViewModel() {
