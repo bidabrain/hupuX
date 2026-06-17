@@ -63,6 +63,11 @@ compose.desktop {
             linux {
                 iconFile.set(project.file("src/jvmMain/resources/icon.png"))
             }
+            windows {
+                iconFile.set(project.file("src/jvmMain/resources/icon.ico"))
+                menuGroup = "HupuX"
+                upgradeUuid = "B3C4D5E6-F7A8-4B9C-8D0E-1F2A3B4C5D6E"
+            }
             modules("java.sql", "java.naming", "jdk.unsupported")
         }
     }
