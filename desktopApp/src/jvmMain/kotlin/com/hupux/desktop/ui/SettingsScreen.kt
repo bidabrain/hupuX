@@ -8,12 +8,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.Image
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.hupux.desktop.BuildConfig
 import com.hupux.desktop.data.DesktopCookieStorage
 import com.hupux.desktop.ui.theme.*
@@ -109,8 +110,8 @@ fun SettingsScreen(cookieStorage: DesktopCookieStorage) {
                     fontSize = 13.sp, color = TextTertiary, lineHeight = 18.sp
                 )
                 Spacer(Modifier.height(14.dp))
-                AsyncImage(
-                    model = object {}.javaClass.classLoader?.getResource("payme.jpg")?.toString(),
+                Image(
+                    painter = painterResource("payme.jpg"),
                     contentDescription = "收款码",
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.size(200.dp).clip(RoundedCornerShape(12.dp))
