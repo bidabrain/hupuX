@@ -187,6 +187,7 @@ fun App(
                     onRepliesClick = { uid -> push(Screen.UserReplyList(uid)) },
                     onRecommendClick = { uid -> push(Screen.UserRecommendList(uid)) },
                     onMessagesClick = { push(Screen.Messages) },
+                    onFavoritesClick = { push(Screen.UserFavoriteList) },
                     onZoneClick = { id, name ->
                         push(Screen.ZoneDetail(Zone(id, name, "", "")))
                     }
@@ -218,6 +219,11 @@ fun App(
                 is Screen.UserRecommendList -> UserRecommendListScreen(
                     uid = s.uid,
                     scraper = desktopScraper,
+                    onPostClick = { tid -> push(Screen.PostDetail(tid)) }
+                )
+
+                is Screen.UserFavoriteList -> UserFavoriteListScreen(
+                    profileRepo = profileRepo,
                     onPostClick = { tid -> push(Screen.PostDetail(tid)) }
                 )
             }

@@ -58,10 +58,10 @@ fun PostDetailScreen(
                 try {
                     val desktop = withContext(Dispatchers.IO) { desktopScraper.fetchPostReplies(tid, 1) }
                     hasMoreComments = desktop.currentPage < desktop.totalPages
+                    isRecommended = desktop.isRecommended
                     base.copy(comments = desktop.comments, hasMoreComments = hasMoreComments,
                         desktopTotalPages = desktop.totalPages, fid = desktop.fid,
                         topicId = desktop.topicId, isRecommended = desktop.isRecommended)
-                    isRecommended = desktop.isRecommended
                 } catch (_: Exception) { base }
             } else base
         } catch (e: Exception) { error = e.message }
