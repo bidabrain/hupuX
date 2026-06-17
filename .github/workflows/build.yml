@@ -139,23 +139,33 @@ jobs:
           name: linux-deb
           path: desktopApp/build/compose/binaries/main/deb/*.deb
 
-  # ── GitHub Release（仅在推送 tag 时触发）─────────────────────────────────────
+  # ── GitHub Release（推送到 main 时触发）──────────────────────────────────────
   release:
     name: Publish Release
     needs: [ android, macos, macos-intel, windows, linux ]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.ref == 'refs/heads/main'
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version
+        id: version
+        run: |
+          VERSION=$(grep '^appVersion=' gradle.properties | cut -d= -f2)
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: Create GitHub Release
+      - name: Create or update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
           files: |
             artifacts/android-apk/*.apk
             artifacts/macos-dmg-arm/*.dmg
