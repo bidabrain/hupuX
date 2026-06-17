@@ -61,7 +61,7 @@ jobs:
   # ── macOS Intel .dmg ──────────────────────────────────────────────────────────
   macos-intel:
     name: macOS DMG (Intel)
-    runs-on: macos-13
+    runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v4
 
