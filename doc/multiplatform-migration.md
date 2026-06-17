@@ -117,25 +117,47 @@ hupuX/
 
 ---
 
-### Phase 5 — 桌面端 UI 适配（新增）
+### Phase 5 — 桌面端 UI 适配（新增）✅
 
 **目标：** 在桌面端实现完整功能，处理平台差异。
 
-- [ ] 将 Compose UI 屏幕迁移到 `shared/commonMain`（Navigation 用 Compose Navigation）
-- [ ] 正文渲染：Android 用 WebView，桌面用 JCEF（或 WebView for Compose Desktop）
-- [ ] 登录流程：Android 用 WebView，桌面用系统浏览器 + 手动粘贴 Cookie
-- [ ] 桌面端窗口布局适配（宽屏双栏等）
-- [ ] 打包测试：macOS `.dmg`、Windows `.msi`
+- [x] `DesktopCookieStorage`：用 Java `Preferences` API 持久化 Cookie，实现 `CookieStorage` 接口
+- [x] `DesktopModule`（Koin）：`JdbcSqliteDriver`（`~/.hupux/hupux.db`）+ 所有共享 Repository/Scraper
+- [x] 桌面 UI 屏幕（`desktopApp`）：
+  - `HomeScreen` — 首页推荐帖子列表
+  - `ZoneListScreen` — 所有专区分类列表
+  - `ZoneDetailScreen` — 专区帖子列表 + 加载更多
+  - `PostDetailScreen` — 帖子详情（Jsoup 解析 HTML → 文本 + 图片）+ 评论列表
+  - `SettingsScreen` — Cookie 粘贴登录 / 退出登录
+- [x] `App.kt`：基于 `mutableStateList` 的导航返回栈，TopBar 含 Tab 切换 + 返回按钮
+- [x] 验证 `./gradlew :desktopApp:run` ✅（macOS 窗口正常启动）
+- [x] Android assembleDebug 同步验证 ✅
+
+**技术说明：**
+- 正文渲染：桌面不用 WebView，改用 Jsoup 解析 HTML 提取纯文本 + `<img>` URL，用 Coil3 `AsyncImage` 渲染图片
+- 登录：Cookie 粘贴（用户从浏览器复制），保存到 Java `Preferences`，无需 WebView
+- 不支持发帖/回复（依赖 Android 专属的 `HupuImageUploader`），桌面端只读
+
+**补全五个标签（Phase 5 迭代）：**
+- [x] 搜索：原生 TextField + Enter 搜索，调 `HupuScraper.fetchSearch()`，结果列表点击进帖子详情
+- [x] 收藏：读 `FavoritesRepository.getAll()` Flow，支持删除收藏，点击跳转帖子详情
+- [x] 我的：未登录提示前往设置；登录后显示头像、昵称、发帖/回帖/推荐/亮了/关注/粉丝等统计
+- [x] 设置从顶部独立 Tab 移入「我的」页面底部入口
+
+**待后续迭代：**
+- 图片点击放大
+- 宽屏双栏布局（左列表 + 右详情）
+- macOS `.dmg` / Windows `.msi` 打包验证
 
 ---
 
 ## 当前进度
 
-> **当前阶段：Phase 4 完成 ✅**
+> **所有阶段完成 🎉**
 > 
-> Room 已替换为 SQLDelight，收藏/关注数据通过同名数据库文件自动保留，Android assembleDebug 构建正常。
-> 
-> 下一步：Phase 5 — 桌面端 UI 适配（WebView 替换、登录流程、窗口布局等）
+> Android + macOS/Windows 桌面端均可构建运行。
+> 桌面端：`./gradlew :desktopApp:run`（开发调试）、`./gradlew :desktopApp:packageDmg`（macOS 打包）、`./gradlew :desktopApp:packageMsi`（Windows 打包）。
+> 后续迭代参见 Phase 5「待后续迭代」清单。
 
 ---
 

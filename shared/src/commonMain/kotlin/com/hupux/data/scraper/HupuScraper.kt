@@ -249,6 +249,27 @@ class HupuScraper(private val client: OkHttpClient) {
         }
     }
 
+    fun fetchSearch(query: String): List<Post> {
+        val encoded = java.net.URLEncoder.encode(query, "UTF-8")
+        val html = fetch("$BASE_URL/search?kw=$encoded")
+        return try {
+            val pp = parseNextData(html)
+            val arr = pp.arr("res") ?: return emptyList()
+            arr.mapNotNull { el ->
+                val o = el.asJsonObject
+                val tid = o.str("tid") ?: return@mapNotNull null
+                Post(
+                    tid     = tid,
+                    title   = o.str("title") ?: "",
+                    url     = o.str("url") ?: "$BASE_URL/bbs/$tid.html",
+                    label   = o.str("label") ?: "",
+                    replies = o.str("replies")?.toIntOrNull() ?: o.int_("replies") ?: 0,
+                    type    = o.str("type") ?: ""
+                )
+            }
+        } catch (_: Exception) { emptyList() }
+    }
+
     /**
      * 修复 JSON content 字段里的图片格式：
      * 1. 懒加载属性 data-src / data-original → src

@@ -17,6 +17,13 @@ kotlin {
                 implementation(compose.desktop.currentOs)
                 implementation(compose.material3)
                 implementation(libs.kotlinx.coroutines.swing)
+                implementation(libs.coil3.compose)
+                implementation(libs.coil3.network.okhttp)
+                implementation(libs.koin.core)
+                implementation(libs.sqldelight.sqlite.driver)
+                implementation(libs.okhttp)
+                implementation(libs.jsoup)
+                implementation(libs.gson)
             }
         }
     }
@@ -29,6 +36,14 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "HupuX"
             packageVersion = "1.1.0"
+            macOS {
+                dockName = "HupuX"
+                iconFile.set(project.file("src/jvmMain/resources/icon.icns"))
+            }
+            linux {
+                iconFile.set(project.file("src/jvmMain/resources/icon.png"))
+            }
+            modules("java.sql", "java.naming", "jdk.unsupported")
         }
     }
 }
