@@ -34,8 +34,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
-import coil.imageLoader
-import coil.request.ImageRequest
+import coil3.Image
+import coil3.asDrawable
+import coil3.imageLoader
+import coil3.request.ImageRequest
 import java.lang.ref.WeakReference
 import org.jsoup.Jsoup
 import androidx.compose.foundation.background
@@ -66,8 +68,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
+import org.koin.androidx.compose.koinViewModel
+import coil3.compose.AsyncImage
 import com.hupux.data.model.Comment
 import com.hupux.data.model.PostDetail
 import com.hupux.ui.home.PillButton
@@ -81,7 +83,7 @@ private val LocalImageClick = staticCompositionLocalOf<(String) -> Unit> { {} }
 fun PostDetailScreen(
     tid: String,
     onBack: () -> Unit,
-    vm: PostDetailViewModel = hiltViewModel()
+    vm: PostDetailViewModel = koinViewModel()
 ) {
     LaunchedEffect(tid) { vm.load(tid) }
     val state by vm.state.collectAsState()
@@ -589,21 +591,26 @@ private class CoilImageGetter(
         context.imageLoader.enqueue(
             ImageRequest.Builder(context)
                 .data(url)
-                .allowHardware(false) // hardware bitmap 无法在 TextView 软件 Canvas 上绘制
-                .target { result ->
-                    val tv = tvRef.get() ?: return@target
-                    val availW = tv.width - tv.paddingLeft - tv.paddingRight
-                    val baseW = if (availW > 0) availW
-                                else context.resources.displayMetrics.widthPixels - 64
-                    val maxW = (baseW * imageScale).toInt().coerceAtLeast(1)
-                    val iw = result.intrinsicWidth.coerceAtLeast(1)
-                    val ih = result.intrinsicHeight.coerceAtLeast(1)
-                    val dh = (ih.toFloat() / iw * maxW).toInt().coerceAtLeast(1)
-                    result.setBounds(0, 0, maxW, dh)
-                    wrap.inner = result
-                    wrap.setBounds(0, 0, maxW, dh)
-                    tv.text = tv.text
-                }
+                .target(
+                    onSuccess = { image: Image ->
+                        val tv = tvRef.get()
+                        if (tv != null) {
+                            // asDrawable 在 Coil 3 返回 BitmapDrawable（ARGB_8888），不用 hardware bitmap
+                            val result = image.asDrawable(context.resources)
+                            val availW = tv.width - tv.paddingLeft - tv.paddingRight
+                            val baseW = if (availW > 0) availW
+                                        else context.resources.displayMetrics.widthPixels - 64
+                            val maxW = (baseW * imageScale).toInt().coerceAtLeast(1)
+                            val iw = result.intrinsicWidth.coerceAtLeast(1)
+                            val ih = result.intrinsicHeight.coerceAtLeast(1)
+                            val dh = (ih.toFloat() / iw * maxW).toInt().coerceAtLeast(1)
+                            result.setBounds(0, 0, maxW, dh)
+                            wrap.inner = result
+                            wrap.setBounds(0, 0, maxW, dh)
+                            tv.text = tv.text
+                        }
+                    }
+                )
                 .build()
         )
         return wrap
@@ -736,9 +743,8 @@ private fun ImageViewerDialog(url: String, onDismiss: () -> Unit) {
                 .background(Color.Black)
         ) {
             AsyncImage(
-                model = coil.request.ImageRequest.Builder(LocalContext.current)
+                model = ImageRequest.Builder(LocalContext.current)
                     .data(url)
-                    .crossfade(false)
                     .build(),
                 contentDescription = null,
                 contentScale = ContentScale.Fit,

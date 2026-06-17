@@ -23,8 +23,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
+import org.koin.androidx.compose.koinViewModel
+import coil3.compose.AsyncImage
 import com.hupux.data.local.FollowedZoneEntity
 import com.hupux.data.model.Zone
 import com.hupux.data.model.ZoneCategory
@@ -35,7 +35,7 @@ import com.hupux.ui.theme.*
 fun ZoneListScreen(
     onZoneClick: (Int, String) -> Unit,
     scrollToTopTrigger: Int = 0,
-    vm: ZoneListViewModel = hiltViewModel()
+    vm: ZoneListViewModel = koinViewModel()
 ) {
     val state       by vm.state.collectAsState()
     val followedIds by vm.followedIds.collectAsState()

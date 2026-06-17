@@ -7,7 +7,6 @@ import android.util.Base64
 import android.util.Log
 import com.google.gson.JsonParser
 import com.hupux.data.local.CookiePreferences
-import dagger.hilt.android.qualifiers.ApplicationContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -20,8 +19,6 @@ import java.util.Locale
 import java.util.TimeZone
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
-import javax.inject.Inject
-import javax.inject.Singleton
 
 private const val TAG = "HupuImageUpload"
 private const val UA  = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
@@ -33,11 +30,10 @@ private const val HSS_MODULE = "editor-oss"
 private const val HSS_PATH   = "/editor"
 private const val HSS_ACTION = "1"
 
-@Singleton
-class HupuImageUploader @Inject constructor(
+class HupuImageUploader constructor(
     private val client: OkHttpClient,
     private val cookiePrefs: CookiePreferences,
-    @ApplicationContext private val ctx: Context
+    private val ctx: Context
 ) {
     fun upload(uri: Uri): String {
         val bytes = ctx.contentResolver.openInputStream(uri)!!.use { it.readBytes() }

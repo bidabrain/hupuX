@@ -30,8 +30,8 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
+import org.koin.androidx.compose.koinViewModel
+import coil3.compose.AsyncImage
 import com.hupux.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -41,7 +41,7 @@ fun NewPostScreen(
     zoneName: String,
     onBack: () -> Unit,
     onPostSuccess: () -> Unit,
-    vm: NewPostViewModel = hiltViewModel()
+    vm: NewPostViewModel = koinViewModel()
 ) {
     val state by vm.state.collectAsState()
     var title   by remember { mutableStateOf("") }

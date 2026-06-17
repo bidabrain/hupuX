@@ -1,14 +1,30 @@
 package com.hupux
 
 import android.app.Application
-import coil.ImageLoader
-import coil.ImageLoaderFactory
-import coil.decode.GifDecoder
-import dagger.hilt.android.HiltAndroidApp
+import coil3.ImageLoader
+import coil3.PlatformContext
+import coil3.SingletonImageLoader
+import coil3.gif.GifDecoder
+import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import com.hupux.di.appModule
+import org.koin.android.ext.koin.androidContext
+import org.koin.core.context.startKoin
 
-@HiltAndroidApp
-class HupuXApp : Application(), ImageLoaderFactory {
-    override fun newImageLoader(): ImageLoader = ImageLoader.Builder(this)
-        .components { add(GifDecoder.Factory()) }
-        .build()
+class HupuXApp : Application(), SingletonImageLoader.Factory {
+
+    override fun onCreate() {
+        super.onCreate()
+        startKoin {
+            androidContext(this@HupuXApp)
+            modules(appModule)
+        }
+    }
+
+    override fun newImageLoader(context: PlatformContext): ImageLoader =
+        ImageLoader.Builder(context)
+            .components {
+                add(OkHttpNetworkFetcherFactory())
+                add(GifDecoder.Factory())
+            }
+            .build()
 }

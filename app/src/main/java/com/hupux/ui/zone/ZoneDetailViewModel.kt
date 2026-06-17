@@ -6,11 +6,9 @@ import com.hupux.data.local.CookiePreferences
 import com.hupux.data.model.Post
 import com.hupux.data.model.ZoneDetail
 import com.hupux.data.repository.ZoneRepository
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 private const val JINGHUA_MIN_RECOMMEND = 20   // 精华 = 推荐数 ≥ 20
 
@@ -29,8 +27,7 @@ data class ZoneDetailUiState(
                                   else allPosts.filter { it.recommendNum >= JINGHUA_MIN_RECOMMEND }
 }
 
-@HiltViewModel
-class ZoneDetailViewModel @Inject constructor(
+class ZoneDetailViewModel constructor(
     private val repo: ZoneRepository,
     private val cookiePrefs: CookiePreferences
 ) : ViewModel() {

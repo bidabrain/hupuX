@@ -11,7 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import com.hupux.ui.theme.HupuRed
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -20,7 +20,7 @@ fun UserWebViewScreen(
     title: String,
     url: String,
     onBack: () -> Unit,
-    vm: UserWebViewViewModel = hiltViewModel()
+    vm: UserWebViewViewModel = koinViewModel()
 ) {
     Scaffold(
         topBar = {

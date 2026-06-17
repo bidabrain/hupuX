@@ -7,8 +7,6 @@ import com.hupux.data.model.*
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.jsoup.Jsoup
-import javax.inject.Inject
-import javax.inject.Singleton
 
 private const val BASE_URL = "https://m.hupu.com"
 private val NEXT_DATA_REGEX = Regex(
@@ -32,8 +30,7 @@ private fun JsonObject.int_(key: String): Int? =
 private fun JsonObject.bool_(key: String): Boolean? =
     get(key)?.takeIf { !it.isJsonNull }?.asBoolean
 
-@Singleton
-class HupuScraper @Inject constructor(private val client: OkHttpClient) {
+class HupuScraper(private val client: OkHttpClient) {
 
     private fun fetch(url: String): String {
         val request = Request.Builder()
@@ -252,6 +249,27 @@ class HupuScraper @Inject constructor(private val client: OkHttpClient) {
         }
     }
 
+    fun fetchSearch(query: String): List<Post> {
+        val encoded = java.net.URLEncoder.encode(query, "UTF-8")
+        val html = fetch("$BASE_URL/search?kw=$encoded")
+        return try {
+            val pp = parseNextData(html)
+            val arr = pp.arr("res") ?: return emptyList()
+            arr.mapNotNull { el ->
+                val o = el.asJsonObject
+                val tid = o.str("tid") ?: return@mapNotNull null
+                Post(
+                    tid     = tid,
+                    title   = o.str("title") ?: "",
+                    url     = o.str("url") ?: "$BASE_URL/bbs/$tid.html",
+                    label   = o.str("label") ?: "",
+                    replies = o.str("replies")?.toIntOrNull() ?: o.int_("replies") ?: 0,
+                    type    = o.str("type") ?: ""
+                )
+            }
+        } catch (_: Exception) { emptyList() }
+    }
+
     /**
      * 修复 JSON content 字段里的图片格式：
      * 1. 懒加载属性 data-src / data-original → src
@@ -309,7 +327,7 @@ class HupuScraper @Inject constructor(private val client: OkHttpClient) {
             if (!url.startsWith("http") || url.startsWith("data:")) return@forEach
             val lower = url.lowercase()
             if (listOf("avatar", "head_img", "default_head", "logo", "placeholder", ".svg",
-                        "/user/")          // 用户头像 URL 路径
+                        "/user/")
                     .any { lower.contains(it) }) return@forEach
             imgUrls.add(url)
         }

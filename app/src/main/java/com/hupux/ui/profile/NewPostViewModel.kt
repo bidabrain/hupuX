@@ -6,14 +6,11 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hupux.data.repository.PostRepository
-import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 data class ImageItem(
     val uri: Uri,
@@ -31,10 +28,9 @@ data class NewPostUiState(
     val images: List<ImageItem> = emptyList()
 )
 
-@HiltViewModel
-class NewPostViewModel @Inject constructor(
+class NewPostViewModel constructor(
     private val postRepo: PostRepository,
-    @ApplicationContext private val appContext: Context
+    private val appContext: Context
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(NewPostUiState())

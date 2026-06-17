@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS favorites (
+    tid TEXT NOT NULL PRIMARY KEY,
+    title TEXT NOT NULL,
+    url TEXT NOT NULL,
+    label TEXT NOT NULL,
+    replies INTEGER NOT NULL,
+    imageUrl TEXT NOT NULL,
+    savedAt INTEGER NOT NULL
+);
+
+selectAll:
+SELECT * FROM favorites ORDER BY savedAt DESC;
+
+isFavorite:
+SELECT EXISTS(SELECT 1 FROM favorites WHERE tid = :tid);
+
+insert:
+INSERT OR REPLACE INTO favorites (tid, title, url, label, replies, imageUrl, savedAt)
+VALUES (:tid, :title, :url, :label, :replies, :imageUrl, :savedAt);
+
+deleteByTid:
+DELETE FROM favorites WHERE tid = :tid;

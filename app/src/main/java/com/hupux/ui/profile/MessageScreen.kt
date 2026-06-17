@@ -24,8 +24,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
+import org.koin.androidx.compose.koinViewModel
+import coil3.compose.AsyncImage
 import com.hupux.data.model.MessageItem
 import com.hupux.ui.home.PillButton
 import com.hupux.ui.theme.*
@@ -40,7 +40,7 @@ private val TABS = listOf(
 fun MessageScreen(
     onPostClick: (tid: String) -> Unit,
     onBack: () -> Unit,
-    vm: MessageViewModel = hiltViewModel()
+    vm: MessageViewModel = koinViewModel()
 ) {
     val state by vm.state.collectAsState()
 

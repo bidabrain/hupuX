@@ -11,7 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import com.hupux.ui.theme.HupuRed
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -19,7 +19,7 @@ import com.hupux.ui.theme.HupuRed
 fun LoginWebViewScreen(
     onLoginSuccess: () -> Unit,
     onBack: () -> Unit,
-    vm: LoginWebViewViewModel = hiltViewModel()
+    vm: LoginWebViewViewModel = koinViewModel()
 ) {
     Scaffold(
         topBar = {

@@ -10,19 +10,15 @@ import android.provider.MediaStore
 import androidx.lifecycle.ViewModel
 import com.hupux.R
 import com.hupux.data.local.CookiePreferences
-import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
 import java.io.FileOutputStream
-import javax.inject.Inject
 
-@HiltViewModel
-class SettingsViewModel @Inject constructor(
+class SettingsViewModel constructor(
     private val cookiePrefs: CookiePreferences,
-    @ApplicationContext private val context: Context
+    private val context: Context
 ) : ViewModel() {
 
     private val _input = MutableStateFlow(cookiePrefs.manualCookie)

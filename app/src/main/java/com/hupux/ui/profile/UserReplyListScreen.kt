@@ -19,7 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import com.hupux.data.model.UserReply
 import com.hupux.ui.home.PillButton
 import com.hupux.ui.theme.*
@@ -30,7 +30,7 @@ import java.util.*
 fun UserReplyListScreen(
     onPostClick: (tid: String) -> Unit,
     onBack: () -> Unit,
-    vm: UserReplyListViewModel = hiltViewModel()
+    vm: UserReplyListViewModel = koinViewModel()
 ) {
     val state by vm.state.collectAsState()
     val listState = rememberLazyListState()
@@ -133,12 +133,13 @@ private fun ReplyCard(reply: UserReply, onClick: () -> Unit) {
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(Modifier.padding(8.dp)) {
-                        if (reply.quoteUsername != null) {
-                            Text(reply.quoteUsername, fontSize = 11.sp, color = HupuRed,
+                        val quoteUser = reply.quoteUsername
+                        if (quoteUser != null) {
+                            Text(quoteUser, fontSize = 11.sp, color = HupuRed,
                                 fontWeight = FontWeight.Medium)
                             Spacer(Modifier.height(2.dp))
                         }
-                        Text(reply.quoteContent, fontSize = 12.sp, color = TextSecondary,
+                        Text(reply.quoteContent ?: "", fontSize = 12.sp, color = TextSecondary,
                             maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }

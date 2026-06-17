@@ -24,8 +24,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
+import org.koin.androidx.compose.koinViewModel
+import coil3.compose.AsyncImage
 import com.hupux.data.model.UserProfile
 import com.hupux.data.model.Zone
 import com.hupux.ui.home.PillButton
@@ -39,7 +39,7 @@ fun ProfileScreen(
     onRecommendClick: (uid: String) -> Unit = {},
     onZoneClick: (topicId: Int, topicName: String) -> Unit = { _, _ -> },
     onMessagesClick: () -> Unit = {},
-    vm: ProfileViewModel = hiltViewModel()
+    vm: ProfileViewModel = koinViewModel()
 ) {
     val state by vm.state.collectAsState()
 

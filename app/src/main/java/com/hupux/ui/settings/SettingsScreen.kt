@@ -29,8 +29,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
+import org.koin.androidx.compose.koinViewModel
+import coil3.compose.AsyncImage
 import com.hupux.R
 import com.hupux.ui.theme.*
 
@@ -40,7 +40,7 @@ private const val APP_VERSION = "1.0 (1)"
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    vm: SettingsViewModel = hiltViewModel()
+    vm: SettingsViewModel = koinViewModel()
 ) {
     val input          by vm.input.collectAsState()
     val saved          by vm.saved.collectAsState()
