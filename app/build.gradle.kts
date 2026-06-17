@@ -4,6 +4,9 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+val appVersion: String by project
+val appVersionCode: String by project
+
 android {
     namespace = "com.hupux"
     compileSdk = 35
@@ -12,8 +15,8 @@ android {
         applicationId = "com.hupux"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = appVersionCode.toInt()
+        versionName = appVersion
     }
 
     buildTypes {
@@ -32,6 +35,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

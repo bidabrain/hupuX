@@ -31,11 +31,11 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import org.koin.androidx.compose.koinViewModel
 import coil3.compose.AsyncImage
+import com.hupux.BuildConfig
 import com.hupux.R
 import com.hupux.ui.theme.*
 
 private const val GITHUB_URL = "https://github.com/bidabrain/hupuX"
-private const val APP_VERSION = "1.0 (1)"
 
 @Composable
 fun SettingsScreen(
@@ -264,7 +264,7 @@ fun SettingsScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("版本", fontSize = 14.sp, color = TextSecondary)
                         Spacer(Modifier.weight(1f))
-                        Text(APP_VERSION, fontSize = 14.sp, color = TextPrimary)
+                        Text("${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", fontSize = 14.sp, color = TextPrimary)
                     }
                     Spacer(Modifier.height(10.dp))
                     HorizontalDivider(color = AppBg)

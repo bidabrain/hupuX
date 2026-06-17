@@ -14,13 +14,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.hupux.desktop.BuildConfig
 import com.hupux.desktop.data.DesktopCookieStorage
 import com.hupux.desktop.ui.theme.*
 import java.awt.Desktop
 import java.net.URI
 
 private const val GITHUB_URL = "https://github.com/bidabrain/hupuX"
-private const val APP_VERSION = "1.1.0"
 
 @Composable
 fun SettingsScreen(cookieStorage: DesktopCookieStorage) {
@@ -127,7 +127,7 @@ fun SettingsScreen(cookieStorage: DesktopCookieStorage) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("版本", fontSize = 14.sp, color = TextSecondary)
                     Spacer(Modifier.weight(1f))
-                    Text(APP_VERSION, fontSize = 14.sp, color = TextPrimary)
+                    Text(BuildConfig.VERSION_NAME, fontSize = 14.sp, color = TextPrimary)
                 }
                 HorizontalDivider(Modifier.padding(vertical = 10.dp), color = DividerColor)
                 Row(verticalAlignment = Alignment.CenterVertically) {

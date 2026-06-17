@@ -6,12 +6,32 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+val appVersion: String by project
+
+val generateDesktopBuildConfig by tasks.registering {
+    val outputDir = layout.buildDirectory.dir("generated/kotlin")
+    outputs.dir(outputDir)
+    inputs.property("appVersion", appVersion)
+    doFirst {
+        val dir = outputDir.get().asFile.resolve("com/hupux/desktop")
+        dir.mkdirs()
+        dir.resolve("BuildConfig.kt").writeText(
+            "package com.hupux.desktop\n\nobject BuildConfig {\n    const val VERSION_NAME = \"$appVersion\"\n}\n"
+        )
+    }
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    dependsOn(generateDesktopBuildConfig)
+}
+
 kotlin {
     jvmToolchain(17)
     jvm()
 
     sourceSets {
         val jvmMain by getting {
+            kotlin.srcDir(layout.buildDirectory.dir("generated/kotlin"))
             dependencies {
                 implementation(project(":shared"))
                 implementation(compose.desktop.currentOs)
@@ -35,7 +55,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "HupuX"
-            packageVersion = "1.1.0"
+            packageVersion = appVersion
             macOS {
                 dockName = "HupuX"
                 iconFile.set(project.file("src/jvmMain/resources/icon.icns"))
