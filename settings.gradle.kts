@@ -15,3 +15,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "HupuX"
 include(":app")
+include(":shared")
+include(":desktopApp")

@@ -45,13 +45,14 @@ hupuX/
 
 **目标：** 建立 KMP 项目骨架，验证 Android 构建不受影响。
 
-- [ ] 创建分支 `feature/multiplatform` ✅（已完成）
-- [ ] 更新 `gradle/libs.versions.toml`：添加 CMP、Koin、SQLDelight、Coil3、multiplatform-settings 依赖声明
-- [ ] 更新 `build.gradle.kts`（根模块）：添加新插件（apply false）
-- [ ] 更新 `settings.gradle.kts`：include `:shared` 和 `:desktopApp`
-- [ ] 创建 `shared/build.gradle.kts`（KMP 模块，空 sourceSet）
-- [ ] 创建 `desktopApp/build.gradle.kts` + 骨架 `Main.kt`（能打开空窗口）
-- [ ] 验证 Android app 仍可正常编译
+- [x] 创建分支 `feature/multiplatform`
+- [x] 更新 `gradle/libs.versions.toml`：添加 CMP、Koin、SQLDelight、Coil3、multiplatform-settings 依赖声明
+- [x] 更新 `build.gradle.kts`（根模块）：添加新插件（apply false）
+- [x] 更新 `settings.gradle.kts`：include `:shared` 和 `:desktopApp`
+- [x] 创建 `shared/build.gradle.kts`（KMP 模块，空 sourceSet）
+- [x] 创建 `desktopApp/build.gradle.kts` + 骨架 `Main.kt`（能打开空窗口）
+- [x] 验证 Android app 仍可正常编译（`./gradlew :app:assembleDebug` ✅）
+- [x] 验证 desktopApp 可编译（`./gradlew :desktopApp:compileKotlinJvm` ✅）
 
 **完成标志：** `./gradlew :app:assembleDebug` 和 `./gradlew :desktopApp:run` 均成功。
 
@@ -107,11 +108,11 @@ hupuX/
 
 ## 当前进度
 
-> **当前阶段：Phase 1（进行中）**
+> **当前阶段：Phase 1 完成 ✅**
 > 
-> 已完成：分支创建
+> Android 构建正常，desktopApp 骨架可编译。
 > 
-> 下一步：更新 Gradle 配置文件，建立模块骨架
+> 下一步：Phase 2 — 将数据层（models / scrapers / repositories）迁移到 `shared/commonMain`
 
 ---
 
