@@ -27,6 +27,7 @@ import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 import kotlinx.coroutines.delay
 import com.hupux.ui.favorites.FavoritesScreen
+import com.hupux.ui.profile.UserFavoriteListScreen
 import com.hupux.ui.home.HomeScreen
 import com.hupux.ui.post.PostDetailScreen
 import com.hupux.ui.profile.LoginWebViewScreen
@@ -209,7 +210,14 @@ fun AppNavigation() {
                     onThreadsClick     = { uid -> navController.navigate("user_threads/$uid") },
                     onRecommendClick   = { uid -> navController.navigate("user_recommend/$uid") },
                     onZoneClick        = { id, name -> navController.navigate("zone/$id/${java.net.URLEncoder.encode(name, "UTF-8")}") },
-                    onMessagesClick    = { navController.navigate("messages") }
+                    onMessagesClick    = { navController.navigate("messages") },
+                    onFavoritesClick   = { navController.navigate("user_favorites") }
+                )
+            }
+            composable("user_favorites") {
+                UserFavoriteListScreen(
+                    onPostClick = { tid -> navController.navigate("post/$tid") },
+                    onBack      = { navController.popBackStack() }
                 )
             }
             composable("messages") {

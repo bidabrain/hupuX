@@ -223,6 +223,8 @@ private fun PostContent(
         item { PostBodyCard(
             post          = s.post,
             isRecommended = s.isRecommended,
+            isCollected   = s.isCollected,
+            onCollect     = if (s.post.fid.isNotEmpty()) vm::toggleCollect else null,
             onRecommend   = if (s.post.fid.isNotEmpty()) vm::recommendPost else null,
             onReplyMain   = if (s.post.fid.isNotEmpty()) vm::startMainPostReply else null
         ) }
@@ -270,6 +272,8 @@ private fun PostContent(
 private fun PostBodyCard(
     post: PostDetail,
     isRecommended: Boolean = false,
+    isCollected: Boolean = false,
+    onCollect: (() -> Unit)? = null,
     onRecommend: (() -> Unit)? = null,
     onReplyMain: (() -> Unit)? = null
 ) {
@@ -309,7 +313,7 @@ private fun PostBodyCard(
             HorizontalDivider(thickness = 0.5.dp, color = DividerColor)
             Spacer(Modifier.height(12.dp))
             PostBodyWebView(html = post.content)
-            if (onRecommend != null || onReplyMain != null) {
+            if (onCollect != null || onRecommend != null || onReplyMain != null) {
                 Spacer(Modifier.height(8.dp))
                 HorizontalDivider(thickness = 0.5.dp, color = DividerColor)
                 Spacer(Modifier.height(4.dp))
@@ -317,6 +321,16 @@ private fun PostBodyCard(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
                 ) {
+                    if (onCollect != null) {
+                        TextButton(onClick = onCollect) {
+                            Text(
+                                if (isCollected) "已收藏" else "收藏",
+                                fontSize = 13.sp,
+                                color = if (isCollected) TextTertiary else HupuRed,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
                     if (onRecommend != null) {
                         TextButton(onClick = onRecommend) {
                             Text(

@@ -43,6 +43,7 @@ private sealed class Screen {
     data class UserThreadList(val uid: String) : Screen()
     data class UserReplyList(val uid: String) : Screen()
     data class UserRecommendList(val uid: String) : Screen()
+    object UserFavoriteList : Screen()
 }
 
 private val tabs = listOf(

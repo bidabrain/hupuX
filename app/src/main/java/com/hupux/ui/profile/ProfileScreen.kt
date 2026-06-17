@@ -39,6 +39,7 @@ fun ProfileScreen(
     onRecommendClick: (uid: String) -> Unit = {},
     onZoneClick: (topicId: Int, topicName: String) -> Unit = { _, _ -> },
     onMessagesClick: () -> Unit = {},
+    onFavoritesClick: () -> Unit = {},
     vm: ProfileViewModel = koinViewModel()
 ) {
     val state by vm.state.collectAsState()
@@ -72,7 +73,7 @@ fun ProfileScreen(
                     PillButton("重试", onClick = vm::loadProfile)
                 }
             }
-            is ProfileViewModel.State.Success     -> ProfileContent(s.profile, s.followedZones, onPostsClick, onThreadsClick, onRecommendClick, onZoneClick, onMessagesClick)
+            is ProfileViewModel.State.Success     -> ProfileContent(s.profile, s.followedZones, s.favoriteCountStr, onPostsClick, onThreadsClick, onRecommendClick, onZoneClick, onMessagesClick, onFavoritesClick)
         }
     }
 }
@@ -96,11 +97,13 @@ private fun NotLoggedInContent(onLogin: () -> Unit) {
 private fun ProfileContent(
     profile: UserProfile,
     followedZones: List<Zone>,
+    favoriteCountStr: String,
     onPostsClick: (uid: String) -> Unit,
     onThreadsClick: (uid: String) -> Unit,
     onRecommendClick: (uid: String) -> Unit,
     onZoneClick: (Int, String) -> Unit,
-    onMessagesClick: () -> Unit
+    onMessagesClick: () -> Unit,
+    onFavoritesClick: () -> Unit
 ) {
     Column(
         Modifier
@@ -166,7 +169,7 @@ private fun ProfileContent(
 
         Spacer(Modifier.height(16.dp))
 
-        // Stats
+        // Stats row 1：不可点击（关注、粉丝、赞、声望）
         Surface(
             Modifier.fillMaxWidth().padding(horizontal = 14.dp),
             shape = RoundedCornerShape(16.dp), color = CardBg, shadowElevation = 4.dp
@@ -179,6 +182,23 @@ private fun ProfileContent(
                 Box(Modifier.width(1.dp).height(36.dp).background(Color.Gray.copy(0.2f)))
                 StatItem("粉丝", profile.beFollowCount.toString())
                 Box(Modifier.width(1.dp).height(36.dp).background(Color.Gray.copy(0.2f)))
+                StatItem("赞", profile.beLightCount.toString())
+                Box(Modifier.width(1.dp).height(36.dp).background(Color.Gray.copy(0.2f)))
+                StatItem("声望", profile.reputation.toString())
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // Stats row 2：可点击进入（发帖、回帖、推荐、收藏）
+        Surface(
+            Modifier.fillMaxWidth().padding(horizontal = 14.dp),
+            shape = RoundedCornerShape(16.dp), color = CardBg, shadowElevation = 4.dp
+        ) {
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 18.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
                 StatItem("发帖", profile.postCount.toString(),
                     onClick = { onThreadsClick(profile.uid) })
                 Box(Modifier.width(1.dp).height(36.dp).background(Color.Gray.copy(0.2f)))
@@ -187,18 +207,8 @@ private fun ProfileContent(
                 Box(Modifier.width(1.dp).height(36.dp).background(Color.Gray.copy(0.2f)))
                 StatItem("推荐", profile.beRecommendCount.toString(),
                     onClick = { onRecommendClick(profile.uid) })
-            }
-        }
-
-        Spacer(Modifier.height(12.dp))
-
-        Surface(
-            Modifier.fillMaxWidth().padding(horizontal = 14.dp),
-            shape = RoundedCornerShape(16.dp), color = CardBg, shadowElevation = 4.dp
-        ) {
-            Row(Modifier.fillMaxWidth().padding(20.dp), horizontalArrangement = Arrangement.spacedBy(28.dp)) {
-                StatItem("赞", profile.beLightCount.toString())
-                StatItem("声望", profile.reputation.toString())
+                Box(Modifier.width(1.dp).height(36.dp).background(Color.Gray.copy(0.2f)))
+                StatItem("收藏", favoriteCountStr, onClick = onFavoritesClick)
             }
         }
 

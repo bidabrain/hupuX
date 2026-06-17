@@ -46,6 +46,8 @@ fun PostDetailScreen(
     var loadingMoreComments by remember { mutableStateOf(false) }
     var likedPids by remember { mutableStateOf(emptySet<String>()) }
     var likingPids by remember { mutableStateOf(emptySet<String>()) }
+    var isCollected by remember { mutableStateOf(false) }
+    var isRecommended by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(tid) {
@@ -59,6 +61,7 @@ fun PostDetailScreen(
                     base.copy(comments = desktop.comments, hasMoreComments = hasMoreComments,
                         desktopTotalPages = desktop.totalPages, fid = desktop.fid,
                         topicId = desktop.topicId, isRecommended = desktop.isRecommended)
+                    isRecommended = desktop.isRecommended
                 } catch (_: Exception) { base }
             } else base
         } catch (e: Exception) { error = e.message }
@@ -197,10 +200,55 @@ fun PostDetailScreen(
                         item { Spacer(Modifier.height(8.dp)) }
                     }
 
-                    // ── 回复框（登录后显示）────────────────────────────────────
+                    // ── 操作栏（登录后显示）────────────────────────────────────
                     if (cookieStorage.isLoggedIn) {
                         Surface(color = CardBg, shadowElevation = 8.dp) {
                             Column(Modifier.padding(12.dp)) {
+                                // 收藏 / 推荐按钮行
+                                if (post?.fid?.isNotEmpty() == true) {
+                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                        TextButton(onClick = {
+                                            val tidL = tid.toLongOrNull() ?: return@TextButton
+                                            val wasCollected = isCollected
+                                            isCollected = !wasCollected
+                                            scope.launch(Dispatchers.IO) {
+                                                try {
+                                                    if (wasCollected) desktopScraper.uncollectThread(tidL)
+                                                    else desktopScraper.collectThread(tidL)
+                                                } catch (_: Exception) { isCollected = wasCollected }
+                                            }
+                                        }) {
+                                            Text(
+                                                if (isCollected) "已收藏" else "收藏",
+                                                fontSize = 13.sp,
+                                                color = if (isCollected) TextSecondary else HupuRed,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
+                                        TextButton(onClick = {
+                                            val p2 = post ?: return@TextButton
+                                            val tidL = tid.toLongOrNull() ?: return@TextButton
+                                            val fidL = p2.fid.toLongOrNull() ?: return@TextButton
+                                            val wasRecommended = isRecommended
+                                            isRecommended = !wasRecommended
+                                            scope.launch(Dispatchers.IO) {
+                                                try {
+                                                    val status = if (wasRecommended) 0 else 1
+                                                    desktopScraper.recommendThread(tidL, fidL, status)
+                                                } catch (_: Exception) { isRecommended = wasRecommended }
+                                            }
+                                        }) {
+                                            Text(
+                                                if (isRecommended) "已推荐" else "推荐",
+                                                fontSize = 13.sp,
+                                                color = if (isRecommended) TextSecondary else HupuRed,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
+                                    }
+                                    HorizontalDivider(thickness = 0.5.dp, color = DividerColor)
+                                    Spacer(Modifier.height(4.dp))
+                                }
                                 replyingTo?.let { c ->
                                     Surface(color = MaterialTheme.colorScheme.surfaceVariant,
                                         shape = RoundedCornerShape(8.dp)) {

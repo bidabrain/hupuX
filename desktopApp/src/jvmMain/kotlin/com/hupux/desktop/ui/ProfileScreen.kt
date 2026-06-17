@@ -34,22 +34,32 @@ fun ProfileScreen(
     onRepliesClick: (uid: String) -> Unit,
     onRecommendClick: (uid: String) -> Unit,
     onMessagesClick: () -> Unit,
+    onFavoritesClick: () -> Unit,
     onZoneClick: (topicId: Int, name: String) -> Unit
 ) {
     var profile by remember { mutableStateOf<UserProfile?>(null) }
     var zones by remember { mutableStateOf<List<Zone>>(emptyList()) }
+    var favoriteCountStr by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val isLoggedIn = cookieStorage.isLoggedIn
 
     LaunchedEffect(isLoggedIn) {
-        if (!isLoggedIn) { profile = null; zones = emptyList(); return@LaunchedEffect }
+        if (!isLoggedIn) { profile = null; zones = emptyList(); favoriteCountStr = ""; return@LaunchedEffect }
         loading = true; error = null
         try {
             withContext(Dispatchers.IO) {
-                val p = async { repo.fetchProfile() }
-                val z = async { runCatching { repo.fetchFollowedZones() }.getOrDefault(emptyList()) }
-                profile = p.await(); zones = z.await()
+                val p   = async { repo.fetchProfile() }
+                val z   = async { runCatching { repo.fetchFollowedZones() }.getOrDefault(emptyList()) }
+                val fav = async { runCatching { repo.fetchFavoriteList() }.getOrNull() }
+                profile = p.await()
+                zones   = z.await()
+                val favPage = fav.await()
+                favoriteCountStr = when {
+                    favPage == null  -> ""
+                    favPage.hasMore  -> "${favPage.threads.size}+"
+                    else             -> favPage.threads.size.toString()
+                }
             }
         } catch (e: Exception) { error = e.message }
         loading = false
@@ -69,10 +79,12 @@ fun ProfileScreen(
             profile != null -> LoggedInContent(
                 profile = profile!!,
                 zones = zones,
+                favoriteCountStr = favoriteCountStr,
                 onThreadsClick = onThreadsClick,
                 onRepliesClick = onRepliesClick,
                 onRecommendClick = onRecommendClick,
                 onMessagesClick = onMessagesClick,
+                onFavoritesClick = onFavoritesClick,
                 onZoneClick = onZoneClick,
                 onSettingsClick = onSettingsClick
             )
@@ -99,10 +111,12 @@ private fun NotLoggedIn(onSettingsClick: () -> Unit) {
 private fun LoggedInContent(
     profile: UserProfile,
     zones: List<Zone>,
+    favoriteCountStr: String,
     onThreadsClick: (String) -> Unit,
     onRepliesClick: (String) -> Unit,
     onRecommendClick: (String) -> Unit,
     onMessagesClick: () -> Unit,
+    onFavoritesClick: () -> Unit,
     onZoneClick: (Int, String) -> Unit,
     onSettingsClick: () -> Unit
 ) {
@@ -135,30 +149,33 @@ private fun LoggedInContent(
 
     HorizontalDivider()
 
-    // Stats row 1
+    // Stats row 1：不可点击项（关注、粉丝、亮了、声望）
     Surface(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
         shape = RoundedCornerShape(12.dp), tonalElevation = 2.dp) {
         Row(Modifier.fillMaxWidth().padding(vertical = 16.dp),
             horizontalArrangement = Arrangement.SpaceEvenly) {
-            StatItem("关注",  profile.followCount.toString())
+            StatItem("关注", profile.followCount.toString())
             VerticalDivider()
-            StatItem("粉丝",  profile.beFollowCount.toString())
+            StatItem("粉丝", profile.beFollowCount.toString())
             VerticalDivider()
-            StatItem("发帖",  profile.postCount.toString(),  clickable = true) { onThreadsClick(profile.uid) }
+            StatItem("亮了", profile.beLightCount.toString())
             VerticalDivider()
-            StatItem("回帖",  profile.replyCount.toString(), clickable = true) { onRepliesClick(profile.uid) }
-            VerticalDivider()
-            StatItem("推荐",  profile.beRecommendCount.toString(), clickable = true) { onRecommendClick(profile.uid) }
+            StatItem("声望", profile.reputation.toString())
         }
     }
 
-    // Stats row 2
+    // Stats row 2：可点击进入项（发帖、回帖、推荐、收藏）
     Surface(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp),
         shape = RoundedCornerShape(12.dp), tonalElevation = 2.dp) {
-        Row(Modifier.fillMaxWidth().padding(vertical = 16.dp).padding(horizontal = 24.dp),
-            horizontalArrangement = Arrangement.spacedBy(32.dp)) {
-            StatItem("亮了", profile.beLightCount.toString())
-            StatItem("声望", profile.reputation.toString())
+        Row(Modifier.fillMaxWidth().padding(vertical = 16.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly) {
+            StatItem("发帖", profile.postCount.toString(), clickable = true) { onThreadsClick(profile.uid) }
+            VerticalDivider()
+            StatItem("回帖", profile.replyCount.toString(), clickable = true) { onRepliesClick(profile.uid) }
+            VerticalDivider()
+            StatItem("推荐", profile.beRecommendCount.toString(), clickable = true) { onRecommendClick(profile.uid) }
+            VerticalDivider()
+            StatItem("收藏", favoriteCountStr, clickable = true) { onFavoritesClick() }
         }
     }
 

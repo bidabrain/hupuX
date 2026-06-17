@@ -31,7 +31,9 @@ sealed class PostDetailUiState {
         val likedPids: Set<String> = emptySet(),    // 本次会话内点亮的 pid 集合
         val likingPids: Set<String> = emptySet(),   // 正在请求中的 pid，防止重复点击
         val isRecommended: Boolean = false,
-        val isRecommending: Boolean = false
+        val isRecommending: Boolean = false,
+        val isCollected: Boolean = false,
+        val isCollecting: Boolean = false
     ) : PostDetailUiState() {
         val expandedPid: String? get() = replyStack.lastOrNull()
     }
@@ -208,6 +210,24 @@ class PostDetailViewModel constructor(
                 val s2 = _state.value as? PostDetailUiState.Success ?: return@onFailure
                 val reverted = if (isCurrentlyLiked) s2.likedPids + pid else s2.likedPids - pid
                 _state.value = s2.copy(likedPids = reverted, likingPids = s2.likingPids - pid)
+            }
+        }
+    }
+
+    fun toggleCollect() {
+        val s = _state.value as? PostDetailUiState.Success ?: return
+        if (s.isCollecting) return
+        val newCollected = !s.isCollected
+        _state.value = s.copy(isCollected = newCollected, isCollecting = true)
+        viewModelScope.launch {
+            runCatching {
+                postRepo.collectPost(currentTid, s.isCollected)
+            }.onSuccess {
+                val s2 = _state.value as? PostDetailUiState.Success ?: return@onSuccess
+                _state.value = s2.copy(isCollecting = false)
+            }.onFailure {
+                val s2 = _state.value as? PostDetailUiState.Success ?: return@onFailure
+                _state.value = s2.copy(isCollected = !newCollected, isCollecting = false)
             }
         }
     }

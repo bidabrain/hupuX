@@ -319,6 +319,39 @@ class HupuDesktopScraper(
         )
     }
 
+    fun fetchFavoriteList(uid: String, maxTime: Long = 0): UserThreadPage {
+        val url = if (maxTime == 0L) "$MY_BASE/$uid?tabKey=4"
+                  else "$MY_BASE/$uid?tabKey=4&maxTime=$maxTime"
+        val html = fetch(url)
+        val marker = "window.\$\$data="
+        val start = html.indexOf(marker).takeIf { it >= 0 }?.plus(marker.length)
+            ?: return UserThreadPage(emptyList(), false, 0L)
+        val end = html.indexOf("</script>", start).takeIf { it >= 0 }
+            ?: return UserThreadPage(emptyList(), false, 0L)
+        val raw = html.substring(start, end).trimEnd(';', ' ', '\n', '\r')
+        val root = JsonParser.parseString(raw).asJsonObject
+        val pageData = root.arr("pageData") ?: return UserThreadPage(emptyList(), false, 0L)
+        val nextMaxTime = root.str("maxTime")?.toLongOrNull() ?: 0L
+        val hasNextPage = root.bool_("nextPage") ?: false
+        val items = pageData.mapNotNull { el ->
+            val o = el.asJsonObject
+            val tid = o.long_("tid") ?: return@mapNotNull null
+            UserThread(
+                tid          = tid,
+                title        = o.str("title") ?: "",
+                topicName    = o.str("topic_name") ?: "",
+                topicLogo    = o.str("topic_logo") ?: "",
+                forumName    = o.str("forum_name") ?: "",
+                replies      = o.int_("replies") ?: 0,
+                lights       = o.int_("lights") ?: 0,
+                recommendNum = o.int_("recommend_num") ?: 0,
+                createTime   = o.long_("create_time") ?: 0L,
+                summary      = o.str("summary") ?: ""
+            )
+        }
+        return UserThreadPage(items, hasNextPage, nextMaxTime)
+    }
+
     fun fetchUserProfile(uid: String): UserProfile {
         val body = fetch("$MY_BASE/pcmapi/pc/space/v1/getUserInfo?euid=$uid")
         val root = JsonParser.parseString(body).asJsonObject
@@ -401,6 +434,26 @@ class HupuDesktopScraper(
         if (code != 1 && code != 5003) {
             error(root.str("msg") ?: "${action}失败")
         }
+    }
+
+    fun collectThread(tid: Long) = callCollectApi(tid, delete = false)
+    fun uncollectThread(tid: Long) = callCollectApi(tid, delete = true)
+
+    private fun callCollectApi(tid: Long, delete: Boolean) {
+        val cookie = cookieStorage.effectiveCookie
+        val body   = "".toRequestBody(null)
+        val req = Request.Builder()
+            .url("$BBS_BASE/api/v2/threads/$tid/collect")
+            .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+            .header("Origin", BBS_BASE)
+            .header("Referer", "$BBS_BASE/$tid.html")
+            .apply { if (cookie.isNotEmpty()) header("Cookie", cookie) }
+            .apply { if (delete) delete() else post(body) }
+            .build()
+        val resp = client.newCall(req).execute().use { it.body!!.string() }
+        val root = JsonParser.parseString(resp).asJsonObject
+        val code = root.get("code")?.asInt ?: 0
+        if (code != 200) error(root.str("message") ?: if (delete) "取消收藏失败" else "收藏失败")
     }
 
     fun recommendThread(tid: Long, fid: Long, recommendStatus: Int) {

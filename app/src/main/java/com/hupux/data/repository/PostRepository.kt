@@ -76,6 +76,12 @@ class PostRepository constructor(
         }
     }
 
+    suspend fun collectPost(tid: String, isCurrentlyCollected: Boolean) = withContext(Dispatchers.IO) {
+        val tidL = tid.toLongOrNull() ?: 0L
+        if (isCurrentlyCollected) desktopScraper.uncollectThread(tidL)
+        else desktopScraper.collectThread(tidL)
+    }
+
     suspend fun recommendPost(tid: String, fid: String, isCurrentlyRecommended: Boolean) =
         withContext(Dispatchers.IO) {
             val tidL = tid.toLongOrNull() ?: 0L

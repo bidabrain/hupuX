@@ -24,6 +24,7 @@ import com.hupux.ui.profile.MessageViewModel
 import com.hupux.ui.profile.NewPostViewModel
 import com.hupux.ui.profile.ProfileViewModel
 import com.hupux.ui.settings.SettingsViewModel
+import com.hupux.ui.profile.UserFavoriteListViewModel
 import com.hupux.ui.profile.UserRecommendListViewModel
 import com.hupux.ui.profile.UserReplyListViewModel
 import com.hupux.ui.profile.UserThreadListViewModel
@@ -76,6 +77,7 @@ val appModule = module {
     viewModel { MessageViewModel(get()) }
     viewModel { NewPostViewModel(get(), androidContext()) }
     viewModel { ProfileViewModel(get(), get<CookiePreferences>()) }
+    viewModel { UserFavoriteListViewModel(get()) }
     viewModel { (handle: SavedStateHandle) -> UserRecommendListViewModel(get(), handle) }
     viewModel { (handle: SavedStateHandle) -> UserReplyListViewModel(get(), handle) }
     viewModel { (handle: SavedStateHandle) -> UserThreadListViewModel(get(), handle) }
