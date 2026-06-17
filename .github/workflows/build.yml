@@ -33,9 +33,9 @@ jobs:
           name: android-apk
           path: app/build/outputs/apk/debug/*.apk
 
-  # ── macOS .dmg ────────────────────────────────────────────────────────────────
+  # ── macOS ARM .dmg ────────────────────────────────────────────────────────────
   macos:
-    name: macOS DMG
+    name: macOS DMG (Apple Silicon)
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -55,7 +55,32 @@ jobs:
       - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:
-          name: macos-dmg
+          name: macos-dmg-arm
+          path: desktopApp/build/compose/binaries/main/dmg/*.dmg
+
+  # ── macOS Intel .dmg ──────────────────────────────────────────────────────────
+  macos-intel:
+    name: macOS DMG (Intel)
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Package DMG
+        run: ./gradlew :desktopApp:packageDmg
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg-intel
           path: desktopApp/build/compose/binaries/main/dmg/*.dmg
 
   # ── Windows .msi ──────────────────────────────────────────────────────────────
@@ -111,7 +136,7 @@ jobs:
   # ── GitHub Release（仅在推送 tag 时触发）─────────────────────────────────────
   release:
     name: Publish Release
-    needs: [ android, macos, windows, linux ]
+    needs: [ android, macos, macos-intel, windows, linux ]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
@@ -127,6 +152,7 @@ jobs:
         with:
           files: |
             artifacts/android-apk/*.apk
-            artifacts/macos-dmg/*.dmg
+            artifacts/macos-dmg-arm/*.dmg
+            artifacts/macos-dmg-intel/*.dmg
             artifacts/windows-msi/*.msi
             artifacts/linux-deb/*.deb
