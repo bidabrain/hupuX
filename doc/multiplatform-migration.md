@@ -58,15 +58,24 @@ hupuX/
 
 ---
 
-### Phase 2 — 数据层迁移到 shared/commonMain（低风险）
+### Phase 2 — 数据层迁移到 shared/commonMain（低风险）✅
 
 **目标：** 将纯 Kotlin 的数据层代码移入共享模块，`app` 改为依赖 `:shared`。
 
-- [ ] 移动数据模型（`data/model` 下的 data class）→ `shared/commonMain`
-- [ ] 移动 Scraper（`HupuScraper`、`HupuDesktopScraper`、`HupuImageUploader`、`ZoneSlugMap`）→ `shared/commonMain`
-- [ ] 移动 Repository（所有 `*Repository.kt`）→ `shared/commonMain`（暂时保留 Hilt 注解）
-- [ ] `app/build.gradle.kts` 添加 `implementation(project(":shared"))`
-- [ ] 验证 Android 功能正常
+- [x] 创建 `CookieStorage` 接口（`shared/commonMain`），解耦 Android 专属的 `CookiePreferences`
+- [x] 移动 `data/model/Models.kt` → `shared/commonMain`
+- [x] 移动 `HupuScraper`、`HupuDesktopScraper`、`ZoneSlugMap` → `shared/commonMain`（去掉 @Inject/@Singleton）
+- [x] 移动 `HomeRepository`、`ZoneRepository`、`ProfileRepository`、`MessageRepository` → `shared/commonMain`
+- [x] `CookiePreferences` 实现 `CookieStorage` 接口（加 override）
+- [x] `AppModule.kt` 补 @Provides 为迁移后的类提供依赖
+- [x] `app/build.gradle.kts` 添加 `implementation(project(":shared"))`
+- [x] 验证 Android assembleDebug ✅（BUILD SUCCESSFUL）
+
+**留在 app（Android 专属，Phase 3/4 处理）：**
+- `data/local/*`（Room + SharedPreferences）
+- `HupuImageUploader`（依赖 Context/Uri/BitmapFactory）
+- `PostRepository`（依赖 Uri + HupuImageUploader）
+- `FavoritesRepository` / `FollowedZonesRepository`（依赖 Room DAO）
 
 ---
 
@@ -108,11 +117,11 @@ hupuX/
 
 ## 当前进度
 
-> **当前阶段：Phase 1 完成 ✅**
+> **当前阶段：Phase 2 完成 ✅**
 > 
-> Android 构建正常，desktopApp 骨架可编译。
+> 数据层（Models、Scrapers、Repositories）已迁移到 `shared/commonMain`，Android assembleDebug 构建正常。
 > 
-> 下一步：Phase 2 — 将数据层（models / scrapers / repositories）迁移到 `shared/commonMain`
+> 下一步：Phase 3 — 替换 Android 专属依赖（Hilt → Koin、Coil 2 → Coil 3、DataStore → multiplatform-settings）
 
 ---
 

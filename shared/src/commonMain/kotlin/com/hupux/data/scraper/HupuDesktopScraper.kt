@@ -3,7 +3,7 @@ package com.hupux.data.scraper
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
-import com.hupux.data.local.CookiePreferences
+import com.hupux.data.CookieStorage
 import com.hupux.data.model.Comment
 import com.hupux.data.model.MessageItem
 import com.hupux.data.model.MessagePage
@@ -19,8 +19,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.jsoup.Jsoup
-import javax.inject.Inject
-import javax.inject.Singleton
 
 private const val MY_BASE  = "https://my.hupu.com"
 private const val BBS_BASE = "https://bbs.hupu.com"
@@ -47,13 +45,12 @@ private fun JsonObject.int_(key: String): Int?       = get(key)?.takeIf { !it.is
 private fun JsonObject.long_(key: String): Long?     = get(key)?.takeIf { !it.isJsonNull }?.asLong
 private fun JsonObject.bool_(key: String): Boolean?  = get(key)?.takeIf { !it.isJsonNull }?.asBoolean
 
-@Singleton
-class HupuDesktopScraper @Inject constructor(
+class HupuDesktopScraper(
     private val client: OkHttpClient,
-    private val cookiePrefs: CookiePreferences
+    private val cookieStorage: CookieStorage
 ) {
     private fun fetchBbs(url: String): String {
-        val cookie = cookiePrefs.effectiveCookie
+        val cookie = cookieStorage.effectiveCookie
         val req = Request.Builder()
             .url(url)
             .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
@@ -84,7 +81,7 @@ class HupuDesktopScraper @Inject constructor(
                 time        = o.str("createdAtFormat") ?: "",
                 location    = o.str("location") ?: "",
                 isAuthor    = o.bool_("isStarter") ?: false,
-                desktopPage = 1   // 标记为桌面版数据，允许显示回复按钮
+                desktopPage = 1
             )
         }
     }
@@ -135,7 +132,7 @@ class HupuDesktopScraper @Inject constructor(
     }
 
     private fun fetch(url: String): String {
-        val cookie = cookiePrefs.effectiveCookie
+        val cookie = cookieStorage.effectiveCookie
         val req = Request.Builder()
             .url(url)
             .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
@@ -146,7 +143,6 @@ class HupuDesktopScraper @Inject constructor(
         return client.newCall(req).execute().use { it.body!!.string() }
     }
 
-    // tabKey=1：发帖列表，maxTime=0 表示首页，分页用上页最后一项的 create_time
     fun fetchThreadList(uid: String, maxTime: Long = 0): UserThreadPage {
         val body = fetch("$MY_BASE/pcmapi/pc/space/v1/getThreadList?euid=$uid&maxTime=$maxTime&page=1&pageSize=10")
         val root = JsonParser.parseString(body).asJsonObject
@@ -172,7 +168,6 @@ class HupuDesktopScraper @Inject constructor(
         return UserThreadPage(threads, hasMore, nextMaxTime)
     }
 
-    // tabKey=2：回帖列表，maxTime=0 表示首页，分页用返回的 maxTime
     fun fetchReplyList(uid: String, maxTime: Long = 0): UserReplyPage {
         val body = fetch("$MY_BASE/pcmapi/pc/space/v1/getReplyList?euid=$uid&maxTime=$maxTime&page=1&pageSize=10")
         val root = JsonParser.parseString(body).asJsonObject
@@ -186,7 +181,6 @@ class HupuDesktopScraper @Inject constructor(
         )
     }
 
-    // tabKey=3：推荐帖子列表，page 翻页
     fun fetchRecommendList(uid: String, page: Int = 1): List<UserRecommendPost> {
         val body = fetch("$MY_BASE/pcmapi/pc/space/v1/getRecommendList?euid=$uid&page=$page&pageSize=30")
         val root = JsonParser.parseString(body).asJsonObject
@@ -222,7 +216,6 @@ class HupuDesktopScraper @Inject constructor(
         summary     = o.str("summary") ?: ""
     )
 
-    // 关注的专区：解析桌面 HTML，用硬编码映射表查 topicId（无需额外网络请求）
     fun fetchFollowedZones(uid: String): List<Zone> {
         val html = fetch("$MY_BASE/$uid")
         val doc  = Jsoup.parse(html)
@@ -231,16 +224,11 @@ class HupuDesktopScraper @Inject constructor(
             val name = a.selectFirst("span.itemImgTitle")?.text()?.trim() ?: return@mapNotNull null
             val slug = a.attr("href").removePrefix("https://bbs.hupu.com/")
             val logo = a.selectFirst("img.cardImg")?.attr("src") ?: ""
-            // 先查映射表，再尝试把 slug 本身当数字 topicId（兜底）
             val topicId = DESKTOP_SLUG_TO_TOPIC_ID[slug] ?: slug.toIntOrNull() ?: return@mapNotNull null
             Zone(topicId = topicId, topicName = name, topicLogo = logo, count = "")
         }
     }
 
-    /**
-     * tabKey: 1=提到我的, 2=评论, 3=亮了/推荐
-     * pageStr=null 时从页面 SSR 读取初始数据，否则调 API 分页
-     */
     fun fetchMessages(tabKey: Int, pageStr: String? = null): MessagePage {
         return if (pageStr == null) {
             val html = fetch("$MY_BASE/message?tabKey=$tabKey")
@@ -290,7 +278,6 @@ class HupuDesktopScraper @Inject constructor(
         )
     }
 
-    // tab1(提到我的) / tab2(评论)：pics 是对象数组 [{url, is_gif, ...}]
     private fun parseReplyMentionItem(o: JsonObject): MessageItem {
         val pics = o.arr("pics")?.mapNotNull { el ->
             if (el.isJsonObject) el.asJsonObject.str("url") else el.asString
@@ -311,7 +298,6 @@ class HupuDesktopScraper @Inject constructor(
         )
     }
 
-    // tab3(亮了/推荐)：tid=operateId，用户信息在 post 子对象
     private fun parseLightItem(o: JsonObject): MessageItem {
         val post = o.obj("post")
         val tid = o.get("operateId")?.takeIf { !it.isJsonNull }?.asLong ?: 0L
@@ -357,10 +343,6 @@ class HupuDesktopScraper @Inject constructor(
         )
     }
 
-    /**
-     * 发帖：POST /pcmapi/pc/bbs/v1/createThread
-     * 返回新帖子 tid，失败抛异常
-     */
     fun createThread(topicId: Int, title: String, content: String): Long {
         val body = com.google.gson.JsonObject().apply {
             addProperty("title",   title)
@@ -369,7 +351,7 @@ class HupuDesktopScraper @Inject constructor(
             addProperty("fid",     0L)
         }.toString()
 
-        val cookie = cookiePrefs.effectiveCookie
+        val cookie = cookieStorage.effectiveCookie
         val req = Request.Builder()
             .url("$BBS_BASE/pcmapi/pc/bbs/v1/createThread")
             .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
@@ -387,10 +369,6 @@ class HupuDesktopScraper @Inject constructor(
         return root.obj("data")?.long_("tid") ?: 0L
     }
 
-    /**
-     * 点亮/取消点亮回复
-     * code 5003 = 已经点亮过，视为成功
-     */
     fun lightReply(pid: Long, tid: Long, puid: Long, fid: Long) =
         callLightApi("light", pid, tid, puid, fid)
 
@@ -406,7 +384,7 @@ class HupuDesktopScraper @Inject constructor(
             addProperty("deviceId", "")
         }.toString()
 
-        val cookie = cookiePrefs.effectiveCookie
+        val cookie = cookieStorage.effectiveCookie
         val req = Request.Builder()
             .url("$BBS_BASE/pcmapi/pc/bbs/v1/reply/$action")
             .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
@@ -425,10 +403,6 @@ class HupuDesktopScraper @Inject constructor(
         }
     }
 
-    /**
-     * 推荐/取消推荐主贴：POST /pcmapi/pc/bbs/v1/thread/recommend
-     * recommendStatus: 1=推荐, 0=取消推荐
-     */
     fun recommendThread(tid: Long, fid: Long, recommendStatus: Int) {
         val body = com.google.gson.JsonObject().apply {
             addProperty("tid",             tid)
@@ -436,7 +410,7 @@ class HupuDesktopScraper @Inject constructor(
             addProperty("recommendStatus", recommendStatus)
         }.toString()
 
-        val cookie = cookiePrefs.effectiveCookie
+        val cookie = cookieStorage.effectiveCookie
         val req = Request.Builder()
             .url("$BBS_BASE/pcmapi/pc/bbs/v1/thread/recommend")
             .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
@@ -453,10 +427,6 @@ class HupuDesktopScraper @Inject constructor(
         if (code != 1) error(root.str("msg") ?: "推荐失败")
     }
 
-    /**
-     * 提交回复：POST /pcmapi/pc/bbs/v1/createReply
-     * 成功返回 true，失败抛异常（message 为服务器返回的 msg）
-     */
     fun createReply(
         tid: String, fid: String, topicId: String,
         quoteId: String, content: String
@@ -471,7 +441,7 @@ class HupuDesktopScraper @Inject constructor(
             addProperty("deviceid", "")
         }.toString()
 
-        val cookie = cookiePrefs.effectiveCookie
+        val cookie = cookieStorage.effectiveCookie
         val req = Request.Builder()
             .url("$BBS_BASE/pcmapi/pc/bbs/v1/createReply")
             .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")

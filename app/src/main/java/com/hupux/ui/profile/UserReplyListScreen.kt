@@ -133,12 +133,13 @@ private fun ReplyCard(reply: UserReply, onClick: () -> Unit) {
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(Modifier.padding(8.dp)) {
-                        if (reply.quoteUsername != null) {
-                            Text(reply.quoteUsername, fontSize = 11.sp, color = HupuRed,
+                        val quoteUser = reply.quoteUsername
+                        if (quoteUser != null) {
+                            Text(quoteUser, fontSize = 11.sp, color = HupuRed,
                                 fontWeight = FontWeight.Medium)
                             Spacer(Modifier.height(2.dp))
                         }
-                        Text(reply.quoteContent, fontSize = 12.sp, color = TextSecondary,
+                        Text(reply.quoteContent ?: "", fontSize = 12.sp, color = TextSecondary,
                             maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }

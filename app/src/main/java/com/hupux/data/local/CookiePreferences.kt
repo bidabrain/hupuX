@@ -1,6 +1,7 @@
 package com.hupux.data.local
 
 import android.content.Context
+import com.hupux.data.CookieStorage
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -10,7 +11,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class CookiePreferences @Inject constructor(@ApplicationContext ctx: Context) {
+class CookiePreferences @Inject constructor(@ApplicationContext ctx: Context) : CookieStorage {
 
     private val prefs = ctx.getSharedPreferences("hupu_prefs", Context.MODE_PRIVATE)
 
@@ -31,19 +32,19 @@ class CookiePreferences @Inject constructor(@ApplicationContext ctx: Context) {
             _changeFlow.tryEmit(Unit)
         }
 
-    var replySignature: String
+    override var replySignature: String
         get() = prefs.getString(KEY_SIGNATURE, "") ?: ""
         set(value) {
             prefs.edit().putString(KEY_SIGNATURE, value).apply()
         }
 
-    val effectiveCookie: String
+    override val effectiveCookie: String
         get() = manualCookie.ifEmpty { webviewCookie }
 
-    val isLoggedIn: Boolean
+    override val isLoggedIn: Boolean
         get() = effectiveCookie.isNotEmpty()
 
-    fun extractUid(): String? {
+    override fun extractUid(): String? {
         val raw = effectiveCookie
             .split(";")
             .map { it.trim() }

@@ -5,11 +5,8 @@ import com.hupux.data.model.ZonePage
 import com.hupux.data.scraper.HupuScraper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class ZoneRepository @Inject constructor(private val scraper: HupuScraper) {
+class ZoneRepository(private val scraper: HupuScraper) {
     suspend fun getZoneList(): List<ZoneCategory> = withContext(Dispatchers.IO) {
         scraper.fetchZoneList()
     }

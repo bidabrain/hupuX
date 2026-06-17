@@ -7,8 +7,6 @@ import com.hupux.data.model.*
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.jsoup.Jsoup
-import javax.inject.Inject
-import javax.inject.Singleton
 
 private const val BASE_URL = "https://m.hupu.com"
 private val NEXT_DATA_REGEX = Regex(
@@ -32,8 +30,7 @@ private fun JsonObject.int_(key: String): Int? =
 private fun JsonObject.bool_(key: String): Boolean? =
     get(key)?.takeIf { !it.isJsonNull }?.asBoolean
 
-@Singleton
-class HupuScraper @Inject constructor(private val client: OkHttpClient) {
+class HupuScraper(private val client: OkHttpClient) {
 
     private fun fetch(url: String): String {
         val request = Request.Builder()
@@ -309,7 +306,7 @@ class HupuScraper @Inject constructor(private val client: OkHttpClient) {
             if (!url.startsWith("http") || url.startsWith("data:")) return@forEach
             val lower = url.lowercase()
             if (listOf("avatar", "head_img", "default_head", "logo", "placeholder", ".svg",
-                        "/user/")          // 用户头像 URL 路径
+                        "/user/")
                     .any { lower.contains(it) }) return@forEach
             imgUrls.add(url)
         }
