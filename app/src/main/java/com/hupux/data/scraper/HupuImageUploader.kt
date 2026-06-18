@@ -35,7 +35,7 @@ class HupuImageUploader constructor(
     private val cookiePrefs: CookiePreferences,
     private val ctx: Context
 ) {
-    fun upload(uri: Uri): String {
+    fun upload(uri: Uri, module: String = HSS_MODULE, path: String = HSS_PATH): String {
         val bytes = ctx.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
         val mime  = ctx.contentResolver.getType(uri) ?: "image/jpeg"
         val ext   = mimeToExt(mime)
@@ -54,8 +54,8 @@ class HupuImageUploader constructor(
             "appId"     to HSS_APP_ID,
             "extension" to ext,
             "fileHash"  to md5,
-            "module"    to HSS_MODULE,
-            "path"      to HSS_PATH,
+            "module"    to module,
+            "path"      to path,
             "timestamp" to timestamp
         )
         val sign = hssSign(signParams)
@@ -65,8 +65,8 @@ class HupuImageUploader constructor(
             .addQueryParameter("action",    HSS_ACTION)
             .addQueryParameter("appId",     HSS_APP_ID)
             .addQueryParameter("fileHash",  md5)
-            .addQueryParameter("module",    HSS_MODULE)
-            .addQueryParameter("path",      HSS_PATH)
+            .addQueryParameter("module",    module)
+            .addQueryParameter("path",      path)
             .addQueryParameter("timestamp", timestamp)
             .addQueryParameter("hss_sign",  sign)
             .addQueryParameter("extension", ext)

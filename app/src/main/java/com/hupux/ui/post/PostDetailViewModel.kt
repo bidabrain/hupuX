@@ -1,5 +1,6 @@
 package com.hupux.ui.post
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hupux.data.local.CookiePreferences
@@ -8,6 +9,8 @@ import com.hupux.data.model.Comment
 import com.hupux.data.model.PostDetail
 import com.hupux.data.repository.FavoritesRepository
 import com.hupux.data.repository.PostRepository
+import com.hupux.ui.profile.ImageItem
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -25,6 +28,7 @@ sealed class PostDetailUiState {
         val replyingTo: Comment? = null,
         val showReplySheet: Boolean = false,
         val replyContent: String = "",
+        val replyImages: List<ImageItem> = emptyList(),
         val isSubmittingReply: Boolean = false,
         val replyError: String? = null,
         val replySuccess: Boolean = false,
@@ -57,6 +61,7 @@ class PostDetailViewModel constructor(
     private val _state = MutableStateFlow<PostDetailUiState>(PostDetailUiState.Loading)
     val state = _state.asStateFlow()
     private var currentTid = ""
+    private val replyUploadJobs = mutableMapOf<Uri, Job>()
 
     fun load(tid: String) {
         if (currentTid == tid && _state.value is PostDetailUiState.Success) return
@@ -194,17 +199,50 @@ class PostDetailViewModel constructor(
 
     fun startReply(comment: Comment) {
         val s = _state.value as? PostDetailUiState.Success ?: return
-        _state.value = s.copy(showReplySheet = true, replyingTo = comment, replyContent = "", replyError = null, replySuccess = false)
+        replyUploadJobs.values.forEach { it.cancel() }
+        replyUploadJobs.clear()
+        _state.value = s.copy(showReplySheet = true, replyingTo = comment, replyContent = "", replyImages = emptyList(), replyError = null, replySuccess = false)
     }
 
     fun startMainPostReply() {
         val s = _state.value as? PostDetailUiState.Success ?: return
-        _state.value = s.copy(showReplySheet = true, replyingTo = null, replyContent = "", replyError = null, replySuccess = false)
+        replyUploadJobs.values.forEach { it.cancel() }
+        replyUploadJobs.clear()
+        _state.value = s.copy(showReplySheet = true, replyingTo = null, replyContent = "", replyImages = emptyList(), replyError = null, replySuccess = false)
     }
 
     fun dismissReply() {
+        replyUploadJobs.values.forEach { it.cancel() }
+        replyUploadJobs.clear()
         val s = _state.value as? PostDetailUiState.Success ?: return
-        _state.value = s.copy(showReplySheet = false, replyingTo = null, replyContent = "", replyError = null)
+        _state.value = s.copy(showReplySheet = false, replyingTo = null, replyContent = "", replyImages = emptyList(), replyError = null)
+    }
+
+    fun addReplyImage(uri: Uri) {
+        val s = _state.value as? PostDetailUiState.Success ?: return
+        _state.value = s.copy(replyImages = s.replyImages + ImageItem(uri, ImageItem.Status.Uploading))
+        val job = viewModelScope.launch {
+            runCatching { postRepo.uploadImageForReply(uri) }
+                .onSuccess { fileSrc ->
+                    val s2 = _state.value as? PostDetailUiState.Success ?: return@onSuccess
+                    _state.value = s2.copy(replyImages = s2.replyImages.map { img ->
+                        if (img.uri == uri) img.copy(status = ImageItem.Status.Done, fileSrc = fileSrc) else img
+                    })
+                }
+                .onFailure { e ->
+                    val s2 = _state.value as? PostDetailUiState.Success ?: return@onFailure
+                    _state.value = s2.copy(replyImages = s2.replyImages.map { img ->
+                        if (img.uri == uri) img.copy(status = ImageItem.Status.Error, errorMsg = e.message) else img
+                    })
+                }
+        }
+        replyUploadJobs[uri] = job
+    }
+
+    fun removeReplyImage(uri: Uri) {
+        replyUploadJobs.remove(uri)?.cancel()
+        val s = _state.value as? PostDetailUiState.Success ?: return
+        _state.value = s.copy(replyImages = s.replyImages.filter { it.uri != uri })
     }
 
     fun updateReplyContent(text: String) {
@@ -215,13 +253,16 @@ class PostDetailViewModel constructor(
     fun submitReply() {
         val s = _state.value as? PostDetailUiState.Success ?: return
         val comment = s.replyingTo   // null = 回复主贴
-        val content = s.replyContent.trim()
-        if (content.isEmpty()) {
+        val text = s.replyContent.trim()
+        val doneImages = s.replyImages.filter { it.status == ImageItem.Status.Done }
+        if (text.isEmpty() && doneImages.isEmpty()) {
             _state.value = s.copy(replyError = "请输入回复内容")
             return
         }
         val sig = cookiePrefs.replySignature.trim()
-        val fullContent = if (sig.isNotEmpty()) "$content\n$sig" else content
+        val textWithSig = if (text.isNotEmpty()) (if (sig.isNotEmpty()) "$text\n$sig" else text) else ""
+        val textHtml = if (textWithSig.isNotEmpty()) "<p>$textWithSig</p>" else ""
+        val imgHtml  = doneImages.joinToString("") { """<img src="${it.fileSrc}" />""" }
         _state.value = s.copy(isSubmittingReply = true, replyError = null)
         viewModelScope.launch {
             runCatching {
@@ -230,7 +271,7 @@ class PostDetailViewModel constructor(
                     fid     = s.post.fid,
                     topicId = s.post.topicId,
                     quoteId = comment?.pid ?: "0",
-                    content = "<p>$fullContent</p>"
+                    content = textHtml + imgHtml
                 )
             }.onSuccess {
                 _state.value = (_state.value as? PostDetailUiState.Success)

@@ -51,19 +51,26 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.lang.ref.WeakReference
 import org.jsoup.Jsoup
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -84,6 +91,7 @@ import coil3.compose.AsyncImage
 import com.hupux.data.model.Comment
 import com.hupux.data.model.PostDetail
 import com.hupux.ui.home.PillButton
+import com.hupux.ui.profile.ImageItem
 import com.hupux.ui.theme.*
 
 // 图片点击回调，由 PostDetailScreen 提供，HtmlText 和 PostBodyWebView 消费
@@ -203,14 +211,17 @@ fun PostDetailScreen(
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ) {
             ReplySheet(
-                replyingTo    = successState.replyingTo,
-                content       = successState.replyContent,
-                isSubmitting  = successState.isSubmittingReply,
-                error         = successState.replyError,
-                success       = successState.replySuccess,
+                replyingTo      = successState.replyingTo,
+                content         = successState.replyContent,
+                images          = successState.replyImages,
+                isSubmitting    = successState.isSubmittingReply,
+                error           = successState.replyError,
+                success         = successState.replySuccess,
                 onContentChange = vm::updateReplyContent,
-                onSubmit      = vm::submitReply,
-                onDismiss     = vm::dismissReply
+                onAddImage      = vm::addReplyImage,
+                onRemoveImage   = vm::removeReplyImage,
+                onSubmit        = vm::submitReply,
+                onDismiss       = vm::dismissReply
             )
         }
     }
@@ -912,10 +923,13 @@ private suspend fun saveImageToGallery(context: Context, url: String) {
 private fun ReplySheet(
     replyingTo: Comment?,   // null = 回复主贴
     content: String,
+    images: List<ImageItem>,
     isSubmitting: Boolean,
     error: String?,
     success: Boolean,
     onContentChange: (String) -> Unit,
+    onAddImage: (Uri) -> Unit,
+    onRemoveImage: (Uri) -> Unit,
     onSubmit: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -926,6 +940,13 @@ private fun ReplySheet(
             onDismiss()
         }
     }
+
+    val picker = rememberLauncherForActivityResult(PickVisualMedia()) { uri ->
+        uri?.let { onAddImage(it) }
+    }
+    val hasUploading = images.any { it.status == ImageItem.Status.Uploading }
+    val canSubmit = !isSubmitting && !hasUploading &&
+        (content.trim().isNotEmpty() || images.any { it.status == ImageItem.Status.Done })
 
     Column(
         Modifier
@@ -963,23 +984,39 @@ private fun ReplySheet(
                 unfocusedBorderColor = DividerColor
             )
         )
+        // 图片缩略图条
+        if (images.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(images, key = { it.uri }) { item ->
+                    ReplyImageThumbnail(item = item, onRemove = { onRemoveImage(item.uri) })
+                }
+            }
+        }
         if (error != null) {
             Spacer(Modifier.height(6.dp))
             Text(error, fontSize = 12.sp, color = HupuRed)
         }
-        Spacer(Modifier.height(12.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        Spacer(Modifier.height(8.dp))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(
+                onClick = { picker.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly)) },
+                enabled = !isSubmitting
+            ) {
+                Icon(Icons.Default.AddPhotoAlternate, contentDescription = "添加图片", tint = TextSecondary)
+            }
+            Spacer(Modifier.weight(1f))
             TextButton(onClick = onDismiss, enabled = !isSubmitting) {
                 Text("取消", color = TextSecondary)
             }
             Spacer(Modifier.width(8.dp))
             Button(
                 onClick = onSubmit,
-                enabled = !isSubmitting && content.trim().isNotEmpty(),
+                enabled = canSubmit,
                 colors = ButtonDefaults.buttonColors(containerColor = HupuRed),
                 shape = RoundedCornerShape(20.dp)
             ) {
-                if (isSubmitting) {
+                if (isSubmitting || hasUploading) {
                     CircularProgressIndicator(Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
                 } else {
                     Text("提交", color = Color.White)
@@ -987,6 +1024,48 @@ private fun ReplySheet(
             }
         }
         Spacer(Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun ReplyImageThumbnail(item: ImageItem, onRemove: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(72.dp)
+            .clip(RoundedCornerShape(8.dp))
+    ) {
+        AsyncImage(
+            model              = item.uri,
+            contentDescription = null,
+            contentScale       = ContentScale.Crop,
+            modifier           = Modifier.fillMaxSize()
+        )
+        when (item.status) {
+            ImageItem.Status.Uploading -> Box(
+                modifier         = Modifier.fillMaxSize().background(Color.Black.copy(0.45f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
+            }
+            ImageItem.Status.Error -> Box(
+                modifier         = Modifier.fillMaxSize().background(Color(0xAAFF0000)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Warning, contentDescription = item.errorMsg, tint = Color.White, modifier = Modifier.size(24.dp))
+            }
+            ImageItem.Status.Done -> Unit
+        }
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(3.dp)
+                .size(18.dp)
+                .background(Color.Black.copy(0.55f), CircleShape)
+                .clickable(onClick = onRemove),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Default.Close, contentDescription = "删除", tint = Color.White, modifier = Modifier.size(12.dp))
+        }
     }
 }
 

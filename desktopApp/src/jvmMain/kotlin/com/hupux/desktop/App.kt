@@ -201,7 +201,8 @@ fun App(
                     tid = s.tid,
                     scraper = scraper,
                     desktopScraper = desktopScraper,
-                    cookieStorage = cookieStorage
+                    cookieStorage = cookieStorage,
+                    imageUploader = imageUploader
                 )
 
                 is Screen.UserThreadList -> UserThreadListScreen(

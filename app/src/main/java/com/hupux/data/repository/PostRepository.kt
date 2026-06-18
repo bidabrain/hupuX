@@ -55,6 +55,9 @@ class PostRepository constructor(
     suspend fun uploadImage(uri: Uri): String =
         withContext(Dispatchers.IO) { imageUploader.upload(uri) }
 
+    suspend fun uploadImageForReply(uri: Uri): String =
+        withContext(Dispatchers.IO) { imageUploader.upload(uri, "reply-oss", "/reply") }
+
     suspend fun submitReply(
         tid: String, fid: String, topicId: String,
         quoteId: String, content: String

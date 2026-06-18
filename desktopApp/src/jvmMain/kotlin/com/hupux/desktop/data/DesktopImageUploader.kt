@@ -28,7 +28,7 @@ class DesktopImageUploader(
     private val cookieStorage: DesktopCookieStorage
 ) {
     /** 上传本地图片文件，返回 CDN URL */
-    fun upload(file: File): String {
+    fun upload(file: File, module: String = HSS_MODULE, path: String = HSS_PATH): String {
         val bytes = file.readBytes()
         val ext = when (file.extension.lowercase()) {
             "png" -> "png"; "gif" -> "gif"; "webp" -> "webp"; else -> "jpeg"
@@ -45,7 +45,7 @@ class DesktopImageUploader(
         val signParams = mapOf(
             "action"    to HSS_ACTION,  "appId"     to HSS_APP_ID,
             "extension" to ext,         "fileHash"  to md5,
-            "module"    to HSS_MODULE,  "path"      to HSS_PATH,
+            "module"    to module,      "path"      to path,
             "timestamp" to timestamp
         )
         val sign = hssSign(signParams)
@@ -55,8 +55,8 @@ class DesktopImageUploader(
             .addQueryParameter("action",    HSS_ACTION)
             .addQueryParameter("appId",     HSS_APP_ID)
             .addQueryParameter("fileHash",  md5)
-            .addQueryParameter("module",    HSS_MODULE)
-            .addQueryParameter("path",      HSS_PATH)
+            .addQueryParameter("module",    module)
+            .addQueryParameter("path",      path)
             .addQueryParameter("timestamp", timestamp)
             .addQueryParameter("hss_sign",  sign)
             .addQueryParameter("extension", ext)

@@ -22,6 +22,8 @@ import com.hupux.data.model.PostDetail
 import com.hupux.data.scraper.HupuDesktopScraper
 import com.hupux.data.scraper.HupuScraper
 import com.hupux.desktop.data.DesktopCookieStorage
+import com.hupux.desktop.data.DesktopImageUploader
+import com.hupux.desktop.data.pickImageFile
 import com.hupux.desktop.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -34,7 +36,8 @@ fun PostDetailScreen(
     tid: String,
     scraper: HupuScraper,
     desktopScraper: HupuDesktopScraper,
-    cookieStorage: DesktopCookieStorage
+    cookieStorage: DesktopCookieStorage,
+    imageUploader: DesktopImageUploader
 ) {
     var post by remember { mutableStateOf<PostDetail?>(null) }
     var loading by remember { mutableStateOf(true) }
@@ -43,6 +46,9 @@ fun PostDetailScreen(
     var replyingTo by remember { mutableStateOf<Comment?>(null) }
     var replySending by remember { mutableStateOf(false) }
     var replyResult by remember { mutableStateOf<String?>(null) }
+    var replyImages by remember { mutableStateOf(listOf<String>()) }  // 已上传的 fileSrc 列表
+    var replyImageUploading by remember { mutableStateOf(false) }
+    var replyImageStatus by remember { mutableStateOf<String?>(null) }
     var commentPage by remember { mutableStateOf(1) }
     var hasMoreComments by remember { mutableStateOf(false) }
     var loadingMoreComments by remember { mutableStateOf(false) }
@@ -365,6 +371,21 @@ fun PostDetailScreen(
                                                 else MaterialTheme.colorScheme.error)
                                     Spacer(Modifier.height(4.dp))
                                 }
+                                // 已上传图片列表
+                                if (replyImages.isNotEmpty()) {
+                                    Column(Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                                        verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        replyImages.forEachIndexed { i, src ->
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text("图片${i + 1}", fontSize = 12.sp, color = TextSecondary,
+                                                    modifier = Modifier.weight(1f))
+                                                TextButton(onClick = {
+                                                    replyImages = replyImages - src
+                                                }) { Text("删除", fontSize = 11.sp) }
+                                            }
+                                        }
+                                    }
+                                }
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     OutlinedTextField(
                                         value = replyText,
@@ -375,35 +396,73 @@ fun PostDetailScreen(
                                         shape = RoundedCornerShape(10.dp)
                                     )
                                     Spacer(Modifier.width(8.dp))
-                                    Button(
-                                        onClick = {
-                                            val content = replyText.trim()
-                                            if (content.isEmpty()) return@Button
-                                            scope.launch {
-                                                replySending = true
-                                                try {
-                                                    withContext(Dispatchers.IO) {
-                                                        desktopScraper.createReply(
-                                                            tid = tid, fid = p.fid, topicId = p.topicId,
-                                                            quoteId = replyingTo?.pid ?: "0",
-                                                            content = "<p>$content</p>"
-                                                        )
+                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        OutlinedButton(
+                                            onClick = {
+                                                scope.launch(Dispatchers.IO) {
+                                                    replyImageUploading = true
+                                                    replyImageStatus = "选择图片中…"
+                                                    val file = pickImageFile()
+                                                    if (file == null) {
+                                                        replyImageUploading = false; replyImageStatus = null
+                                                        return@launch
                                                     }
-                                                    replyText = ""; replyingTo = null
-                                                    replyResult = "✓ 回复成功"
-                                                } catch (e: Exception) {
-                                                    replyResult = "回复失败：${e.message}"
+                                                    replyImageStatus = "上传中…"
+                                                    try {
+                                                        val url = imageUploader.upload(file, "reply-oss", "/reply")
+                                                        replyImages = replyImages + url
+                                                        replyImageStatus = "✓ 已添加"
+                                                    } catch (e: Exception) {
+                                                        replyImageStatus = "上传失败：${e.message}"
+                                                    }
+                                                    replyImageUploading = false
                                                 }
-                                                replySending = false
-                                            }
-                                        },
-                                        enabled = !replySending && replyText.isNotBlank(),
-                                        shape = RoundedCornerShape(10.dp)
-                                    ) {
-                                        if (replySending) CircularProgressIndicator(Modifier.size(16.dp),
-                                            color = Color.White)
-                                        else Text("发送")
+                                            },
+                                            enabled = !replyImageUploading && !replySending,
+                                            modifier = Modifier.width(72.dp)
+                                        ) {
+                                            Text(if (replyImageUploading) "…" else "加图片", fontSize = 12.sp)
+                                        }
+                                        Button(
+                                            onClick = {
+                                                val text = replyText.trim()
+                                                if (text.isEmpty() && replyImages.isEmpty()) return@Button
+                                                scope.launch {
+                                                    replySending = true
+                                                    try {
+                                                        val textHtml = if (text.isNotEmpty()) "<p>$text</p>" else ""
+                                                        val imgHtml  = replyImages.joinToString("") { """<img src="$it" />""" }
+                                                        withContext(Dispatchers.IO) {
+                                                            desktopScraper.createReply(
+                                                                tid = tid, fid = p.fid, topicId = p.topicId,
+                                                                quoteId = replyingTo?.pid ?: "0",
+                                                                content = textHtml + imgHtml
+                                                            )
+                                                        }
+                                                        replyText = ""; replyingTo = null
+                                                        replyImages = emptyList(); replyImageStatus = null
+                                                        replyResult = "✓ 回复成功"
+                                                    } catch (e: Exception) {
+                                                        replyResult = "回复失败：${e.message}"
+                                                    }
+                                                    replySending = false
+                                                }
+                                            },
+                                            enabled = !replySending && !replyImageUploading &&
+                                                (replyText.isNotBlank() || replyImages.isNotEmpty()),
+                                            shape = RoundedCornerShape(10.dp),
+                                            modifier = Modifier.width(72.dp)
+                                        ) {
+                                            if (replySending) CircularProgressIndicator(Modifier.size(16.dp),
+                                                color = Color.White)
+                                            else Text("发送")
+                                        }
                                     }
+                                }
+                                replyImageStatus?.let { status ->
+                                    Text(status, fontSize = 11.sp,
+                                        color = if (status.startsWith("✓")) MaterialTheme.colorScheme.primary
+                                                else MaterialTheme.colorScheme.error)
                                 }
                             }
                         }
