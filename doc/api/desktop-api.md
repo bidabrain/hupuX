@@ -50,6 +50,11 @@ Cookie: <effectiveCookie>
 | author.header | String | 头像 URL |
 | author.puid | String | 用户 puid |
 
+> ⚠️ **引用信息不在 `__NEXT_DATA__` JSON 中。** 有引用的回复，其引用内容通过解析 SSR HTML 提取：
+> - 引用内容：`<span id="{pid}">` 后紧跟的 `.post-reply-list-container` → `.quote-thread .seo-dom` 的内部 HTML
+> - 引用用户名：同容器内 `[class*=quote-text] a` 的文本
+> - 实现见 `HupuDesktopScraper.buildQuoteMap()`
+
 **帖子元数据路径：** `detail.thread`
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -84,11 +89,19 @@ Cookie: <effectiveCookie>
   "code": 200,
   "message": "success",
   "data": {
-    "list": [ <Comment 字段同上> ],
-    "nextPage": 1   // 0=无更多, 非0=有更多（翻页用上一页最后 pid 作为 maxpid）
+    "list": [ "<Comment 字段同上，另含 replyQuoteContent/replyQuoteUser>" ],
+    "nextPage": 1
   }
 }
 ```
+
+> `list[]` 每项除评论列表公共字段外，还包含：
+> | 字段 | 类型 | 说明 |
+> |------|------|------|
+> | replyQuoteContent | String? | 被引用回复的 HTML 内容 |
+> | replyQuoteUser | String? | 被引用用户名 |
+>
+> `nextPage`：0=无更多，非0=有更多（翻页时传上一页最后一条的 `pid` 作为 `maxpid`）
 
 **Headers 需要：**
 ```

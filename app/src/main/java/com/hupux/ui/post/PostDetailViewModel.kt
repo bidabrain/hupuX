@@ -33,9 +33,17 @@ sealed class PostDetailUiState {
         val isRecommended: Boolean = false,
         val isRecommending: Boolean = false,
         val isCollected: Boolean = false,
-        val isCollecting: Boolean = false
+        val isCollecting: Boolean = false,
+        val isReversed: Boolean = false,
+        val reversedComments: List<Comment> = emptyList(),
+        val reversedDisplayCount: Int = 0,
+        val isLoadingReversed: Boolean = false
     ) : PostDetailUiState() {
         val expandedPid: String? get() = replyStack.lastOrNull()
+        val displayedComments: List<Comment> get() =
+            if (isReversed) reversedComments.take(reversedDisplayCount) else post.comments
+        val hasMoreDisplayed: Boolean get() =
+            if (isReversed) reversedDisplayCount < reversedComments.size else post.hasMoreComments
     }
     data class Error(val message: String) : PostDetailUiState()
 }
@@ -120,6 +128,53 @@ class PostDetailViewModel constructor(
                     }
                 }
         }
+    }
+
+    fun toggleReverse() {
+        val s = _state.value as? PostDetailUiState.Success ?: return
+        if (s.isReversed) {
+            _state.value = s.copy(isReversed = false, reversedComments = emptyList(), reversedDisplayCount = 0)
+            return
+        }
+        if (!cookiePrefs.isLoggedIn) {
+            val reversed = s.post.comments.reversed()
+            _state.value = s.copy(
+                isReversed = true,
+                reversedComments = reversed,
+                reversedDisplayCount = minOf(REVERSE_PAGE_SIZE, reversed.size)
+            )
+        } else {
+            _state.value = s.copy(isLoadingReversed = true)
+            viewModelScope.launch {
+                val all = s.post.comments.toMutableList()
+                var page = s.commentPage + 1
+                while (page <= s.post.desktopTotalPages) {
+                    runCatching { postRepo.loadMoreComments(currentTid, page) }
+                        .onSuccess { (comments, _) ->
+                            val seen = all.map { it.pid }.toHashSet()
+                            all.addAll(comments.filter { it.pid !in seen })
+                        }
+                    page++
+                }
+                val reversed = all.reversed()
+                (_state.value as? PostDetailUiState.Success)?.let { s2 ->
+                    _state.value = s2.copy(
+                        isReversed = true,
+                        reversedComments = reversed,
+                        reversedDisplayCount = minOf(REVERSE_PAGE_SIZE, reversed.size),
+                        isLoadingReversed = false
+                    )
+                }
+            }
+        }
+    }
+
+    fun loadMoreReversed() {
+        val s = _state.value as? PostDetailUiState.Success ?: return
+        if (!s.isReversed || s.reversedDisplayCount >= s.reversedComments.size) return
+        _state.value = s.copy(
+            reversedDisplayCount = minOf(s.reversedDisplayCount + REVERSE_PAGE_SIZE, s.reversedComments.size)
+        )
     }
 
     /** 返回上一层 */
@@ -271,4 +326,8 @@ class PostDetailViewModel constructor(
         comments
             .filter { it.quotePid != null }
             .groupBy { it.quotePid!! }
+
+    companion object {
+        private const val REVERSE_PAGE_SIZE = 20
+    }
 }

@@ -1,6 +1,7 @@
 package com.hupux.desktop.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -27,6 +28,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PostDetailScreen(
     tid: String,
@@ -48,7 +50,15 @@ fun PostDetailScreen(
     var likingPids by remember { mutableStateOf(emptySet<String>()) }
     var isCollected by remember { mutableStateOf(false) }
     var isRecommended by remember { mutableStateOf(false) }
+    var subRepliesMap by remember { mutableStateOf<Map<String, List<Comment>>>(emptyMap()) }
+    var replyStack by remember { mutableStateOf<List<String>>(emptyList()) }
+    var isLoadingSubReplies by remember { mutableStateOf(false) }
+    var isReversed by remember { mutableStateOf(false) }
+    var reversedComments by remember { mutableStateOf<List<Comment>>(emptyList()) }
+    var reversedDisplayCount by remember { mutableStateOf(0) }
+    var isLoadingReversed by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val reversePageSize = 20
 
     LaunchedEffect(tid) {
         loading = true; error = null; commentPage = 1
@@ -66,6 +76,61 @@ fun PostDetailScreen(
             } else base
         } catch (e: Exception) { error = e.message }
         loading = false
+    }
+
+    fun showReplies(parentPid: String) {
+        replyStack = replyStack + parentPid
+        isLoadingSubReplies = true
+        scope.launch {
+            runCatching { withContext(Dispatchers.IO) { desktopScraper.fetchDesktopSubReplies(tid, parentPid) } }
+                .onSuccess { subs ->
+                    val existing = subRepliesMap[parentPid] ?: emptyList()
+                    val merged = (existing + subs).distinctBy { it.pid }.sortedBy { it.pid.toLongOrNull() ?: 0L }
+                    subRepliesMap = subRepliesMap + (parentPid to merged)
+                }
+            isLoadingSubReplies = false
+        }
+    }
+
+    fun popReplies() { replyStack = replyStack.dropLast(1); isLoadingSubReplies = false }
+    fun dismissReplies() { replyStack = emptyList() }
+
+    fun toggleReverse() {
+        val p = post ?: return
+        if (isReversed) {
+            isReversed = false; reversedComments = emptyList(); reversedDisplayCount = 0
+            return
+        }
+        if (!cookieStorage.isLoggedIn) {
+            val reversed = p.comments.reversed()
+            reversedComments = reversed
+            reversedDisplayCount = minOf(reversePageSize, reversed.size)
+            isReversed = true
+        } else {
+            isLoadingReversed = true
+            scope.launch {
+                val all = p.comments.toMutableList()
+                var page = commentPage + 1
+                while (page <= p.desktopTotalPages) {
+                    runCatching { withContext(Dispatchers.IO) { desktopScraper.fetchPostReplies(tid, page) } }
+                        .onSuccess { result ->
+                            val seen = all.map { it.pid }.toHashSet()
+                            all.addAll(result.comments.filter { it.pid !in seen })
+                        }
+                    page++
+                }
+                val reversed = all.reversed()
+                reversedComments = reversed
+                reversedDisplayCount = minOf(reversePageSize, reversed.size)
+                isReversed = true
+                isLoadingReversed = false
+            }
+        }
+    }
+
+    fun loadMoreReversed() {
+        if (!isReversed || reversedDisplayCount >= reversedComments.size) return
+        reversedDisplayCount = minOf(reversedDisplayCount + reversePageSize, reversedComments.size)
     }
 
     fun loadMoreComments() {
@@ -146,17 +211,40 @@ fun PostDetailScreen(
 
                         // ── 评论区标题 ────────────────────────────────────────
                         item {
-                            Text("${p.replies} 条回复", fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp, color = TextPrimary,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp))
+                            Row(
+                                Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("${p.replies} 条回复", fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp, color = TextPrimary)
+                                Spacer(Modifier.weight(1f))
+                                if (isLoadingReversed) {
+                                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                                } else {
+                                    TextButton(
+                                        onClick = { toggleReverse() },
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                    ) {
+                                        Text(
+                                            if (isReversed) "正序" else "倒序",
+                                            fontSize = 13.sp,
+                                            color = if (isReversed) HupuRed else TextSecondary
+                                        )
+                                    }
+                                }
+                            }
                         }
 
                         // ── 评论列表 ──────────────────────────────────────────
-                        items(p.comments) { comment ->
+                        val displayedComments = if (isReversed) reversedComments.take(reversedDisplayCount) else p.comments
+                        items(displayedComments) { comment ->
                             CommentCard(
-                                comment  = comment,
-                                isLiked  = comment.pid in likedPids,
-                                isLiking = comment.pid in likingPids,
+                                comment      = comment,
+                                isLiked      = comment.pid in likedPids,
+                                isLiking     = comment.pid in likingPids,
+                                onReplyClick = if (comment.replyCount > 0) {
+                                    { showReplies(comment.pid) }
+                                } else null,
                                 onReply  = if (cookieStorage.isLoggedIn) {
                                     { replyingTo = comment; replyText = "" }
                                 } else null,
@@ -186,8 +274,18 @@ fun PostDetailScreen(
                             )
                         }
 
-                        // ── 加载更多评论 ──────────────────────────────────────
-                        if (hasMoreComments || loadingMoreComments) {
+                        // ── 加载更多 ──────────────────────────────────────────
+                        val hasMoreReversed = isReversed && reversedDisplayCount < reversedComments.size
+                        if (hasMoreReversed) {
+                            item {
+                                Box(Modifier.fillMaxWidth().padding(4.dp), Alignment.Center) {
+                                    OutlinedButton(onClick = { loadMoreReversed() }) {
+                                        Text("加载更多（${reversedComments.size - reversedDisplayCount} 条）")
+                                    }
+                                }
+                            }
+                        }
+                        if (!isReversed && (hasMoreComments || loadingMoreComments)) {
                             item {
                                 Box(Modifier.fillMaxWidth().padding(4.dp), Alignment.Center) {
                                     if (loadingMoreComments) CircularProgressIndicator(Modifier.size(24.dp))
@@ -314,6 +412,123 @@ fun PostDetailScreen(
             }
         }
     }
+
+    // ── 子回复 ModalBottomSheet ────────────────────────────────────────────────
+    val expandedPid = replyStack.lastOrNull()
+    val currentPost = post
+    if (expandedPid != null && currentPost != null) {
+        val subReplies = subRepliesMap[expandedPid] ?: emptyList()
+        val parent = currentPost.comments.find { it.pid == expandedPid }
+            ?: subRepliesMap.values.flatten().find { it.pid == expandedPid }
+        ModalBottomSheet(
+            onDismissRequest = ::dismissReplies,
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ) {
+            SubRepliesSheet(
+                subReplies   = subReplies,
+                totalCount   = parent?.replyCount ?: subReplies.size,
+                isLoading    = isLoadingSubReplies,
+                canGoBack    = replyStack.size > 1,
+                likedPids    = likedPids,
+                onBack       = ::popReplies,
+                onReplyClick = ::showReplies,
+                onLike       = if (cookieStorage.isLoggedIn && currentPost.fid.isNotEmpty()) { comment ->
+                    val pid = comment.pid
+                    if (pid !in likingPids) {
+                        likingPids = likingPids + pid
+                        val isLiked = pid in likedPids
+                        likedPids = if (isLiked) likedPids - pid else likedPids + pid
+                        scope.launch(Dispatchers.IO) {
+                            try {
+                                val puid = cookieStorage.extractUid()?.toLongOrNull() ?: 0L
+                                val fidL = currentPost.fid.toLongOrNull() ?: 0L
+                                val tidL = tid.toLongOrNull() ?: 0L
+                                val pidL = pid.toLongOrNull() ?: 0L
+                                if (isLiked) desktopScraper.cancelLightReply(pidL, tidL, puid, fidL)
+                                else desktopScraper.lightReply(pidL, tidL, puid, fidL)
+                            } catch (_: Exception) {
+                                likedPids = if (isLiked) likedPids + pid else likedPids - pid
+                            }
+                            likingPids = likingPids - pid
+                        }
+                    }
+                } else null,
+                onReply      = if (cookieStorage.isLoggedIn) { comment ->
+                    replyingTo = comment; replyText = ""; dismissReplies()
+                } else null
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SubRepliesSheet(
+    subReplies: List<Comment>,
+    totalCount: Int,
+    isLoading: Boolean,
+    canGoBack: Boolean,
+    likedPids: Set<String> = emptySet(),
+    onBack: () -> Unit,
+    onReplyClick: (String) -> Unit,
+    onLike: ((Comment) -> Unit)? = null,
+    onReply: ((Comment) -> Unit)? = null
+) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
+        Row(
+            Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (canGoBack) {
+                TextButton(onClick = onBack, contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)) {
+                    Text("← 返回", fontSize = 13.sp, color = TextSecondary)
+                }
+                Spacer(Modifier.width(4.dp))
+            }
+            Text("回复", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+            Spacer(Modifier.width(6.dp))
+            Text("$totalCount 条", fontSize = 13.sp, color = TextTertiary)
+        }
+        HorizontalDivider(color = DividerColor)
+
+        if (isLoading) {
+            Box(Modifier.fillMaxWidth().height(120.dp), Alignment.Center) {
+                CircularProgressIndicator(Modifier.size(28.dp))
+            }
+        } else if (subReplies.isEmpty()) {
+            Box(Modifier.fillMaxWidth().height(100.dp), Alignment.Center) {
+                Text("暂未找到回复内容", color = TextTertiary, fontSize = 13.sp)
+            }
+        } else {
+            LazyColumn(
+                contentPadding = PaddingValues(vertical = 8.dp),
+                modifier       = Modifier.fillMaxWidth().heightIn(max = 480.dp)
+            ) {
+                items(subReplies) { reply ->
+                    CommentCard(
+                        comment      = reply,
+                        isLiked      = reply.pid in likedPids,
+                        isLiking     = false,
+                        showQuote    = false,
+                        onReplyClick = if (reply.replyCount > 0) ({ onReplyClick(reply.pid) }) else null,
+                        onLike       = onLike?.let { { it(reply) } },
+                        onReply      = onReply?.let { { it(reply) } }
+                    )
+                }
+                if (subReplies.size < totalCount) {
+                    item {
+                        Box(Modifier.fillMaxWidth().padding(8.dp), Alignment.Center) {
+                            Text(
+                                "还有 ${totalCount - subReplies.size} 条回复，请在帖子中查看",
+                                fontSize = 11.sp, color = TextTertiary
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+    }
 }
 
 @Composable
@@ -321,6 +536,8 @@ private fun CommentCard(
     comment: Comment,
     isLiked: Boolean,
     isLiking: Boolean,
+    showQuote: Boolean = true,
+    onReplyClick: (() -> Unit)? = null,
     onReply: (() -> Unit)?,
     onLike: (() -> Unit)?
 ) {
@@ -377,6 +594,14 @@ private fun CommentCard(
                         )
                     }
                 }
+                // X 条回复
+                if (onReplyClick != null) {
+                    TextButton(onClick = onReplyClick,
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)) {
+                        Text("${comment.replyCount} 条回复", fontSize = 12.sp, color = HupuRed,
+                            fontWeight = FontWeight.Medium)
+                    }
+                }
                 // 回复
                 if (onReply != null) {
                     TextButton(onClick = onReply,
@@ -387,12 +612,14 @@ private fun CommentCard(
             }
 
             // 引用
-            comment.quoteContent?.let { q ->
-                Spacer(Modifier.height(8.dp))
-                Surface(color = BgGray, shape = RoundedCornerShape(8.dp)) {
-                    Text("↩ ${comment.quoteUsername ?: ""}：${Jsoup.parse(q).text()}",
-                        fontSize = 12.sp, color = TextSecondary,
-                        modifier = Modifier.padding(8.dp), maxLines = 2)
+            if (showQuote) {
+                comment.quoteContent?.let { q ->
+                    Spacer(Modifier.height(8.dp))
+                    Surface(color = BgGray, shape = RoundedCornerShape(8.dp)) {
+                        Text("↩ ${comment.quoteUsername ?: ""}：${Jsoup.parse(q).text()}",
+                            fontSize = 12.sp, color = TextSecondary,
+                            modifier = Modifier.padding(8.dp), maxLines = 2)
+                    }
                 }
             }
 

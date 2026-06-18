@@ -1,10 +1,16 @@
 package com.hupux.ui.post
 
+import android.content.ContentValues
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.ColorFilter
 import android.graphics.PixelFormat
+import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
+import android.os.Build
+import android.provider.MediaStore
+import android.widget.Toast
 import android.text.Html
 import android.text.method.LinkMovementMethod
 import android.content.Intent
@@ -24,6 +30,7 @@ import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.geometry.Offset
@@ -38,6 +45,10 @@ import coil3.Image
 import coil3.asDrawable
 import coil3.imageLoader
 import coil3.request.ImageRequest
+import coil3.request.SuccessResult
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.lang.ref.WeakReference
 import org.jsoup.Jsoup
 import androidx.compose.foundation.background
@@ -240,11 +251,29 @@ private fun PostContent(
                     Text("全部评论", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                     Spacer(Modifier.width(6.dp))
                     Text("${s.post.replies}", fontSize = 14.sp, color = TextTertiary)
+                    Spacer(Modifier.weight(1f))
+                    if (s.isLoadingReversed) {
+                        CircularProgressIndicator(Modifier.size(16.dp), color = HupuRed, strokeWidth = 2.dp)
+                        Spacer(Modifier.width(8.dp))
+                    } else {
+                        TextButton(
+                            onClick = vm::toggleReverse,
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                        ) {
+                            Text(
+                                if (s.isReversed) "正序" else "倒序",
+                                fontSize = 13.sp,
+                                color = if (s.isReversed) HupuRed else TextTertiary
+                            )
+                        }
+                    }
                 }
             }
         }
-        itemsIndexed(s.post.comments, key = { _, c -> c.pid }) { index, comment ->
-            if (index == s.post.comments.size - 3 && s.post.hasMoreComments)
+        val displayedComments = s.displayedComments
+        itemsIndexed(displayedComments, key = { _, c -> c.pid }) { index, comment ->
+            // 正序模式：靠近底部时自动加载下一页
+            if (!s.isReversed && index == displayedComments.size - 3 && s.post.hasMoreComments)
                 LaunchedEffect(s.post.comments.size) { vm.loadMoreComments() }
             CommentCard(
                 comment          = comment,
@@ -256,7 +285,20 @@ private fun PostContent(
                 } else null
             )
         }
-        if (s.isLoadingMoreComments) {
+        // 倒序模式：显示「加载更多」按钮（数据已全部在内存，无需网络请求）
+        if (s.isReversed && s.hasMoreDisplayed) {
+            item {
+                Box(Modifier.fillMaxWidth().padding(8.dp), Alignment.Center) {
+                    OutlinedButton(
+                        onClick = vm::loadMoreReversed,
+                        colors  = ButtonDefaults.outlinedButtonColors(contentColor = HupuRed)
+                    ) {
+                        Text("加载更多（还有 ${s.reversedComments.size - s.reversedDisplayCount} 条）")
+                    }
+                }
+            }
+        }
+        if (s.isLoadingMoreComments && !s.isReversed) {
             item {
                 Box(Modifier.fillMaxWidth().padding(16.dp), Alignment.Center) {
                     CircularProgressIndicator(Modifier.size(24.dp), color = HupuRed)
@@ -359,6 +401,7 @@ private fun PostBodyCard(
 fun CommentCard(
     comment: Comment,
     isLiked: Boolean = false,
+    showQuote: Boolean = true,
     onLike: (() -> Unit)? = null,
     onReplyClick: (() -> Unit)? = null,
     onReplyToComment: (() -> Unit)? = null
@@ -393,17 +436,19 @@ fun CommentCard(
                             modifier = likeMod)
                     }
                     Spacer(Modifier.height(5.dp))
-                    comment.quoteContent?.let { quote ->
-                        Surface(color = BgGray, shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.fillMaxWidth()) {
-                            Column(Modifier.padding(horizontal = 10.dp, vertical = 7.dp)) {
-                                Text("@${comment.quoteUsername}", fontSize = 12.sp,
-                                    color = HupuRed, fontWeight = FontWeight.Medium)
-                                Spacer(Modifier.height(2.dp))
-                                HtmlText(html = quote, imageScale = 0.125f)
+                    if (showQuote) {
+                        comment.quoteContent?.let { quote ->
+                            Surface(color = BgGray, shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()) {
+                                Column(Modifier.padding(horizontal = 10.dp, vertical = 7.dp)) {
+                                    Text("@${comment.quoteUsername}", fontSize = 12.sp,
+                                        color = HupuRed, fontWeight = FontWeight.Medium)
+                                    Spacer(Modifier.height(2.dp))
+                                    HtmlText(html = quote, imageScale = 0.125f)
+                                }
                             }
+                            Spacer(Modifier.height(6.dp))
                         }
-                        Spacer(Modifier.height(6.dp))
                     }
                     HtmlText(html = comment.content, imageScale = 0.125f)
                     Spacer(Modifier.height(6.dp))
@@ -513,6 +558,7 @@ private fun SubRepliesSheet(
                     CommentCard(
                         comment          = reply,
                         isLiked          = reply.pid in likedPids,
+                        showQuote        = false,
                         onLike           = onLike?.let { { it(reply) } },
                         onReplyClick     = if (reply.replyCount > 0) ({ onReplyClick(reply.pid) }) else null,
                         onReplyToComment = if (reply.desktopPage > 0) onReplyToComment?.let { { it(reply) } } else null
@@ -676,7 +722,8 @@ private fun PostBodyWebView(html: String, modifier: Modifier = Modifier) {
                     @JavascriptInterface
                     fun onHeight(cssPx: Int) {
                         Handler(Looper.getMainLooper()).post {
-                            val h = cssPx.dp + 24.dp
+                            // Compose 布局最大约 262143 px；以 dp 计上限取 60000.dp 留足余量
+                            val h = (cssPx.dp + 24.dp).coerceAtMost(60000.dp)
                             if (h > heightState.value) heightState.value = h
                         }
                     }
@@ -693,14 +740,17 @@ private fun PostBodyWebView(html: String, modifier: Modifier = Modifier) {
             }
         },
         update = { wv ->
-            // 注入 JS：ResizeObserver + 每张图片 load/error 事件 → 精准上报高度
-            val heightScript = """<script>
+            // AndroidView.update 在每次 recomposition 后都会执行；
+            // 用 tag 记录上次加载的页面 key，内容未变则跳过，防止 WebView 重载导致高度闪变
+            val pageKey = "$html|$textHex|$bgColor"
+            if (wv.tag as? String != pageKey) {
+                wv.tag = pageKey
+                val heightScript = """<script>
 (function(){
   function report(){
-    var h=Math.max(document.body.scrollHeight||0,
-                   document.documentElement.scrollHeight||0,
-                   document.body.offsetHeight||0);
-    if(h>10) App.onHeight(h);
+    var h=document.body.getBoundingClientRect().height||0;
+    if(h<=0) h=document.body.scrollHeight||document.body.offsetHeight||0;
+    if(h>10) App.onHeight(Math.ceil(h));
   }
   if(typeof ResizeObserver!=='undefined'){
     new ResizeObserver(report).observe(document.body);
@@ -718,7 +768,7 @@ private fun PostBodyWebView(html: String, modifier: Modifier = Modifier) {
   [0,200,600,1500,3500].forEach(function(t){ setTimeout(report,t); });
 })();
 </script>"""
-            val page = """<!DOCTYPE html><html><head>
+                val page = """<!DOCTYPE html><html><head>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <style>
 body{background:transparent;color:$textHex;font-size:15px;line-height:1.65;
@@ -730,7 +780,8 @@ img{max-width:100%;height:auto;display:block;margin:8px 0;border-radius:4px}
               display:block;flex-shrink:0;object-fit:contain;max-width:none;margin:0}
 video{width:100%;height:auto;border-radius:4px;margin:8px 0;display:block}
 </style></head><body>$html$heightScript</body></html>"""
-            wv.loadDataWithBaseURL("https://m.hupu.com/", page, "text/html", "UTF-8", null)
+                wv.loadDataWithBaseURL("https://m.hupu.com/", page, "text/html", "UTF-8", null)
+            }
         },
         modifier = modifier.fillMaxWidth().height(heightDp)
     )
@@ -746,6 +797,9 @@ private fun ImageViewerDialog(url: String, onDismiss: () -> Unit) {
         scale = (scale * zoomChange).coerceIn(1f, 8f)
         offset = if (scale > 1f) offset + panChange else Offset.Zero
     }
+    var isSaving by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope   = rememberCoroutineScope()
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -757,7 +811,7 @@ private fun ImageViewerDialog(url: String, onDismiss: () -> Unit) {
                 .background(Color.Black)
         ) {
             AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
+                model = ImageRequest.Builder(context)
                     .data(url)
                     .build(),
                 contentDescription = null,
@@ -767,7 +821,6 @@ private fun ImageViewerDialog(url: String, onDismiss: () -> Unit) {
                     .graphicsLayer { scaleX = scale; scaleY = scale
                                      translationX = offset.x; translationY = offset.y }
                     .transformable(state = transformState)
-                    // 未放大时单击关闭
                     .clickable(enabled = scale <= 1.05f, onClick = onDismiss)
             )
 
@@ -785,6 +838,72 @@ private fun ImageViewerDialog(url: String, onDismiss: () -> Unit) {
                 Icon(Icons.Filled.Close, contentDescription = "关闭",
                     tint = Color.White, modifier = Modifier.size(20.dp))
             }
+
+            // 保存按钮
+            Box(
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .navigationBarsPadding()
+                    .padding(16.dp)
+                    .size(44.dp)
+                    .background(Color.Black.copy(0.55f), CircleShape)
+                    .clickable(enabled = !isSaving) {
+                        scope.launch {
+                            isSaving = true
+                            try {
+                                saveImageToGallery(context, url)
+                                Toast.makeText(context, "已保存到相册", Toast.LENGTH_SHORT).show()
+                            } catch (_: Exception) {
+                                Toast.makeText(context, "保存失败", Toast.LENGTH_SHORT).show()
+                            }
+                            isSaving = false
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                if (isSaving) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(Icons.Filled.Download, contentDescription = "保存图片",
+                        tint = Color.White, modifier = Modifier.size(22.dp))
+                }
+            }
+        }
+    }
+}
+
+private suspend fun saveImageToGallery(context: Context, url: String) {
+    val bitmap = withContext(Dispatchers.IO) {
+        val result = context.imageLoader.execute(
+            ImageRequest.Builder(context).data(url).build()
+        ) as? SuccessResult ?: throw Exception("图片加载失败")
+        (result.image.asDrawable(context.resources) as? BitmapDrawable)?.bitmap
+            ?: throw Exception("无法获取位图")
+    }
+    withContext(Dispatchers.IO) {
+        val filename = "hupu_${System.currentTimeMillis()}.jpg"
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, filename)
+            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/HupuX")
+                put(MediaStore.Images.Media.IS_PENDING, 1)
+            }
+        }
+        val uri = context.contentResolver.insert(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values
+        ) ?: throw Exception("无法创建文件")
+        context.contentResolver.openOutputStream(uri)?.use { out ->
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            values.clear()
+            values.put(MediaStore.Images.Media.IS_PENDING, 0)
+            context.contentResolver.update(uri, values, null, null)
         }
     }
 }

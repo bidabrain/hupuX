@@ -71,19 +71,65 @@ class HupuDesktopScraper(
             val o = el.asJsonObject
             if (o.bool_("isHidden") == true || o.bool_("isDelete") == true) return@mapNotNull null
             val author = o.obj("author")
+            val content = o.str("content") ?: ""
+            val (quoteUser, quoteContent) = parseQuoteFromJson(o)
             Comment(
-                pid         = o.str("pid") ?: return@mapNotNull null,
-                username    = author?.str("puname") ?: "",
-                avatar      = author?.str("header") ?: "",
-                content     = o.str("content") ?: "",
-                lights      = o.int_("count") ?: 0,
-                replyCount  = o.int_("replyNum") ?: 0,
-                time        = o.str("createdAtFormat") ?: "",
-                location    = o.str("location") ?: "",
-                isAuthor    = o.bool_("isStarter") ?: false,
-                desktopPage = 1
+                pid           = o.str("pid") ?: return@mapNotNull null,
+                username      = author?.str("puname") ?: "",
+                avatar        = author?.str("header") ?: "",
+                content       = content,
+                lights        = o.int_("count") ?: 0,
+                replyCount    = o.int_("replyNum") ?: 0,
+                time          = o.str("createdAtFormat") ?: "",
+                location      = o.str("location") ?: "",
+                isAuthor      = o.bool_("isStarter") ?: false,
+                quoteUsername = quoteUser,
+                quoteContent  = quoteContent,
+                desktopPage   = 1
             )
         }
+    }
+
+    /**
+     * 从页面 HTML 中提取引用信息，构建 pid → (quoteUser, quoteContent) 映射。
+     * 结构：<span id="PID"> → 紧接的 .post-reply-list-container
+     *       → .quote-thread .seo-dom（引用 HTML）
+     *       → [class*=quote-text] a（引用用户名）
+     */
+    private fun buildQuoteMap(html: String): Map<String, Pair<String?, String?>> =
+        try {
+            Jsoup.parse(html)
+                .select("span[id]")
+                .mapNotNull { anchor ->
+                    val pid = anchor.id().takeIf { it.isNotEmpty() } ?: return@mapNotNull null
+                    val container = anchor.nextElementSibling()
+                        ?.takeIf { it.hasClass("post-reply-list-container") }
+                        ?: return@mapNotNull null
+                    val quoteThread = container.selectFirst(".quote-thread")
+                        ?: return@mapNotNull null
+                    val quoteContent = quoteThread.selectFirst(".seo-dom")?.html()
+                        ?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                    val quoteUser = container.selectFirst("[class*=quote-text] a")?.text()
+                    pid to Pair(quoteUser, quoteContent)
+                }
+                .toMap()
+        } catch (_: Exception) {
+            emptyMap()
+        }
+
+    /**
+     * 从子回复 JSON 对象中提取引用信息（用于 fetchDesktopSubReplies）。
+     * 尝试 replyQuoteContent / replyQuoteUser 字段名（与页面 data-admininfo 保持一致）。
+     */
+    private fun parseQuoteFromJson(o: JsonObject): Pair<String?, String?> {
+        val qc = o.str("replyQuoteContent")?.takeIf { it.isNotBlank() }
+        if (qc != null) return Pair(o.str("replyQuoteUser"), qc)
+        val qi = o.obj("quoteInfo")
+        if (qi != null) {
+            val content = qi.str("content")?.takeIf { it.isNotBlank() }
+            if (content != null) return Pair(qi.str("puname") ?: qi.str("username"), content)
+        }
+        return Pair(null, null)
     }
 
     /** 登录状态下从桌面版拉取帖子评论，page=1 对应 /{tid}.html，page2+ 对应 /{tid}-{page}.html */
@@ -110,22 +156,30 @@ class HupuDesktopScraper(
         val topicId     = thread?.str("topicId") ?: ""
         val isRecommended = detail?.bool_("isRecommended") ?: false
 
+        // 从 HTML data-admininfo 属性提取引用信息
+        val quoteMap = buildQuoteMap(html)
+
         val list = replies.arr("list") ?: JsonArray()
         val comments = list.mapNotNull { el ->
             val o = el.asJsonObject
             if (o.bool_("isHidden") == true || o.bool_("isDelete") == true) return@mapNotNull null
             val author = o.obj("author")
+            val content = o.str("content") ?: ""
+            val pid = o.str("pid") ?: return@mapNotNull null
+            val (quoteUser, quoteContent) = quoteMap[pid] ?: Pair(null, null)
             Comment(
-                pid         = o.str("pid") ?: return@mapNotNull null,
-                username    = author?.str("puname") ?: "",
-                avatar      = author?.str("header") ?: "",
-                content     = o.str("content") ?: "",
-                lights      = o.int_("count") ?: 0,
-                replyCount  = o.int_("replyNum") ?: 0,
-                time        = o.str("createdAtFormat") ?: "",
-                location    = o.str("location") ?: "",
-                isAuthor    = o.bool_("isStarter") ?: false,
-                desktopPage = currentPage
+                pid           = pid,
+                username      = author?.str("puname") ?: "",
+                avatar        = author?.str("header") ?: "",
+                content       = content,
+                lights        = o.int_("count") ?: 0,
+                replyCount    = o.int_("replyNum") ?: 0,
+                time          = o.str("createdAtFormat") ?: "",
+                location      = o.str("location") ?: "",
+                isAuthor      = o.bool_("isStarter") ?: false,
+                quoteUsername = quoteUser,
+                quoteContent  = quoteContent,
+                desktopPage   = currentPage
             )
         }
         return DesktopRepliesPage(comments, baseUrl, currentPage, totalPages, fid, topicId, isRecommended)
