@@ -37,8 +37,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import coil3.Image
@@ -703,8 +705,9 @@ private class CoilImageGetter(
 
 @Composable
 private fun PostBodyWebView(html: String, modifier: Modifier = Modifier) {
-    // heightState 作为稳定引用供 JS 接口捕获
-    val heightState  = remember { mutableStateOf(200.dp) }
+    // heightState 作为稳定引用供 JS 接口捕获；用 rememberSaveable 持久化 dp 整型值，
+    // 防止 LazyColumn 回收 item 后重进 composition 时高度重置为 200.dp 导致白色空档
+    val heightState = rememberSaveable { mutableIntStateOf(200) }
     var heightDp by heightState
     val isDark       = isSystemInDarkTheme()
     val textHex      = if (isDark) "#EBEBF0" else "#1A1A2E"
@@ -733,9 +736,9 @@ private fun PostBodyWebView(html: String, modifier: Modifier = Modifier) {
                     @JavascriptInterface
                     fun onHeight(cssPx: Int) {
                         Handler(Looper.getMainLooper()).post {
-                            // Compose 布局最大约 262143 px；以 dp 计上限取 60000.dp 留足余量
-                            val h = (cssPx.dp + 24.dp).coerceAtMost(60000.dp)
-                            if (h > heightState.value) heightState.value = h
+                            // Compose 布局最大约 262143 px；以 dp 计上限取 60000 留足余量
+                            val h = (cssPx + 24).coerceAtMost(60000)
+                            if (h > heightState.intValue) heightState.intValue = h
                         }
                     }
                     @JavascriptInterface
@@ -794,7 +797,7 @@ video{width:100%;height:auto;border-radius:4px;margin:8px 0;display:block}
                 wv.loadDataWithBaseURL("https://m.hupu.com/", page, "text/html", "UTF-8", null)
             }
         },
-        modifier = modifier.fillMaxWidth().height(heightDp)
+        modifier = modifier.fillMaxWidth().height(heightDp.dp)
     )
 }
 
