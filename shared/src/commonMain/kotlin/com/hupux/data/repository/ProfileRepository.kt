@@ -28,4 +28,8 @@ class ProfileRepository(
         val uid = cookieStorage.extractUid() ?: error("未登录")
         scraper.fetchFavoriteList(uid, maxTime)
     }
+
+    suspend fun fetchUnreadMessageCount(): Int = withContext(Dispatchers.IO) {
+        scraper.fetchUnreadMessageCount()
+    }
 }

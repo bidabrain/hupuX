@@ -23,7 +23,8 @@ class ProfileViewModel constructor(
         data class Success(
             val profile: UserProfile,
             val followedZones: List<Zone> = emptyList(),
-            val favoriteCountStr: String = ""
+            val favoriteCountStr: String = "",
+            val unreadMessageCount: Int = 0
         ) : State()
         data class Error(val msg: String) : State()
     }
@@ -50,13 +51,19 @@ class ProfileViewModel constructor(
                 val profileDeferred  = async { repo.fetchProfile() }
                 val zonesDeferred    = async { runCatching { repo.fetchFollowedZones() }.getOrDefault(emptyList()) }
                 val favDeferred      = async { runCatching { repo.fetchFavoriteList() }.getOrNull() }
+                val unreadDeferred   = async { runCatching { repo.fetchUnreadMessageCount() }.getOrDefault(0) }
                 val favPage          = favDeferred.await()
                 val favoriteCountStr = when {
                     favPage == null              -> ""
                     favPage.hasMore              -> "${favPage.threads.size}+"
                     else                         -> favPage.threads.size.toString()
                 }
-                _state.value = State.Success(profileDeferred.await(), zonesDeferred.await(), favoriteCountStr)
+                _state.value = State.Success(
+                    profile             = profileDeferred.await(),
+                    followedZones       = zonesDeferred.await(),
+                    favoriteCountStr    = favoriteCountStr,
+                    unreadMessageCount  = unreadDeferred.await()
+                )
             } catch (e: Exception) {
                 _state.value = State.Error(e.message ?: "加载失败")
             }

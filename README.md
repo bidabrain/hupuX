@@ -29,10 +29,12 @@
 ### 帖子详情
 - 正文完整显示图片（含虎扑自定义 `<center class="hupu-img">` 格式）
 - Android：WebView 渲染正文，支持视频（HTML5 `<video>`）；图片点击全屏查看（双指缩放 / 平移 / GIF 循环播放）
-- 评论列表：显示用户头像、楼主标识、引用回复、点赞数
-- Android：点击「X 条回复」展开子回复面板，支持无限递归嵌套展开
+- 评论列表：显示用户头像、楼主标识、引用回复（桌面端登录后可见）、点赞数
+- 评论支持**倒序**显示（登录后全量加载再倒序，未登录仅对当前页倒序）
+- 点击「X 条回复」展开子回复面板，支持无限递归嵌套展开（Android & 桌面端登录后）
+- Android：正文 / 评论图片点击全屏查看，支持双指缩放；**长按图片可保存至相册**
 - 本地收藏 / 取消收藏
-- Android：分享帖子链接至其他应用
+- Android：分享帖子链接至其他应用；大图查看器内置保存按钮可直接保存至相册
 - **收藏（需要登录）**：主贴下方「收藏」按钮直接同步至虎扑账号，再次点击取消收藏
 - **推荐（需要登录）**：主贴下方「推荐」按钮，已推荐显示灰色
 - **回复（需要登录）**：点击评论卡片上的「回复」按钮发送回复；支持引用指定评论；桌面版底部常驻回复输入框
@@ -46,7 +48,7 @@
 - **我的推荐**：本人推荐过的帖子，分页加载
 - **我的收藏**：从虎扑服务端实时拉取的收藏帖子列表，分页加载
 - **我关注的专区**：横滑展示，点击直接进入专区列表
-- **消息中心**：提到我的 / 评论 / 亮了·推荐，显示发送者、内容摘要、所在帖子
+- **消息中心**：提到我的 / 评论 / 亮了·推荐，显示发送者、内容摘要、所在帖子；有未读时消息入口显示红色气泡数字
 
 ### 导航体验
 - Android：底部红色渐变导航栏 + 白色胶囊按钮；双击 Tab 平滑滚回顶部；二次返回退出
@@ -167,7 +169,7 @@ hupuX/
 
 ```bash
 # 克隆仓库
-git clone https://github.com/你的用户名/hupuX.git
+git clone https://github.com/bidabrain/hupuX.git
 cd hupuX
 
 # Android：构建 Debug 包
@@ -182,6 +184,18 @@ cd hupuX
 ./gradlew :desktopApp:packageMsi
 ./gradlew :desktopApp:packageDeb
 ```
+
+---
+
+## Star History
+
+<a href="https://www.star-history.com/?type=date&repos=bidabrain%2FhupuX">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=bidabrain/hupuX&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=bidabrain/hupuX&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=bidabrain/hupuX&type=date&legend=top-left" />
+ </picture>
+</a>
 
 ---
 

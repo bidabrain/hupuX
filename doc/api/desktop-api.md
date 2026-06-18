@@ -12,6 +12,37 @@ Cookie: <effectiveCookie>
 
 ---
 
+## 零、未读消息数
+
+### 获取未读消息数
+
+**URL：** `GET https://my.hupu.com/message?tabKey=1`
+
+**方式：** 解析页面内嵌的 `window.$$data` JSON
+
+> ⚠️ 通知数字由 JavaScript 动态渲染，不在 SSR HTML 里；`bbs.hupu.com/` 首页无法直接抓取。
+
+**解析路径：** `window.$$data.redDot.schema_list[].unread_count` 求和
+
+```javascript
+// window.$$data 结构
+{
+  "redDot": {
+    "schema_list": [
+      { "msg_type": 1, "unread_count": 2 },  // 提到我
+      { "msg_type": 2, "unread_count": 1 },  // 评论
+      { "msg_type": 3, "unread_count": 0 }   // 亮了·推荐
+    ]
+  }
+}
+```
+
+**逻辑：** 将 `schema_list` 所有项的 `unread_count` 求和，无字段或异常时返回 0
+
+**实现：** `HupuDesktopScraper.fetchUnreadMessageCount()`
+
+---
+
 ## 一、帖子评论（bbs.hupu.com）
 
 ### 1. 帖子评论列表（SSR）

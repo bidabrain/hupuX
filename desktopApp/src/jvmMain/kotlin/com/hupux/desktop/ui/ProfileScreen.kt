@@ -40,18 +40,20 @@ fun ProfileScreen(
     var profile by remember { mutableStateOf<UserProfile?>(null) }
     var zones by remember { mutableStateOf<List<Zone>>(emptyList()) }
     var favoriteCountStr by remember { mutableStateOf("") }
+    var unreadMessageCount by remember { mutableStateOf(0) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val isLoggedIn = cookieStorage.isLoggedIn
 
     LaunchedEffect(isLoggedIn) {
-        if (!isLoggedIn) { profile = null; zones = emptyList(); favoriteCountStr = ""; return@LaunchedEffect }
+        if (!isLoggedIn) { profile = null; zones = emptyList(); favoriteCountStr = ""; unreadMessageCount = 0; return@LaunchedEffect }
         loading = true; error = null
         try {
             withContext(Dispatchers.IO) {
-                val p   = async { repo.fetchProfile() }
-                val z   = async { runCatching { repo.fetchFollowedZones() }.getOrDefault(emptyList()) }
-                val fav = async { runCatching { repo.fetchFavoriteList() }.getOrNull() }
+                val p      = async { repo.fetchProfile() }
+                val z      = async { runCatching { repo.fetchFollowedZones() }.getOrDefault(emptyList()) }
+                val fav    = async { runCatching { repo.fetchFavoriteList() }.getOrNull() }
+                val unread = async { runCatching { repo.fetchUnreadMessageCount() }.getOrDefault(0) }
                 profile = p.await()
                 zones   = z.await()
                 val favPage = fav.await()
@@ -60,6 +62,7 @@ fun ProfileScreen(
                     favPage.hasMore  -> "${favPage.threads.size}+"
                     else             -> favPage.threads.size.toString()
                 }
+                unreadMessageCount = unread.await()
             }
         } catch (e: Exception) { error = e.message }
         loading = false
@@ -80,6 +83,7 @@ fun ProfileScreen(
                 profile = profile!!,
                 zones = zones,
                 favoriteCountStr = favoriteCountStr,
+                unreadMessageCount = unreadMessageCount,
                 onThreadsClick = onThreadsClick,
                 onRepliesClick = onRepliesClick,
                 onRecommendClick = onRecommendClick,
@@ -112,6 +116,7 @@ private fun LoggedInContent(
     profile: UserProfile,
     zones: List<Zone>,
     favoriteCountStr: String,
+    unreadMessageCount: Int,
     onThreadsClick: (String) -> Unit,
     onRepliesClick: (String) -> Unit,
     onRecommendClick: (String) -> Unit,
@@ -190,6 +195,21 @@ private fun LoggedInContent(
             Text("🔔", fontSize = 18.sp)
             Spacer(Modifier.width(10.dp))
             Text("消息", fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            if (unreadMessageCount > 0) {
+                Surface(
+                    color = MaterialTheme.colorScheme.error,
+                    shape = CircleShape
+                ) {
+                    Text(
+                        text = if (unreadMessageCount > 99) "99+" else unreadMessageCount.toString(),
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onError,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+            }
             Text("›", fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }

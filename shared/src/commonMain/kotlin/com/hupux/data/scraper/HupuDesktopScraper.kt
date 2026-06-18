@@ -132,6 +132,23 @@ class HupuDesktopScraper(
         return Pair(null, null)
     }
 
+    /**
+     * 从消息中心页面 window.$$data.redDot.schema_list 获取各类型未读消息数之和。
+     * 无未读或异常时返回 0。
+     */
+    fun fetchUnreadMessageCount(): Int = try {
+        val html = fetch("$MY_BASE/message?tabKey=1")
+        val marker = "window.\$\$data="
+        val start = html.indexOf(marker).takeIf { it >= 0 }?.plus(marker.length)
+            ?: return 0
+        val end = html.indexOf("</script>", start).takeIf { it >= 0 } ?: return 0
+        val raw = html.substring(start, end).trimEnd(';', ' ', '\n', '\r')
+        val root = JsonParser.parseString(raw).asJsonObject
+        root.obj("redDot")?.arr("schema_list")
+            ?.sumOf { it.asJsonObject.int_("unread_count") ?: 0 }
+            ?: 0
+    } catch (_: Exception) { 0 }
+
     /** 登录状态下从桌面版拉取帖子评论，page=1 对应 /{tid}.html，page2+ 对应 /{tid}-{page}.html */
     fun fetchPostReplies(tid: String, page: Int = 1): DesktopRepliesPage {
         val url = if (page <= 1) "$BBS_BASE/$tid.html" else "$BBS_BASE/$tid-$page.html"

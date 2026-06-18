@@ -73,7 +73,7 @@ fun ProfileScreen(
                     PillButton("重试", onClick = vm::loadProfile)
                 }
             }
-            is ProfileViewModel.State.Success     -> ProfileContent(s.profile, s.followedZones, s.favoriteCountStr, onPostsClick, onThreadsClick, onRecommendClick, onZoneClick, onMessagesClick, onFavoritesClick)
+            is ProfileViewModel.State.Success     -> ProfileContent(s.profile, s.followedZones, s.favoriteCountStr, s.unreadMessageCount, onPostsClick, onThreadsClick, onRecommendClick, onZoneClick, onMessagesClick, onFavoritesClick)
         }
     }
 }
@@ -98,6 +98,7 @@ private fun ProfileContent(
     profile: UserProfile,
     followedZones: List<Zone>,
     favoriteCountStr: String,
+    unreadMessageCount: Int,
     onPostsClick: (uid: String) -> Unit,
     onThreadsClick: (uid: String) -> Unit,
     onRecommendClick: (uid: String) -> Unit,
@@ -220,6 +221,7 @@ private fun ProfileContent(
             ProfileMenuRow(
                 icon  = Icons.Outlined.Notifications,
                 label = "消息",
+                badge = unreadMessageCount,
                 onClick = onMessagesClick
             )
         }
@@ -275,7 +277,7 @@ private fun ZoneChip(zone: Zone, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ProfileMenuRow(icon: ImageVector, label: String, onClick: () -> Unit) {
+private fun ProfileMenuRow(icon: ImageVector, label: String, badge: Int = 0, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -287,6 +289,23 @@ private fun ProfileMenuRow(icon: ImageVector, label: String, onClick: () -> Unit
         Spacer(Modifier.width(12.dp))
         Text(label, fontSize = 15.sp, fontWeight = FontWeight.Medium,
             color = TextPrimary, modifier = Modifier.weight(1f))
+        if (badge > 0) {
+            Box(
+                modifier = Modifier
+                    .defaultMinSize(minWidth = 20.dp, minHeight = 20.dp)
+                    .background(HupuRed, CircleShape)
+                    .padding(horizontal = 5.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (badge > 99) "99+" else badge.toString(),
+                    fontSize = 11.sp,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+        }
         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null,
             tint = TextTertiary, modifier = Modifier.size(20.dp))
     }
