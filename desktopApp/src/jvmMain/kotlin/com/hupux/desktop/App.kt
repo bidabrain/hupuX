@@ -40,6 +40,7 @@ private sealed class Screen {
     object Messages : Screen()
     data class PostDetail(val tid: String) : Screen()
     data class ZoneDetail(val zone: Zone) : Screen()
+    data class TopicDetail(val tagId: Long, val tagName: String) : Screen()
     data class UserThreadList(val uid: String) : Screen()
     data class UserReplyList(val uid: String) : Screen()
     data class UserRecommendList(val uid: String) : Screen()
@@ -75,7 +76,7 @@ fun App(
 
     val selectedTab by derivedStateOf {
         when (current) {
-            is Screen.Home, is Screen.PostDetail                    -> 0
+            is Screen.Home, is Screen.PostDetail, is Screen.TopicDetail -> 0
             is Screen.ZoneList, is Screen.ZoneDetail                -> 1
             is Screen.Search                                        -> 2
             is Screen.Favorites                                     -> 3
@@ -161,7 +162,18 @@ fun App(
 
             // ── Content ──────────────────────────────────────────────────────
             when (val s = current) {
-                is Screen.Home -> HomeScreen(homeRepo, zoneRepo, followedRepo) { tid -> push(Screen.PostDetail(tid)) }
+                is Screen.Home -> HomeScreen(
+                    homeRepo, zoneRepo, followedRepo,
+                    onPostClick  = { tid -> push(Screen.PostDetail(tid)) },
+                    onTopicClick = { tagId, name -> push(Screen.TopicDetail(tagId, name)) }
+                )
+
+                is Screen.TopicDetail -> TopicDetailScreen(
+                    tagId       = s.tagId,
+                    tagName     = s.tagName,
+                    homeRepo    = homeRepo,
+                    onPostClick = { tid -> push(Screen.PostDetail(tid)) }
+                )
 
                 is Screen.ZoneList -> ZoneListScreen(zoneRepo) { zone -> push(Screen.ZoneDetail(zone)) }
 

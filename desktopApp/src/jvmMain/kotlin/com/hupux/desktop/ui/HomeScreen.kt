@@ -15,6 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.hupux.data.model.HotItem
 import com.hupux.data.model.Post
 import com.hupux.data.repository.FollowedZonesRepository
 import com.hupux.data.repository.HomeRepository
@@ -32,7 +33,8 @@ fun HomeScreen(
     homeRepo:     HomeRepository,
     zoneRepo:     ZoneRepository,
     followedRepo: FollowedZonesRepository,
-    onPostClick:  (String) -> Unit
+    onPostClick:  (String) -> Unit,
+    onTopicClick: (Long, String) -> Unit = { _, _ -> }
 ) {
     var selectedTab by remember { mutableStateOf(0) }
 
@@ -42,7 +44,7 @@ fun HomeScreen(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            listOf("推荐", "关注").forEachIndexed { idx, label ->
+            listOf("推荐", "热榜", "关注").forEachIndexed { idx, label ->
                 val selected = selectedTab == idx
                 Surface(
                     onClick = { selectedTab = idx },
@@ -63,7 +65,8 @@ fun HomeScreen(
 
         when (selectedTab) {
             0 -> RecommendTab(homeRepo, onPostClick)
-            1 -> FollowedTab(zoneRepo, followedRepo, onPostClick)
+            1 -> HotTab(homeRepo, onTopicClick)
+            2 -> FollowedTab(zoneRepo, followedRepo, onPostClick)
         }
     }
 }
@@ -92,6 +95,65 @@ private fun RecommendTab(repo: HomeRepository, onPostClick: (String) -> Unit) {
             }
         }
     }
+}
+
+@Composable
+private fun HotTab(repo: HomeRepository, onTopicClick: (Long, String) -> Unit) {
+    var items by remember { mutableStateOf<List<HotItem>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        loading = true; error = null
+        try { items = withContext(Dispatchers.IO) { repo.getHotItems() } }
+        catch (e: Exception) { error = e.message }
+        loading = false
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        when {
+            loading       -> CircularProgressIndicator(Modifier.align(Alignment.Center))
+            error != null -> Text("加载失败：$error", Modifier.align(Alignment.Center).padding(16.dp))
+            else -> LazyColumn(Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(items) { HotItemCard(it, onTopicClick) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HotItemCard(item: HotItem, onClick: (Long, String) -> Unit) {
+    Surface(
+        modifier        = Modifier.fillMaxWidth().clickable { onClick(item.tagId, item.tagName) },
+        shape           = RoundedCornerShape(14.dp),
+        color           = MaterialTheme.colorScheme.surface,
+        shadowElevation = 3.dp,
+        tonalElevation  = 0.dp
+    ) {
+        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                item.rank.toString(),
+                fontSize = 18.sp, fontWeight = FontWeight.ExtraBold,
+                color = if (item.rank <= 3) HupuRed else TextTertiary,
+                modifier = Modifier.width(32.dp)
+            )
+            Column(Modifier.weight(1f)) {
+                Text(item.tagName, fontWeight = FontWeight.Medium, fontSize = 15.sp,
+                    color = TextPrimary, lineHeight = 22.sp)
+                if (item.heat > 0) {
+                    Spacer(Modifier.height(6.dp))
+                    Text("🔥 ${formatHeat(item.heat)}", fontSize = 12.sp, color = TextTertiary)
+                }
+            }
+        }
+    }
+}
+
+private fun formatHeat(heat: Long): String = when {
+    heat >= 10000 -> "${heat / 10000}.${(heat % 10000) / 1000}万"
+    else          -> heat.toString()
 }
 
 @Composable

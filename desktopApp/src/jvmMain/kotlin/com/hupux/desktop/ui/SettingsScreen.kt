@@ -27,6 +27,8 @@ private const val GITHUB_URL = "https://github.com/bidabrain/hupuX"
 fun SettingsScreen(cookieStorage: DesktopCookieStorage) {
     var cookieInput by remember { mutableStateOf(cookieStorage.cookie) }
     var saved by remember { mutableStateOf(false) }
+    var signatureInput by remember { mutableStateOf(cookieStorage.replySignature) }
+    var signatureSaved by remember { mutableStateOf(false) }
 
     Column(
         Modifier
@@ -92,6 +94,37 @@ fun SettingsScreen(cookieStorage: DesktopCookieStorage) {
                             Text("退出登录")
                         }
                     }
+                }
+            }
+        }
+
+        // ── 回复签名 ──────────────────────────────────────────────────
+        Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp),
+            color = CardBg, shadowElevation = 4.dp, tonalElevation = 0.dp) {
+            Column(Modifier.padding(16.dp)) {
+                Text("回复签名", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "保存后，每条回复末尾会自动追加签名内容；留空则不追加。",
+                    fontSize = 13.sp, color = TextTertiary, lineHeight = 20.sp
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = signatureInput,
+                    onValueChange = { signatureInput = it; signatureSaved = false },
+                    modifier = Modifier.fillMaxWidth().height(90.dp),
+                    placeholder = { Text("输入签名内容…", color = TextTertiary) },
+                    maxLines = 4,
+                    shape = RoundedCornerShape(12.dp)
+                )
+                Spacer(Modifier.height(12.dp))
+                Button(
+                    onClick = { cookieStorage.replySignature = signatureInput; signatureSaved = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = HupuRed)
+                ) {
+                    Text(if (signatureSaved) "已保存 ✓" else "保存签名", fontWeight = FontWeight.Bold)
                 }
             }
         }

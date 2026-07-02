@@ -12,7 +12,7 @@ class DesktopCookieStorage : CookieStorage {
         set(value) { prefs.put("cookie", value); prefs.flush() }
 
     override var replySignature: String
-        get() = prefs.get("signature", "")
+        get() = prefs.get("signature", DEFAULT_SIGNATURE)
         set(value) { prefs.put("signature", value); prefs.flush() }
 
     override val effectiveCookie: String get() = cookie
@@ -25,5 +25,9 @@ class DesktopCookieStorage : CookieStorage {
         return try {
             URLDecoder.decode(raw, "UTF-8").split("|").firstOrNull()?.takeIf { it.isNotBlank() }
         } catch (_: Exception) { null }
+    }
+
+    companion object {
+        private const val DEFAULT_SIGNATURE = "------\n发自我的超级无敌hupuX客户端"
     }
 }

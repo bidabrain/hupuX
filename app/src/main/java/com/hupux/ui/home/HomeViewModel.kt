@@ -2,6 +2,7 @@ package com.hupux.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hupux.data.model.HotItem
 import com.hupux.data.model.Post
 import com.hupux.data.repository.FollowedZonesRepository
 import com.hupux.data.repository.HomeRepository
@@ -14,11 +15,14 @@ import kotlinx.coroutines.launch
 data class HomeUiState(
     val recommendPosts:      List<Post>       = emptyList(),
     val bannerPosts:         List<Post>       = emptyList(),
+    val hotItems:            List<HotItem>    = emptyList(),
     val followedPool:        List<Post>       = emptyList(),
     val followDisplayCount:  Int              = 10,
     val followZoneCursors:   Map<Int, String> = emptyMap(),
     val selectedTab:         Int              = 0,
     val isLoading:           Boolean          = true,
+    val isLoadingHot:        Boolean          = false,
+    val hotError:            String?          = null,
     val isLoadingFollow:     Boolean          = false,
     val isLoadingMoreFollow: Boolean          = false,
     val error:               String?          = null
@@ -63,7 +67,24 @@ class HomeViewModel constructor(
 
     fun selectTab(index: Int) {
         _state.value = _state.value.copy(selectedTab = index)
-        if (index == 1 && _state.value.followedPool.isEmpty()) loadFollowedFeed()
+        when (index) {
+            1 -> if (_state.value.hotItems.isEmpty()) loadHot()
+            2 -> if (_state.value.followedPool.isEmpty()) loadFollowedFeed()
+        }
+    }
+
+    fun loadHot() {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isLoadingHot = true, hotError = null)
+            runCatching { homeRepo.getHotItems() }
+                .onSuccess { items ->
+                    _state.value = _state.value.copy(hotItems = items, isLoadingHot = false)
+                }
+                .onFailure {
+                    _state.value = _state.value.copy(
+                        isLoadingHot = false, hotError = it.message ?: "加载失败")
+                }
+        }
     }
 
     fun loadFollowedFeed() {

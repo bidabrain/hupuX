@@ -2,6 +2,7 @@ package com.hupux.data.repository
 
 import com.hupux.data.model.HotItem
 import com.hupux.data.model.Post
+import com.hupux.data.model.TopicThreadPage
 import com.hupux.data.scraper.HupuScraper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -14,4 +15,9 @@ class HomeRepository(private val scraper: HupuScraper) {
     suspend fun getHotItems(): List<HotItem> = withContext(Dispatchers.IO) {
         scraper.fetchHot()
     }
+
+    suspend fun getTopicThreads(tagId: Long, page: Int = 1): TopicThreadPage =
+        withContext(Dispatchers.IO) {
+            scraper.fetchTopicThreads(tagId, page)
+        }
 }

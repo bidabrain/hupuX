@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import org.koin.androidx.compose.koinViewModel
 import coil3.compose.AsyncImage
 import androidx.compose.material.icons.outlined.Settings
+import com.hupux.data.model.HotItem
 import com.hupux.data.model.Post
 import com.hupux.ui.theme.*
 import kotlinx.coroutines.delay
@@ -44,6 +45,7 @@ import kotlinx.coroutines.delay
 @Composable
 fun HomeScreen(
     onPostClick: (String) -> Unit,
+    onTopicClick: (Long, String) -> Unit = { _, _ -> },
     onSettingsClick: () -> Unit = {},
     scrollToTopTrigger: Int = 0,
     vm: HomeViewModel = koinViewModel()
@@ -52,12 +54,17 @@ fun HomeScreen(
     val followedCount by vm.followedCount.collectAsState()
 
     val recommendListState = rememberLazyListState()
+    val hotListState       = rememberLazyListState()
     val followedListState  = rememberLazyListState()
 
     // 当前 tab 对应的列表滚动到顶附近时才显示 header
     val headerVisible by remember {
         derivedStateOf {
-            val listState = if (state.selectedTab == 0) recommendListState else followedListState
+            val listState = when (state.selectedTab) {
+                0    -> recommendListState
+                1    -> hotListState
+                else -> followedListState
+            }
             listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset < 150
         }
     }
@@ -65,8 +72,11 @@ fun HomeScreen(
     // 触发器递增时滚到当前分页面顶部
     LaunchedEffect(scrollToTopTrigger) {
         if (scrollToTopTrigger > 0) {
-            if (state.selectedTab == 0) recommendListState.animateScrollToItem(0)
-            else                        followedListState.animateScrollToItem(0)
+            when (state.selectedTab) {
+                0    -> recommendListState.animateScrollToItem(0)
+                1    -> hotListState.animateScrollToItem(0)
+                else -> followedListState.animateScrollToItem(0)
+            }
         }
     }
 
@@ -141,6 +151,14 @@ fun HomeScreen(
                         PostCard(post = post, onClick = { onPostClick(post.tid) })
                     }
                 }
+                state.selectedTab == 1 -> HotFeed(
+                    items       = state.hotItems,
+                    isLoading   = state.isLoadingHot,
+                    error       = state.hotError,
+                    onRetry     = vm::loadHot,
+                    onTopicClick = onTopicClick,
+                    listState   = hotListState
+                )
                 else -> FollowedFeed(
                     posts         = state.followedPosts,
                     isLoading     = state.isLoadingFollow,
@@ -218,7 +236,7 @@ private fun NewsBanner(posts: List<Post>, onPostClick: (String) -> Unit) {
 
 @Composable
 private fun PlasticTabRow(selectedIndex: Int, followedCount: Int, onSelect: (Int) -> Unit) {
-    val labels = listOf("推荐",
+    val labels = listOf("推荐", "热榜",
         if (followedCount > 0) "关注 ($followedCount)" else "关注")
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp),
@@ -249,6 +267,74 @@ private fun PlasticTabRow(selectedIndex: Int, followedCount: Int, onSelect: (Int
             }
         }
     }
+}
+
+// ─── Hot feed（热榜话题）───────────────────────────────────────────────────────
+
+@Composable
+private fun HotFeed(
+    items: List<HotItem>,
+    isLoading: Boolean,
+    error: String?,
+    onRetry: () -> Unit,
+    onTopicClick: (Long, String) -> Unit,
+    listState: LazyListState = rememberLazyListState()
+) {
+    when {
+        isLoading -> Box(Modifier.fillMaxSize(), Alignment.Center) {
+            CircularProgressIndicator(color = HupuRed)
+        }
+        error != null -> Column(Modifier.fillMaxSize(), Arrangement.Center,
+            Alignment.CenterHorizontally) {
+            Text(error, color = HupuRed)
+            Spacer(Modifier.height(12.dp))
+            PillButton("重试", onClick = onRetry)
+        }
+        else -> LazyColumn(state = listState, modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(top = 12.dp, bottom = 8.dp)) {
+            items(items, key = { it.tagId }) { item ->
+                HotItemCard(item, onClick = { onTopicClick(item.tagId, item.tagName) })
+            }
+        }
+    }
+}
+
+@Composable
+private fun HotItemCard(item: HotItem, onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 5.dp)
+            .clickable(onClick = onClick),
+        shape           = RoundedCornerShape(16.dp),
+        color           = CardBg,
+        shadowElevation = 4.dp
+    ) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            // 排名徽标：前三名红色
+            val rankColor = if (item.rank <= 3) HupuRed else TextTertiary
+            Text(
+                item.rank.toString(),
+                fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = rankColor,
+                modifier = Modifier.width(32.dp)
+            )
+            Column(Modifier.weight(1f)) {
+                Text(item.tagName, fontSize = 15.sp, fontWeight = FontWeight.Medium,
+                    color = TextPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    lineHeight = 21.sp)
+                if (item.heat > 0) {
+                    Spacer(Modifier.height(6.dp))
+                    Text("🔥 ${formatHeat(item.heat)}", fontSize = 12.sp, color = TextTertiary)
+                }
+            }
+        }
+    }
+}
+
+private fun formatHeat(heat: Long): String = when {
+    heat >= 10000 -> "${heat / 10000}.${(heat % 10000) / 1000}万"
+    else          -> heat.toString()
 }
 
 // ─── Followed feed ────────────────────────────────────────────────────────────

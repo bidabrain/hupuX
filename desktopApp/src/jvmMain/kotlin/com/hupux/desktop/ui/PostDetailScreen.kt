@@ -430,7 +430,9 @@ fun PostDetailScreen(
                                                 scope.launch {
                                                     replySending = true
                                                     try {
-                                                        val textHtml = if (text.isNotEmpty()) "<p>$text</p>" else ""
+                                                        val sig = cookieStorage.replySignature.trim()
+                                                        val textWithSig = if (sig.isNotEmpty()) "$text\n$sig" else text
+                                                        val textHtml = if (text.isNotEmpty()) "<p>$textWithSig</p>" else ""
                                                         val imgHtml  = replyImages.joinToString("") { """<img src="$it" />""" }
                                                         withContext(Dispatchers.IO) {
                                                             desktopScraper.createReply(

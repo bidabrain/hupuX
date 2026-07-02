@@ -40,6 +40,7 @@ import com.hupux.ui.profile.UserThreadListScreen
 import com.hupux.ui.search.SearchScreen
 import com.hupux.ui.settings.SettingsScreen
 import com.hupux.ui.theme.*
+import com.hupux.ui.topic.TopicDetailScreen
 import com.hupux.ui.zone.ZoneDetailScreen
 import com.hupux.ui.zone.ZoneListScreen
 
@@ -187,6 +188,9 @@ fun AppNavigation() {
             composable("home") {
                 HomeScreen(
                     onPostClick        = { tid -> navController.navigate("post/$tid") },
+                    onTopicClick       = { tagId, name ->
+                        navController.navigate("topic/$tagId/${java.net.URLEncoder.encode(name, "UTF-8")}")
+                    },
                     onSettingsClick    = { navController.navigate("settings") },
                     scrollToTopTrigger = homeScrollTrigger
                 )
@@ -297,6 +301,23 @@ fun AppNavigation() {
                             "new_post/$topicId/${java.net.URLEncoder.encode(topicName, "UTF-8")}"
                         )
                     }
+                )
+            }
+            composable(
+                "topic/{tagId}/{tagName}",
+                arguments = listOf(
+                    navArgument("tagId")   { type = NavType.LongType },
+                    navArgument("tagName") { type = NavType.StringType }
+                )
+            ) { back ->
+                val tagId   = back.arguments!!.getLong("tagId")
+                val tagName = java.net.URLDecoder.decode(
+                    back.arguments!!.getString("tagName") ?: "", "UTF-8")
+                TopicDetailScreen(
+                    tagId       = tagId,
+                    tagName     = tagName,
+                    onPostClick = { tid -> navController.navigate("post/$tid") },
+                    onBack      = { navController.popBackStack() }
                 )
             }
             composable(

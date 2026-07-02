@@ -78,6 +78,24 @@ data class HotItem(
     val icon: String = ""
 )
 
+// 热榜话题的头部信息
+data class TopicInfo(
+    val tagId: Long,
+    val name: String,
+    val banner: String = "",
+    val bannerRgb: String = "",
+    val threadNum: Int = 0,
+    val followNum: Int = 0,
+    val pv: Long = 0
+)
+
+// 某个话题下的帖子列表（分页）
+data class TopicThreadPage(
+    val info: TopicInfo,
+    val posts: List<Post>,
+    val nextPage: Int?          // null = 没有更多
+)
+
 data class UserThread(
     val tid: Long,
     val title: String,

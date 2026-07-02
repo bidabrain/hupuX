@@ -27,6 +27,9 @@ private fun JsonObject.str(key: String): String? =
 private fun JsonObject.int_(key: String): Int? =
     get(key)?.takeIf { !it.isJsonNull }?.asInt
 
+private fun JsonObject.long_(key: String): Long? =
+    get(key)?.takeIf { !it.isJsonNull }?.asLong
+
 private fun JsonObject.bool_(key: String): Boolean? =
     get(key)?.takeIf { !it.isJsonNull }?.asBoolean
 
@@ -248,6 +251,55 @@ class HupuScraper(private val client: OkHttpClient) {
             )
         }
     }
+
+    /**
+     * 热榜话题下的帖子列表。
+     * page=1 走 SSR（/tag/{tagId}，含话题头部信息）；page2+ 走 REST API（只有帖子列表）。
+     */
+    fun fetchTopicThreads(tagId: Long, page: Int = 1): TopicThreadPage {
+        if (page <= 1) {
+            val html = fetch("$BASE_URL/tag/$tagId")
+            val pp = parseNextData(html)
+            val top = pp.obj("topicTopInfo")
+            val info = TopicInfo(
+                tagId     = top?.long_("tagId") ?: tagId,
+                name      = top?.str("name") ?: "",
+                banner    = top?.str("banner") ?: "",
+                bannerRgb = top?.str("bannerRgb") ?: "",
+                threadNum = top?.int_("tNum") ?: 0,
+                followNum = top?.int_("followNum") ?: 0,
+                pv        = top?.long_("pv") ?: 0
+            )
+            val ttl = pp.obj("topicThreadList")
+            val threads = ttl?.arr("threadList") ?: JsonArray()
+            val hasNext = ttl?.bool_("nextPage") ?: false
+            return TopicThreadPage(info, parseTopicThreads(threads), if (hasNext) 2 else null)
+        }
+        val url = "$BASE_URL/api/v2/bbs/tagThreads?tagId=$tagId&page=$page"
+        val data = JsonParser.parseString(fetch(url)).asJsonObject.obj("data")
+            ?: return TopicThreadPage(TopicInfo(tagId, ""), emptyList(), null)
+        val threads = data.arr("threadList") ?: JsonArray()
+        val hasNext = data.bool_("nextPage") ?: false
+        return TopicThreadPage(TopicInfo(tagId, ""), parseTopicThreads(threads), if (hasNext) page + 1 else null)
+    }
+
+    private fun parseTopicThreads(threads: JsonArray): List<Post> =
+        threads.mapNotNull { el ->
+            val o = el.asJsonObject
+            val tid = o.long_("tid")?.toString() ?: return@mapNotNull null
+            val images = o.arr("picList")?.mapNotNull { it.asJsonObject.str("url") } ?: emptyList()
+            Post(
+                tid          = tid,
+                title        = o.str("title") ?: "",
+                url          = "$BASE_URL/bbs/$tid.html",
+                replies      = o.int_("replies") ?: 0,
+                recommendNum = o.int_("recommendCount") ?: 0,
+                username     = o.str("userName") ?: "",
+                time         = o.str("time") ?: "",
+                images       = images,
+                isVideo      = o.get("video")?.let { !it.isJsonNull } ?: false
+            )
+        }
 
     fun fetchSearch(query: String): List<Post> {
         val encoded = java.net.URLEncoder.encode(query, "UTF-8")

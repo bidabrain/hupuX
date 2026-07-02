@@ -29,6 +29,7 @@ import com.hupux.ui.profile.UserRecommendListViewModel
 import com.hupux.ui.profile.UserReplyListViewModel
 import com.hupux.ui.profile.UserThreadListViewModel
 import com.hupux.ui.profile.UserWebViewViewModel
+import com.hupux.ui.topic.TopicDetailViewModel
 import com.hupux.ui.zone.ZoneDetailViewModel
 import com.hupux.ui.zone.ZoneListViewModel
 import okhttp3.OkHttpClient
@@ -85,4 +86,5 @@ val appModule = module {
     viewModel { SettingsViewModel(get<CookiePreferences>(), androidContext()) }
     viewModel { ZoneDetailViewModel(get(), get<CookiePreferences>()) }
     viewModel { ZoneListViewModel(get(), get()) }
+    viewModel { TopicDetailViewModel(get()) }
 }
