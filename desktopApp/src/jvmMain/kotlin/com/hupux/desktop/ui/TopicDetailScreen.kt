@@ -2,8 +2,7 @@ package com.hupux.desktop.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -72,12 +71,10 @@ fun TopicDetailScreen(
             when {
                 loading       -> CircularProgressIndicator(Modifier.align(Alignment.Center))
                 error != null -> Text("加载失败：$error", Modifier.align(Alignment.Center).padding(16.dp))
-                else -> LazyColumn(Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                else -> PostGrid {
                     items(posts) { PostCard(it, onPostClick) }
                     if (nextPage != null) {
-                        item {
+                        fullSpanItem {
                             Box(Modifier.fillMaxWidth().padding(8.dp), Alignment.Center) {
                                 if (loadingMore) {
                                     CircularProgressIndicator(Modifier.size(24.dp), color = HupuRed)

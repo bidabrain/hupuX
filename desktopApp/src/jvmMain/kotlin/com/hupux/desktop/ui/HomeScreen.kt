@@ -3,8 +3,7 @@ package com.hupux.desktop.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -88,9 +87,7 @@ private fun RecommendTab(repo: HomeRepository, onPostClick: (String) -> Unit) {
         when {
             loading       -> CircularProgressIndicator(Modifier.align(Alignment.Center))
             error != null -> Text("加载失败：$error", Modifier.align(Alignment.Center).padding(16.dp))
-            else -> LazyColumn(Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            else -> PostGrid {
                 items(posts) { PostCard(it, onPostClick) }
             }
         }
@@ -99,13 +96,13 @@ private fun RecommendTab(repo: HomeRepository, onPostClick: (String) -> Unit) {
 
 @Composable
 private fun HotTab(repo: HomeRepository, onTopicClick: (Long, String) -> Unit) {
-    var items by remember { mutableStateOf<List<HotItem>>(emptyList()) }
+    var hotItems by remember { mutableStateOf<List<HotItem>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         loading = true; error = null
-        try { items = withContext(Dispatchers.IO) { repo.getHotItems() } }
+        try { hotItems = withContext(Dispatchers.IO) { repo.getHotItems() } }
         catch (e: Exception) { error = e.message }
         loading = false
     }
@@ -114,10 +111,8 @@ private fun HotTab(repo: HomeRepository, onTopicClick: (Long, String) -> Unit) {
         when {
             loading       -> CircularProgressIndicator(Modifier.align(Alignment.Center))
             error != null -> Text("加载失败：$error", Modifier.align(Alignment.Center).padding(16.dp))
-            else -> LazyColumn(Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(items) { HotItemCard(it, onTopicClick) }
+            else -> PostGrid {
+                items(hotItems) { HotItemCard(it, onTopicClick) }
             }
         }
     }
@@ -193,12 +188,10 @@ private fun FollowedTab(
                 Text("在「发现」进入专区后点击关注", fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            else -> LazyColumn(Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            else -> PostGrid {
                 items(posts.take(displayCount)) { PostCard(it, onPostClick) }
                 if (displayCount < posts.size) {
-                    item {
+                    fullSpanItem {
                         Box(Modifier.fillMaxWidth().padding(8.dp), Alignment.Center) {
                             OutlinedButton(onClick = { displayCount += 20 }) { Text("加载更多") }
                         }

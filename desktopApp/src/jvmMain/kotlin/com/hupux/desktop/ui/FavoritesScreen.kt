@@ -2,8 +2,7 @@ package com.hupux.desktop.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -35,7 +34,7 @@ fun FavoritesScreen(repo: FavoritesRepository, onPostClick: (String) -> Unit) {
                 Text("在帖子详情页点击书签按钮收藏", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else {
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            PostGrid {
                 items(favorites, key = { it.tid }) { item ->
                     FavoriteCard(
                         item      = item,

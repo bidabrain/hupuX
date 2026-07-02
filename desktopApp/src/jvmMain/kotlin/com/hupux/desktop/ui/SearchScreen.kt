@@ -2,8 +2,7 @@ package com.hupux.desktop.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -68,11 +67,7 @@ fun SearchScreen(scraper: HupuScraper, onPostClick: (String) -> Unit) {
                     Modifier.align(Alignment.Center),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                else -> LazyColumn(
-                    Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+                else -> PostGrid {
                     items(results) { post ->
                         Surface(
                             modifier = Modifier.fillMaxWidth().clickable { onPostClick(post.tid) },

@@ -2,8 +2,7 @@ package com.hupux.desktop.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -102,11 +101,7 @@ fun ZoneDetailScreen(
             if (loading) {
                 CircularProgressIndicator(Modifier.align(Alignment.Center))
             } else {
-                LazyColumn(
-                    Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+                PostGrid {
                     items(posts) { post ->
                         Surface(
                             modifier = Modifier.fillMaxWidth().clickable { onPostClick(post.tid) },
@@ -134,7 +129,7 @@ fun ZoneDetailScreen(
                         }
                     }
                     if (cursor != null) {
-                        item {
+                        fullSpanItem {
                             Box(Modifier.fillMaxWidth().padding(8.dp), contentAlignment = Alignment.Center) {
                                 if (loadingMore) {
                                     CircularProgressIndicator(modifier = Modifier.size(24.dp))
