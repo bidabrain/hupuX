@@ -5,6 +5,7 @@ import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import com.hupux.data.CookieStorage
 import com.hupux.data.local.CookiePreferences
+import com.hupux.data.local.ResilientSqliteCallback
 import com.hupux.data.repository.FavoritesRepository
 import com.hupux.data.repository.FollowedZonesRepository
 import com.hupux.shared.db.HupuDatabase
@@ -48,7 +49,12 @@ val appModule = module {
             .build()
     }
     single<SqlDriver> {
-        AndroidSqliteDriver(HupuDatabase.Schema, androidContext(), "favorites.db")
+        AndroidSqliteDriver(
+            schema   = HupuDatabase.Schema,
+            context  = androidContext(),
+            name     = "favorites.db",
+            callback = ResilientSqliteCallback(HupuDatabase.Schema)
+        )
     }
     single<HupuDatabase> { HupuDatabase(get()) }
 
