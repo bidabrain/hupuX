@@ -15,6 +15,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+/** 评论排序方式 */
+enum class CommentSort { DEFAULT, REVERSED, BY_LIKES }
+
 sealed class PostDetailUiState {
     object Loading : PostDetailUiState()
     data class Success(
@@ -38,16 +41,19 @@ sealed class PostDetailUiState {
         val isRecommending: Boolean = false,
         val isCollected: Boolean = false,
         val isCollecting: Boolean = false,
-        val isReversed: Boolean = false,
-        val reversedComments: List<Comment> = emptyList(),
-        val reversedDisplayCount: Int = 0,
-        val isLoadingReversed: Boolean = false
+        val sortMode: CommentSort = CommentSort.DEFAULT,
+        val sortedComments: List<Comment> = emptyList(),
+        val sortedDisplayCount: Int = 0,
+        val isLoadingSort: Boolean = false,
+        val fullComments: List<Comment> = emptyList()   // 登录后全量拉取的完整评论（时间正序），用于本地重排
     ) : PostDetailUiState() {
         val expandedPid: String? get() = replyStack.lastOrNull()
         val displayedComments: List<Comment> get() =
-            if (isReversed) reversedComments.take(reversedDisplayCount) else post.comments
+            if (sortMode == CommentSort.DEFAULT) post.comments
+            else sortedComments.take(sortedDisplayCount)
         val hasMoreDisplayed: Boolean get() =
-            if (isReversed) reversedDisplayCount < reversedComments.size else post.hasMoreComments
+            if (sortMode == CommentSort.DEFAULT) post.hasMoreComments
+            else sortedDisplayCount < sortedComments.size
     }
     data class Error(val message: String) : PostDetailUiState()
 }
@@ -135,50 +141,71 @@ class PostDetailViewModel constructor(
         }
     }
 
-    fun toggleReverse() {
+    fun setSort(mode: CommentSort) {
         val s = _state.value as? PostDetailUiState.Success ?: return
-        if (s.isReversed) {
-            _state.value = s.copy(isReversed = false, reversedComments = emptyList(), reversedDisplayCount = 0)
+        if (s.sortMode == mode) return
+
+        // 回到默认（时间正序）
+        if (mode == CommentSort.DEFAULT) {
+            _state.value = s.copy(
+                sortMode = CommentSort.DEFAULT, sortedComments = emptyList(), sortedDisplayCount = 0)
             return
         }
-        if (!cookiePrefs.isLoggedIn) {
-            val reversed = s.post.comments.reversed()
+
+        // 已有全量缓存（登录后拉过），或未登录用手头的 —— 直接本地重排，不重复联网
+        val cached = when {
+            s.fullComments.isNotEmpty() -> s.fullComments
+            !cookiePrefs.isLoggedIn     -> s.post.comments
+            else                        -> null
+        }
+        if (cached != null) {
+            val sorted = applySort(cached, mode)
             _state.value = s.copy(
-                isReversed = true,
-                reversedComments = reversed,
-                reversedDisplayCount = minOf(REVERSE_PAGE_SIZE, reversed.size)
+                sortMode = mode,
+                sortedComments = sorted,
+                sortedDisplayCount = minOf(REVERSE_PAGE_SIZE, sorted.size)
             )
-        } else {
-            _state.value = s.copy(isLoadingReversed = true)
-            viewModelScope.launch {
-                val all = s.post.comments.toMutableList()
-                var page = s.commentPage + 1
-                while (page <= s.post.desktopTotalPages) {
-                    runCatching { postRepo.loadMoreComments(currentTid, page) }
-                        .onSuccess { (comments, _) ->
-                            val seen = all.map { it.pid }.toHashSet()
-                            all.addAll(comments.filter { it.pid !in seen })
-                        }
-                    page++
-                }
-                val reversed = all.reversed()
-                (_state.value as? PostDetailUiState.Success)?.let { s2 ->
-                    _state.value = s2.copy(
-                        isReversed = true,
-                        reversedComments = reversed,
-                        reversedDisplayCount = minOf(REVERSE_PAGE_SIZE, reversed.size),
-                        isLoadingReversed = false
-                    )
-                }
+            return
+        }
+
+        // 登录且尚未全量：把剩余页全部拉下来再排（时间正序缓存到 fullComments）
+        _state.value = s.copy(isLoadingSort = true)
+        viewModelScope.launch {
+            val all = s.post.comments.toMutableList()
+            var page = s.commentPage + 1
+            while (page <= s.post.desktopTotalPages) {
+                runCatching { postRepo.loadMoreComments(currentTid, page) }
+                    .onSuccess { (comments, _) ->
+                        val seen = all.map { it.pid }.toHashSet()
+                        all.addAll(comments.filter { it.pid !in seen })
+                    }
+                page++
+            }
+            val sorted = applySort(all, mode)
+            (_state.value as? PostDetailUiState.Success)?.let { s2 ->
+                _state.value = s2.copy(
+                    sortMode = mode,
+                    fullComments = all,
+                    sortedComments = sorted,
+                    sortedDisplayCount = minOf(REVERSE_PAGE_SIZE, sorted.size),
+                    isLoadingSort = false
+                )
             }
         }
     }
 
-    fun loadMoreReversed() {
+    /** 始终从时间正序的源列表出发排序，保证多次切换结果稳定正确 */
+    private fun applySort(comments: List<Comment>, mode: CommentSort): List<Comment> = when (mode) {
+        CommentSort.REVERSED -> comments.reversed()
+        CommentSort.BY_LIKES -> comments.sortedByDescending { it.lights }  // 稳定排序：同赞数保持时间序
+        CommentSort.DEFAULT  -> comments
+    }
+
+    fun loadMoreSorted() {
         val s = _state.value as? PostDetailUiState.Success ?: return
-        if (!s.isReversed || s.reversedDisplayCount >= s.reversedComments.size) return
+        if (s.sortMode == CommentSort.DEFAULT || s.sortedDisplayCount >= s.sortedComments.size) return
         _state.value = s.copy(
-            reversedDisplayCount = minOf(s.reversedDisplayCount + REVERSE_PAGE_SIZE, s.reversedComments.size)
+            sortedDisplayCount = minOf(s.sortedDisplayCount + REVERSE_PAGE_SIZE, s.sortedComments.size)
         )
     }
 

@@ -265,20 +265,13 @@ private fun PostContent(
                     Spacer(Modifier.width(6.dp))
                     Text("${s.post.replies}", fontSize = 14.sp, color = TextTertiary)
                     Spacer(Modifier.weight(1f))
-                    if (s.isLoadingReversed) {
+                    if (s.isLoadingSort) {
                         CircularProgressIndicator(Modifier.size(16.dp), color = HupuRed, strokeWidth = 2.dp)
                         Spacer(Modifier.width(8.dp))
                     } else {
-                        TextButton(
-                            onClick = vm::toggleReverse,
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
-                        ) {
-                            Text(
-                                if (s.isReversed) "正序" else "倒序",
-                                fontSize = 13.sp,
-                                color = if (s.isReversed) HupuRed else TextTertiary
-                            )
-                        }
+                        SortChip("正序", s.sortMode == CommentSort.DEFAULT)  { vm.setSort(CommentSort.DEFAULT) }
+                        SortChip("倒序", s.sortMode == CommentSort.REVERSED) { vm.setSort(CommentSort.REVERSED) }
+                        SortChip("最热", s.sortMode == CommentSort.BY_LIKES) { vm.setSort(CommentSort.BY_LIKES) }
                     }
                 }
             }
@@ -286,7 +279,7 @@ private fun PostContent(
         val displayedComments = s.displayedComments
         itemsIndexed(displayedComments, key = { _, c -> c.pid }) { index, comment ->
             // 正序模式：靠近底部时自动加载下一页
-            if (!s.isReversed && index == displayedComments.size - 3 && s.post.hasMoreComments)
+            if (s.sortMode == CommentSort.DEFAULT && index == displayedComments.size - 3 && s.post.hasMoreComments)
                 LaunchedEffect(s.post.comments.size) { vm.loadMoreComments() }
             CommentCard(
                 comment          = comment,
@@ -298,26 +291,41 @@ private fun PostContent(
                 } else null
             )
         }
-        // 倒序模式：显示「加载更多」按钮（数据已全部在内存，无需网络请求）
-        if (s.isReversed && s.hasMoreDisplayed) {
+        // 非默认排序：数据已全部在内存，「加载更多」只是本地增量显示，无需网络
+        if (s.sortMode != CommentSort.DEFAULT && s.hasMoreDisplayed) {
             item {
                 Box(Modifier.fillMaxWidth().padding(8.dp), Alignment.Center) {
                     OutlinedButton(
-                        onClick = vm::loadMoreReversed,
+                        onClick = vm::loadMoreSorted,
                         colors  = ButtonDefaults.outlinedButtonColors(contentColor = HupuRed)
                     ) {
-                        Text("加载更多（还有 ${s.reversedComments.size - s.reversedDisplayCount} 条）")
+                        Text("加载更多（还有 ${s.sortedComments.size - s.sortedDisplayCount} 条）")
                     }
                 }
             }
         }
-        if (s.isLoadingMoreComments && !s.isReversed) {
+        if (s.isLoadingMoreComments && s.sortMode == CommentSort.DEFAULT) {
             item {
                 Box(Modifier.fillMaxWidth().padding(16.dp), Alignment.Center) {
                     CircularProgressIndicator(Modifier.size(24.dp), color = HupuRed)
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SortChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    TextButton(
+        onClick = onClick,
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+    ) {
+        Text(
+            label,
+            fontSize = 13.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            color = if (selected) HupuRed else TextTertiary
+        )
     }
 }
 

@@ -30,6 +30,24 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
 
+/** 评论排序方式 */
+private enum class CommentSort { DEFAULT, REVERSED, BY_LIKES }
+
+@Composable
+private fun SortChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    TextButton(
+        onClick = onClick,
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+    ) {
+        Text(
+            label,
+            fontSize = 13.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            color = if (selected) HupuRed else TextSecondary
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PostDetailScreen(
@@ -59,10 +77,11 @@ fun PostDetailScreen(
     var subRepliesMap by remember { mutableStateOf<Map<String, List<Comment>>>(emptyMap()) }
     var replyStack by remember { mutableStateOf<List<String>>(emptyList()) }
     var isLoadingSubReplies by remember { mutableStateOf(false) }
-    var isReversed by remember { mutableStateOf(false) }
-    var reversedComments by remember { mutableStateOf<List<Comment>>(emptyList()) }
-    var reversedDisplayCount by remember { mutableStateOf(0) }
-    var isLoadingReversed by remember { mutableStateOf(false) }
+    var sortMode by remember { mutableStateOf(CommentSort.DEFAULT) }
+    var sortedComments by remember { mutableStateOf<List<Comment>>(emptyList()) }
+    var sortedDisplayCount by remember { mutableStateOf(0) }
+    var isLoadingSort by remember { mutableStateOf(false) }
+    var fullComments by remember { mutableStateOf<List<Comment>>(emptyList()) }  // 登录后全量拉取（时间正序），用于本地重排
     val scope = rememberCoroutineScope()
     val reversePageSize = 20
 
@@ -101,42 +120,61 @@ fun PostDetailScreen(
     fun popReplies() { replyStack = replyStack.dropLast(1); isLoadingSubReplies = false }
     fun dismissReplies() { replyStack = emptyList() }
 
-    fun toggleReverse() {
+    fun applySort(comments: List<Comment>, mode: CommentSort): List<Comment> = when (mode) {
+        CommentSort.REVERSED -> comments.reversed()
+        CommentSort.BY_LIKES -> comments.sortedByDescending { it.lights }  // 稳定排序：同赞数保持时间序
+        CommentSort.DEFAULT  -> comments
+    }
+
+    fun setSort(mode: CommentSort) {
         val p = post ?: return
-        if (isReversed) {
-            isReversed = false; reversedComments = emptyList(); reversedDisplayCount = 0
+        if (sortMode == mode) return
+
+        // 回到默认（时间正序）
+        if (mode == CommentSort.DEFAULT) {
+            sortMode = CommentSort.DEFAULT; sortedComments = emptyList(); sortedDisplayCount = 0
             return
         }
-        if (!cookieStorage.isLoggedIn) {
-            val reversed = p.comments.reversed()
-            reversedComments = reversed
-            reversedDisplayCount = minOf(reversePageSize, reversed.size)
-            isReversed = true
-        } else {
-            isLoadingReversed = true
-            scope.launch {
-                val all = p.comments.toMutableList()
-                var page = commentPage + 1
-                while (page <= p.desktopTotalPages) {
-                    runCatching { withContext(Dispatchers.IO) { desktopScraper.fetchPostReplies(tid, page) } }
-                        .onSuccess { result ->
-                            val seen = all.map { it.pid }.toHashSet()
-                            all.addAll(result.comments.filter { it.pid !in seen })
-                        }
-                    page++
-                }
-                val reversed = all.reversed()
-                reversedComments = reversed
-                reversedDisplayCount = minOf(reversePageSize, reversed.size)
-                isReversed = true
-                isLoadingReversed = false
+
+        // 已有全量缓存，或未登录用手头的 —— 直接本地重排，不重复联网
+        val cached = when {
+            fullComments.isNotEmpty()     -> fullComments
+            !cookieStorage.isLoggedIn     -> p.comments
+            else                          -> null
+        }
+        if (cached != null) {
+            val sorted = applySort(cached, mode)
+            sortedComments = sorted
+            sortedDisplayCount = minOf(reversePageSize, sorted.size)
+            sortMode = mode
+            return
+        }
+
+        // 登录且尚未全量：把剩余页全部拉下来再排（时间正序缓存到 fullComments）
+        isLoadingSort = true
+        scope.launch {
+            val all = p.comments.toMutableList()
+            var page = commentPage + 1
+            while (page <= p.desktopTotalPages) {
+                runCatching { withContext(Dispatchers.IO) { desktopScraper.fetchPostReplies(tid, page) } }
+                    .onSuccess { result ->
+                        val seen = all.map { it.pid }.toHashSet()
+                        all.addAll(result.comments.filter { it.pid !in seen })
+                    }
+                page++
             }
+            fullComments = all
+            val sorted = applySort(all, mode)
+            sortedComments = sorted
+            sortedDisplayCount = minOf(reversePageSize, sorted.size)
+            sortMode = mode
+            isLoadingSort = false
         }
     }
 
-    fun loadMoreReversed() {
-        if (!isReversed || reversedDisplayCount >= reversedComments.size) return
-        reversedDisplayCount = minOf(reversedDisplayCount + reversePageSize, reversedComments.size)
+    fun loadMoreSorted() {
+        if (sortMode == CommentSort.DEFAULT || sortedDisplayCount >= sortedComments.size) return
+        sortedDisplayCount = minOf(sortedDisplayCount + reversePageSize, sortedComments.size)
     }
 
     fun loadMoreComments() {
@@ -224,25 +262,19 @@ fun PostDetailScreen(
                                 Text("${p.replies} 条回复", fontWeight = FontWeight.Bold,
                                     fontSize = 15.sp, color = TextPrimary)
                                 Spacer(Modifier.weight(1f))
-                                if (isLoadingReversed) {
+                                if (isLoadingSort) {
                                     CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                                 } else {
-                                    TextButton(
-                                        onClick = { toggleReverse() },
-                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
-                                    ) {
-                                        Text(
-                                            if (isReversed) "正序" else "倒序",
-                                            fontSize = 13.sp,
-                                            color = if (isReversed) HupuRed else TextSecondary
-                                        )
-                                    }
+                                    SortChip("正序", sortMode == CommentSort.DEFAULT)  { setSort(CommentSort.DEFAULT) }
+                                    SortChip("倒序", sortMode == CommentSort.REVERSED) { setSort(CommentSort.REVERSED) }
+                                    SortChip("最热", sortMode == CommentSort.BY_LIKES) { setSort(CommentSort.BY_LIKES) }
                                 }
                             }
                         }
 
                         // ── 评论列表 ──────────────────────────────────────────
-                        val displayedComments = if (isReversed) reversedComments.take(reversedDisplayCount) else p.comments
+                        val displayedComments = if (sortMode == CommentSort.DEFAULT) p.comments
+                                                else sortedComments.take(sortedDisplayCount)
                         items(displayedComments) { comment ->
                             CommentCard(
                                 comment      = comment,
@@ -281,17 +313,17 @@ fun PostDetailScreen(
                         }
 
                         // ── 加载更多 ──────────────────────────────────────────
-                        val hasMoreReversed = isReversed && reversedDisplayCount < reversedComments.size
-                        if (hasMoreReversed) {
+                        val hasMoreSorted = sortMode != CommentSort.DEFAULT && sortedDisplayCount < sortedComments.size
+                        if (hasMoreSorted) {
                             item {
                                 Box(Modifier.fillMaxWidth().padding(4.dp), Alignment.Center) {
-                                    OutlinedButton(onClick = { loadMoreReversed() }) {
-                                        Text("加载更多（${reversedComments.size - reversedDisplayCount} 条）")
+                                    OutlinedButton(onClick = { loadMoreSorted() }) {
+                                        Text("加载更多（${sortedComments.size - sortedDisplayCount} 条）")
                                     }
                                 }
                             }
                         }
-                        if (!isReversed && (hasMoreComments || loadingMoreComments)) {
+                        if (sortMode == CommentSort.DEFAULT && (hasMoreComments || loadingMoreComments)) {
                             item {
                                 Box(Modifier.fillMaxWidth().padding(4.dp), Alignment.Center) {
                                     if (loadingMoreComments) CircularProgressIndicator(Modifier.size(24.dp))
