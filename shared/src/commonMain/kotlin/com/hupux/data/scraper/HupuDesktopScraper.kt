@@ -198,7 +198,7 @@ class HupuDesktopScraper(
                 quoteContent  = quoteContent,
                 desktopPage   = currentPage
             )
-        }
+        }.distinctBy { it.pid }   // 虎扑 SSR 会把亮评重复列入 list，按 pid 去重避免重复 key
         return DesktopRepliesPage(comments, baseUrl, currentPage, totalPages, fid, topicId, isRecommended)
     }
 

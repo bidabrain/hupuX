@@ -49,8 +49,9 @@ sealed class PostDetailUiState {
     ) : PostDetailUiState() {
         val expandedPid: String? get() = replyStack.lastOrNull()
         val displayedComments: List<Comment> get() =
-            if (sortMode == CommentSort.DEFAULT) post.comments
-            else sortedComments.take(sortedDisplayCount)
+            (if (sortMode == CommentSort.DEFAULT) post.comments
+             else sortedComments.take(sortedDisplayCount))
+                .distinctBy { it.pid }   // 保证 LazyColumn key 唯一，避免重复 pid 崩溃
         val hasMoreDisplayed: Boolean get() =
             if (sortMode == CommentSort.DEFAULT) post.hasMoreComments
             else sortedDisplayCount < sortedComments.size
