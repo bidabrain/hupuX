@@ -61,33 +61,50 @@ class HupuDesktopScraper(
         return client.newCall(req).execute().use { it.body!!.string() }
     }
 
-    /** 桌面版子回复 API：/api/v2/reply/reply?tid=&pid=&maxpid= */
-    fun fetchDesktopSubReplies(tid: String, parentPid: String, maxPid: String = "0"): List<Comment> {
-        val url = "$BBS_BASE/api/v2/reply/reply?tid=$tid&pid=$parentPid&maxpid=$maxPid"
-        val body = fetchBbs(url)
-        val root = JsonParser.parseString(body).asJsonObject
-        val list = root.obj("data")?.arr("list") ?: return emptyList()
-        return list.mapNotNull { el ->
-            val o = el.asJsonObject
-            if (o.bool_("isHidden") == true || o.bool_("isDelete") == true) return@mapNotNull null
-            val author = o.obj("author")
-            val content = o.str("content") ?: ""
-            val (quoteUser, quoteContent) = parseQuoteFromJson(o)
-            Comment(
-                pid           = o.str("pid") ?: return@mapNotNull null,
-                username      = author?.str("puname") ?: "",
-                avatar        = author?.str("header") ?: "",
-                content       = content,
-                lights        = o.int_("count") ?: 0,
-                replyCount    = o.int_("replyNum") ?: 0,
-                time          = o.str("createdAtFormat") ?: "",
-                location      = o.str("location") ?: "",
-                isAuthor      = o.bool_("isStarter") ?: false,
-                quoteUsername = quoteUser,
-                quoteContent  = quoteContent,
-                desktopPage   = 1
-            )
+    /**
+     * 桌面版子回复 API：/api/v2/reply/reply?tid=&pid=&maxpid=
+     * 循环翻页拉取该评论下的**全部**子回复：nextPage!=0 时以本页最后一条 pid 作为 maxpid 继续，
+     * 直到 nextPage==0。（单次请求只返回一页，早期只取首页会导致"还有 X 条回复"截断。）
+     */
+    fun fetchDesktopSubReplies(tid: String, parentPid: String): List<Comment> {
+        val all = mutableListOf<Comment>()
+        var maxPid = "0"
+        var guard = 0
+        while (guard++ < 50) {   // 安全上限，避免异常分页导致死循环
+            val url = "$BBS_BASE/api/v2/reply/reply?tid=$tid&pid=$parentPid&maxpid=$maxPid"
+            val data = try {
+                JsonParser.parseString(fetchBbs(url)).asJsonObject.obj("data")
+            } catch (_: Exception) { null } ?: break
+            val list = data.arr("list") ?: break
+            val page = list.mapNotNull { el ->
+                val o = el.asJsonObject
+                if (o.bool_("isHidden") == true || o.bool_("isDelete") == true) return@mapNotNull null
+                val author = o.obj("author")
+                val content = o.str("content") ?: ""
+                val (quoteUser, quoteContent) = parseQuoteFromJson(o)
+                Comment(
+                    pid           = o.str("pid") ?: return@mapNotNull null,
+                    username      = author?.str("puname") ?: "",
+                    avatar        = author?.str("header") ?: "",
+                    content       = content,
+                    lights        = o.int_("count") ?: 0,
+                    replyCount    = o.int_("replyNum") ?: 0,
+                    time          = o.str("createdAtFormat") ?: "",
+                    location      = o.str("location") ?: "",
+                    isAuthor      = o.bool_("isStarter") ?: false,
+                    quoteUsername = quoteUser,
+                    quoteContent  = quoteContent,
+                    desktopPage   = 1
+                )
+            }
+            all.addAll(page)
+            // nextPage：0=无更多；游标为本页最后一条 pid（用整个 list 的最后一条，避免被过滤后取错）
+            val nextPage = data.int_("nextPage") ?: 0
+            val lastPid  = list.lastOrNull()?.asJsonObject?.str("pid")
+            if (nextPage == 0 || lastPid == null || lastPid == maxPid) break
+            maxPid = lastPid
         }
+        return all.distinctBy { it.pid }
     }
 
     /**
