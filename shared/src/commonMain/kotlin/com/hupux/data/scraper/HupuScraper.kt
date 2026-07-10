@@ -417,6 +417,7 @@ class HupuScraper(private val client: OkHttpClient) {
             time = o.str("createDt") ?: "",
             location = o.str("location") ?: "",
             isAuthor = (o.int_("is_lz") ?: 0) == 1,
+            authorPuid = user?.str("puid") ?: user?.str("uid") ?: "",
             quoteUsername = quoteInfo?.str("username"),
             quoteContent  = quoteInfo?.str("content"),
             quotePid      = quoteInfo?.str("pid")

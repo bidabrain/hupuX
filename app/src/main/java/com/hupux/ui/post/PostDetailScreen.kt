@@ -104,6 +104,7 @@ private val LocalImageClick = staticCompositionLocalOf<(String) -> Unit> { {} }
 fun PostDetailScreen(
     tid: String,
     onBack: () -> Unit,
+    onOpenUser: (puid: String) -> Unit = {},
     vm: PostDetailViewModel = koinViewModel()
 ) {
     LaunchedEffect(tid) { vm.load(tid) }
@@ -173,7 +174,7 @@ fun PostDetailScreen(
                     Spacer(Modifier.height(12.dp))
                     PillButton("重试", onClick = { vm.load(tid) })
                 }
-                is PostDetailUiState.Success -> PostContent(st, vm)
+                is PostDetailUiState.Success -> PostContent(st, vm, onOpenUser)
             }
         }
     }
@@ -200,7 +201,8 @@ fun PostDetailScreen(
                 onLike           = if (success.post.fid.isNotEmpty()) vm::toggleLike else null,
                 onBack           = vm::popReplies,
                 onReplyClick     = vm::showReplies,
-                onReplyToComment = vm::startReply
+                onReplyToComment = vm::startReply,
+                onOpenUser       = onOpenUser
             )
         }
     }
@@ -241,7 +243,8 @@ fun PostDetailScreen(
 @Composable
 private fun PostContent(
     s: PostDetailUiState.Success,
-    vm: PostDetailViewModel
+    vm: PostDetailViewModel,
+    onOpenUser: (puid: String) -> Unit = {}
 ) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
         item { PostBodyCard(
@@ -288,7 +291,10 @@ private fun PostContent(
                 onReplyClick     = { vm.showReplies(comment.pid) },
                 onReplyToComment = if (comment.desktopPage > 0) {
                     { vm.startReply(comment) }
-                } else null
+                } else null,
+                onUserClick      = if (comment.authorPuid.isNotEmpty() && comment.desktopPage > 0) {
+                    { onOpenUser(comment.authorPuid) }
+                } else null   // 仅登录后的桌面版数据可点：主页列表接口需登录
             )
         }
         // 非默认排序：数据已全部在内存，「加载更多」只是本地增量显示，无需网络
@@ -425,7 +431,8 @@ fun CommentCard(
     showQuote: Boolean = true,
     onLike: (() -> Unit)? = null,
     onReplyClick: (() -> Unit)? = null,
-    onReplyToComment: (() -> Unit)? = null
+    onReplyToComment: (() -> Unit)? = null,
+    onUserClick: (() -> Unit)? = null
 ) {
     Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp),
         shape = RoundedCornerShape(12.dp), color = CardBg, shadowElevation = 2.dp) {
@@ -433,12 +440,14 @@ fun CommentCard(
             Row(verticalAlignment = Alignment.Top) {
                 AsyncImage(model = comment.avatar, contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(34.dp).clip(CircleShape).background(BgGray))
+                    modifier = Modifier.size(34.dp).clip(CircleShape).background(BgGray)
+                        .then(if (onUserClick != null) Modifier.clickable(onClick = onUserClick) else Modifier))
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(comment.username, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-                            color = TextPrimary)
+                            color = TextPrimary,
+                            modifier = if (onUserClick != null) Modifier.clickable(onClick = onUserClick) else Modifier)
                         if (comment.isAuthor) {
                             Spacer(Modifier.width(5.dp))
                             Surface(color = HupuRed, shape = RoundedCornerShape(3.dp)) {
@@ -542,7 +551,8 @@ private fun SubRepliesSheet(
     onLike: ((Comment) -> Unit)? = null,
     onBack: () -> Unit,
     onReplyClick: (String) -> Unit,
-    onReplyToComment: ((Comment) -> Unit)? = null
+    onReplyToComment: ((Comment) -> Unit)? = null,
+    onOpenUser: (String) -> Unit = {}
 ) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
         Row(
@@ -582,7 +592,8 @@ private fun SubRepliesSheet(
                         showQuote        = false,
                         onLike           = onLike?.let { { it(reply) } },
                         onReplyClick     = if (reply.replyCount > 0) ({ onReplyClick(reply.pid) }) else null,
-                        onReplyToComment = if (reply.desktopPage > 0) onReplyToComment?.let { { it(reply) } } else null
+                        onReplyToComment = if (reply.desktopPage > 0) onReplyToComment?.let { { it(reply) } } else null,
+                        onUserClick      = if (reply.authorPuid.isNotEmpty() && reply.desktopPage > 0) ({ onOpenUser(reply.authorPuid) }) else null
                     )
                 }
                 if (subReplies.size < totalCount) {

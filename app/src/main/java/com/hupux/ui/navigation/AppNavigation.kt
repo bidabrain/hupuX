@@ -36,6 +36,7 @@ import com.hupux.ui.profile.NewPostScreen
 import com.hupux.ui.profile.ProfileScreen
 import com.hupux.ui.profile.UserRecommendListScreen
 import com.hupux.ui.profile.UserReplyListScreen
+import com.hupux.ui.profile.UserSpaceScreen
 import com.hupux.ui.profile.UserThreadListScreen
 import com.hupux.ui.search.SearchScreen
 import com.hupux.ui.settings.SettingsScreen
@@ -257,6 +258,15 @@ fun AppNavigation() {
                     onBack      = { navController.popBackStack() }
                 )
             }
+            composable(
+                "user_space/{uid}",
+                arguments = listOf(navArgument("uid") { type = NavType.StringType })
+            ) {
+                UserSpaceScreen(
+                    onPostClick = { tid -> navController.navigate("post/$tid") },
+                    onBack      = { navController.popBackStack() }
+                )
+            }
             composable("settings") {
                 SettingsScreen(onBack = { navController.popBackStack() })
             }
@@ -325,8 +335,9 @@ fun AppNavigation() {
                 arguments = listOf(navArgument("tid") { type = NavType.StringType })
             ) { back ->
                 PostDetailScreen(
-                    tid    = back.arguments!!.getString("tid") ?: "",
-                    onBack = { navController.popBackStack() }
+                    tid        = back.arguments!!.getString("tid") ?: "",
+                    onBack     = { navController.popBackStack() },
+                    onOpenUser = { puid -> navController.navigate("user_space/$puid") }
                 )
             }
         }

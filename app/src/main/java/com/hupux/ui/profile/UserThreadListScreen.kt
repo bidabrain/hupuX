@@ -36,18 +36,6 @@ fun UserThreadListScreen(
     onBack: () -> Unit,
     vm: UserThreadListViewModel = koinViewModel()
 ) {
-    val state by vm.state.collectAsState()
-    val listState = rememberLazyListState()
-
-    val shouldLoadMore by remember {
-        derivedStateOf {
-            val info = listState.layoutInfo
-            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: 0
-            lastVisible >= info.totalItemsCount - 3 && state.hasMore && !state.isLoading
-        }
-    }
-    LaunchedEffect(shouldLoadMore) { if (shouldLoadMore) vm.load() }
-
     Column(Modifier.fillMaxSize().background(AppBg)) {
         Box(
             Modifier
@@ -68,7 +56,30 @@ fun UserThreadListScreen(
                 Text("我的发帖", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
             }
         }
+        UserThreadListBody(vm, onPostClick, Modifier.weight(1f))
+    }
+}
 
+/** 发帖列表主体（无顶栏），供「我的发帖」和「用户主页」pill 切换复用 */
+@Composable
+fun UserThreadListBody(
+    vm: UserThreadListViewModel,
+    onPostClick: (tid: String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val state by vm.state.collectAsState()
+    val listState = rememberLazyListState()
+
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: 0
+            lastVisible >= info.totalItemsCount - 3 && state.hasMore && !state.isLoading
+        }
+    }
+    LaunchedEffect(shouldLoadMore) { if (shouldLoadMore) vm.load() }
+
+    Box(modifier.fillMaxWidth()) {
         when {
             state.isLoading && state.items.isEmpty() ->
                 Box(Modifier.fillMaxSize(), Alignment.Center) {
@@ -84,6 +95,7 @@ fun UserThreadListScreen(
                 }
             else -> LazyColumn(
                 state = listState,
+                modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(top = 12.dp, bottom = 16.dp)
             ) {
                 items(state.items, key = { it.tid }) { thread ->

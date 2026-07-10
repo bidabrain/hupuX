@@ -32,19 +32,6 @@ fun UserReplyListScreen(
     onBack: () -> Unit,
     vm: UserReplyListViewModel = koinViewModel()
 ) {
-    val state by vm.state.collectAsState()
-    val listState = rememberLazyListState()
-
-    // 触底加载更多
-    val shouldLoadMore by remember {
-        derivedStateOf {
-            val info = listState.layoutInfo
-            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: 0
-            lastVisible >= info.totalItemsCount - 3 && state.hasMore && !state.isLoading
-        }
-    }
-    LaunchedEffect(shouldLoadMore) { if (shouldLoadMore) vm.load() }
-
     Column(Modifier.fillMaxSize().background(AppBg)) {
         Box(
             Modifier
@@ -65,7 +52,31 @@ fun UserReplyListScreen(
                 Text("我的回帖", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
             }
         }
+        UserReplyListBody(vm, onPostClick, Modifier.weight(1f))
+    }
+}
 
+/** 回帖列表主体（无顶栏），供「我的回帖」和「用户主页」pill 切换复用 */
+@Composable
+fun UserReplyListBody(
+    vm: UserReplyListViewModel,
+    onPostClick: (tid: String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val state by vm.state.collectAsState()
+    val listState = rememberLazyListState()
+
+    // 触底加载更多
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: 0
+            lastVisible >= info.totalItemsCount - 3 && state.hasMore && !state.isLoading
+        }
+    }
+    LaunchedEffect(shouldLoadMore) { if (shouldLoadMore) vm.load() }
+
+    Box(modifier.fillMaxWidth()) {
         when {
             state.isLoading && state.items.isEmpty() ->
                 Box(Modifier.fillMaxSize(), Alignment.Center) {
@@ -81,6 +92,7 @@ fun UserReplyListScreen(
                 }
             else -> LazyColumn(
                 state = listState,
+                modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(top = 12.dp, bottom = 16.dp)
             ) {
                 items(state.items, key = { it.pid }) { reply ->

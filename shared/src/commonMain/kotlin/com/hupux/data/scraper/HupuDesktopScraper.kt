@@ -92,6 +92,7 @@ class HupuDesktopScraper(
                     time          = o.str("createdAtFormat") ?: "",
                     location      = o.str("location") ?: "",
                     isAuthor      = o.bool_("isStarter") ?: false,
+                    authorPuid    = author?.str("puid") ?: "",
                     quoteUsername = quoteUser,
                     quoteContent  = quoteContent,
                     desktopPage   = 1
@@ -211,6 +212,7 @@ class HupuDesktopScraper(
                 time          = o.str("createdAtFormat") ?: "",
                 location      = o.str("location") ?: "",
                 isAuthor      = o.bool_("isStarter") ?: false,
+                authorPuid    = author?.str("puid") ?: "",
                 quoteUsername = quoteUser,
                 quoteContent  = quoteContent,
                 desktopPage   = currentPage
@@ -487,6 +489,91 @@ class HupuDesktopScraper(
         val root = JsonParser.parseString(resp).asJsonObject
         val code = root.get("code")?.asInt ?: 0
         if (code != 1) error(root.str("msg") ?: "发帖失败")
+        return root.obj("data")?.long_("tid") ?: 0L
+    }
+
+    /** 上传视频后换取封面：POST /api/v1/video/cover {videoUrl} → data.videoCover */
+    fun getVideoCover(videoUrl: String): String {
+        val body = com.google.gson.JsonObject().apply { addProperty("videoUrl", videoUrl) }.toString()
+        val cookie = cookieStorage.effectiveCookie
+        val req = Request.Builder()
+            .url("$BBS_BASE/api/v1/video/cover")
+            .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+            .header("Content-Type", "application/json")
+            .header("Origin", BBS_BASE)
+            .header("Referer", "$BBS_BASE/")
+            .apply { if (cookie.isNotEmpty()) header("Cookie", cookie) }
+            .post(body.toRequestBody("application/json".toMediaType()))
+            .build()
+        val resp = client.newCall(req).execute().use { it.body!!.string() }
+        println("HupuVideoUpload: video/cover response: $resp")
+        val root = JsonParser.parseString(resp).asJsonObject
+        return root.obj("data")?.str("videoCover")
+            ?: error(root.str("msg") ?: "获取视频封面失败")
+    }
+
+    /**
+     * 发视频帖，沿用 createThread 接口但 Body 不同（逆向自 PC 编辑器 submit()）。
+     * @param videoInfoKey 已是 base64(objectKey + 毫秒时间戳)，由调用方（Android 层）算好传入
+     * @param creationType "REPRINT"(转载) / "ORIGINAL"(原创)
+     * @param containsAi 内容声明，0=无需标注
+     */
+    fun createVideoThread(
+        topicId: Int, title: String, desc: String,
+        videoUrl: String, coverUrl: String, videoInfoKey: String,
+        creationType: String, containsAi: Int
+    ): Long {
+        val contentText = desc.trim().ifEmpty {
+            "<span data-time=${System.currentTimeMillis()} style=\"display:none\"></span>"
+        }
+
+        val slateText = com.google.gson.JsonObject().apply { addProperty("text", desc.trim()) }
+        val slateChildren = com.google.gson.JsonArray().apply { add(slateText) }
+        val paragraph = com.google.gson.JsonObject().apply {
+            addProperty("type", "paragraph"); add("children", slateChildren)
+        }
+        val slateValue = com.google.gson.JsonArray().apply { add(paragraph) }
+        val videoInfo = com.google.gson.JsonObject().apply {
+            addProperty("key", videoInfoKey)
+            addProperty("remoteUrl", videoUrl)
+            addProperty("coverUrl", coverUrl)
+        }
+        val format = com.google.gson.JsonObject().apply {
+            add("slateValue", slateValue); add("videoInfo", videoInfo)
+        }.toString()
+
+        val body = com.google.gson.JsonObject().apply {
+            addProperty("title",            title.trim())
+            addProperty("content",          contentText)
+            addProperty("videoSnapshotUrl", coverUrl)
+            addProperty("videoUrl",         videoUrl)
+            addProperty("videoSource",      "")
+            addProperty("topicId",          topicId.toLong())
+            addProperty("tagIdList",        "")
+            addProperty("shumeiId",         "")
+            addProperty("zoneId",           0)
+            addProperty("creationType",     creationType)
+            addProperty("containsAi",       containsAi)
+            addProperty("format",           format)
+        }.toString()
+
+        val cookie = cookieStorage.effectiveCookie
+        val req = Request.Builder()
+            .url("$BBS_BASE/pcmapi/pc/bbs/v1/createThread")
+            .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+            .header("Content-Type", "application/json")
+            .header("Origin", BBS_BASE)
+            .header("Referer", "$BBS_BASE/newpost/$topicId?tabkey=2")
+            .apply { if (cookie.isNotEmpty()) header("Cookie", cookie) }
+            .post(body.toRequestBody("application/json".toMediaType()))
+            .build()
+
+        val resp = client.newCall(req).execute().use { it.body!!.string() }
+        println("HupuVideoUpload: createVideoThread req=$body")
+        println("HupuVideoUpload: createVideoThread resp=$resp")
+        val root = JsonParser.parseString(resp).asJsonObject
+        val code = root.get("code")?.asInt ?: 0
+        if (code != 1) error(root.str("msg") ?: "发视频帖失败")
         return root.obj("data")?.long_("tid") ?: 0L
     }
 

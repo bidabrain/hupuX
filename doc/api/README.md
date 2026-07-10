@@ -26,6 +26,7 @@ doc/api/
 | 提交回复 | `/pcmapi/pc/bbs/v1/createReply` | [desktop-api.md §4](desktop-api.md#4-提交回复) |
 | 发帖 | `/pcmapi/pc/bbs/v1/createThread` | [desktop-api.md](desktop-api.md) |
 | 发帖插图（本地图片上传） | `hss.hupu.com/kaleido/hss/*` + 阿里云 OSS | [image-upload.md](image-upload.md) |
+| 发视频帖（视频上传+提交） | `module=editor-video-oss` + `/api/v1/video/cover` + `createThread` | [video-upload.md](video-upload.md) |
 | 转存外链图片 | `/pcapi/all/upload/img` | [image-upload.md](image-upload.md#验证记录) |
 | 用户资料 | `/pcmapi/pc/space/v1/getUserInfo` | [desktop-api.md §1](desktop-api.md#1-用户资料) |
 | 我的回帖 | `/pcmapi/pc/space/v1/getReplyList` | [desktop-api.md §2](desktop-api.md#2-我的回帖列表) |

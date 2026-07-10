@@ -17,6 +17,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import java.util.concurrent.TimeUnit
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
@@ -30,22 +31,45 @@ private const val HSS_MODULE = "editor-oss"
 private const val HSS_PATH   = "/editor"
 private const val HSS_ACTION = "1"
 
+/** 视频上传结果：videoUrl（带 auth_key，用作 createThread.videoUrl）+ objectKey（用于 format.videoInfo.key） */
+data class VideoUploadResult(val videoUrl: String, val objectKey: String)
+
 class HupuImageUploader constructor(
     private val client: OkHttpClient,
     private val cookiePrefs: CookiePreferences,
     private val ctx: Context
 ) {
+    // 大文件（尤其视频）OSS 直传需要长写超时，避免默认 10s 写超时中断
+    private val uploadClient by lazy {
+        client.newBuilder()
+            .writeTimeout(5, TimeUnit.MINUTES)
+            .readTimeout(5, TimeUnit.MINUTES)
+            .build()
+    }
+
     fun upload(uri: Uri, module: String = HSS_MODULE, path: String = HSS_PATH): String {
         val bytes = ctx.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
         val mime  = ctx.contentResolver.getType(uri) ?: "image/jpeg"
         val ext   = mimeToExt(mime)
-        val contentType = "image/$ext"
 
         val opts = BitmapFactory.Options().also { it.inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
-        val width  = opts.outWidth
-        val height = opts.outHeight
 
+        return runUpload(bytes, ext, "image/$ext", module, path, opts.outWidth, opts.outHeight).first
+    }
+
+    /** 上传视频：module=editor-video-oss，返回 videoUrl（v.hoopchina，带 auth_key）+ objectKey */
+    fun uploadVideo(uri: Uri): VideoUploadResult {
+        val bytes = ctx.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
+        val (videoUrl, objectKey) = runUpload(bytes, "mp4", "video/mp4", "editor-video-oss", "/editor", 0, 0)
+        return VideoUploadResult(videoUrl, objectKey)
+    }
+
+    /** 通用上传链路：凭证 → OSS V1 PUT → uploadStatus，返回 (fileSrc, objectKey) */
+    private fun runUpload(
+        bytes: ByteArray, ext: String, contentType: String,
+        module: String, path: String, width: Int, height: Int
+    ): Pair<String, String> {
         val md5       = md5Hex(bytes)
         val timestamp = System.currentTimeMillis().toString()
 
@@ -93,14 +117,17 @@ class HupuImageUploader constructor(
             error("获取上传凭证失败: ${credRoot.get("msg")?.asString}")
 
         val data = credRoot.getAsJsonObject("data")
+        val objectKeyFromCred = data.get("objectKey")?.takeIf { !it.isJsonNull }?.asString
 
         if (data.get("status")?.asString != "processing") {
-            // Hash already exists on server — skip PUT, return cached URL
-            return data.get("fileSrc")?.asString ?: error("缺少 fileSrc")
+            // Hash 已存在（服务端去重）：直接用缓存 URL。此响应可能不含 objectKey，则从 fileSrc 路径推导
+            val fileSrc = data.get("fileSrc")?.asString ?: error("缺少 fileSrc")
+            val objectKey = objectKeyFromCred ?: fileSrc.substringAfter("://").substringAfter('/')
+            return fileSrc to objectKey
         }
 
+        val objectKey = objectKeyFromCred ?: error("缺少 objectKey")
         val bucket    = data.get("bucket").asString
-        val objectKey = data.get("objectKey").asString
         val accessKey = data.get("accessKey").asString
         val secretKey = data.get("secretKey").asString
         val token     = data.get("token").asString
@@ -113,7 +140,7 @@ class HupuImageUploader constructor(
         val auth = ossAuthorization(accessKey, secretKey, token, contentType, date, bucket, objectKey)
         val ossUrl = "https://$bucket.oss-cn-hangzhou.aliyuncs.com/$objectKey"
 
-        val ossResp = client.newCall(
+        val ossResp = uploadClient.newCall(
             Request.Builder()
                 .url(ossUrl)
                 .header("Date", date)
@@ -144,10 +171,11 @@ class HupuImageUploader constructor(
 
         Log.d(TAG, "uploadStatus response: $statusJson")
 
-        return JsonParser.parseString(statusJson).asJsonObject
+        val fileSrc = JsonParser.parseString(statusJson).asJsonObject
             .getAsJsonObject("data")
             ?.get("fileSrc")?.asString
-            ?: error("获取图片地址失败")
+            ?: error("获取上传地址失败")
+        return fileSrc to objectKey
     }
 
     private fun mimeToExt(mime: String) = when (mime) {

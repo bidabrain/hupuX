@@ -17,6 +17,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -47,13 +49,21 @@ fun NewPostScreen(
     var title   by remember { mutableStateOf("") }
     var content by remember { mutableStateOf("") }
 
+    val video            = state.video
+    val isVideoMode      = video != null
     val titleOk          = title.trim().length in 4..40
     val hasValidContent  = content.trim().isNotEmpty() || state.images.any { it.status == ImageItem.Status.Done }
     val hasUploading     = state.images.any { it.status == ImageItem.Status.Uploading }
-    val canSubmit        = titleOk && hasValidContent && !state.isSubmitting && !hasUploading
+    val canSubmit        = if (isVideoMode)
+        titleOk && video?.status == VideoItem.Status.Done && !state.isSubmitting
+    else
+        titleOk && hasValidContent && !state.isSubmitting && !hasUploading
 
     val picker = rememberLauncherForActivityResult(PickVisualMedia()) { uri ->
         uri?.let { vm.addImage(it) }
+    }
+    val videoPicker = rememberLauncherForActivityResult(PickVisualMedia()) { uri ->
+        uri?.let { vm.addVideo(it) }
     }
 
     LaunchedEffect(state.success) {
@@ -77,7 +87,10 @@ fun NewPostScreen(
                 },
                 actions = {
                     TextButton(
-                        onClick  = { vm.submit(topicId, title, content) },
+                        onClick  = {
+                            if (isVideoMode) vm.submitVideo(topicId, title, content)
+                            else vm.submit(topicId, title, content)
+                        },
                         enabled  = canSubmit,
                         modifier = Modifier.padding(end = 4.dp)
                     ) {
@@ -115,13 +128,24 @@ fun NewPostScreen(
                         .padding(horizontal = 4.dp, vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = {
-                        picker.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly))
-                    }) {
+                    IconButton(
+                        onClick = { picker.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly)) },
+                        enabled = !isVideoMode   // 视频帖不混图片
+                    ) {
                         Icon(
                             Icons.Default.AddPhotoAlternate,
                             contentDescription = "添加图片",
-                            tint = TextSecondary
+                            tint = if (isVideoMode) TextTertiary.copy(0.4f) else TextSecondary
+                        )
+                    }
+                    IconButton(
+                        onClick = { videoPicker.launch(PickVisualMediaRequest(PickVisualMedia.VideoOnly)) },
+                        enabled = !isVideoMode && state.images.isEmpty()   // 视频与图片互斥
+                    ) {
+                        Icon(
+                            Icons.Default.Videocam,
+                            contentDescription = "添加视频",
+                            tint = if (!isVideoMode && state.images.isEmpty()) TextSecondary else TextTertiary.copy(0.4f)
                         )
                     }
                 }
@@ -167,11 +191,19 @@ fun NewPostScreen(
 
             HorizontalDivider(thickness = 1.dp, color = AppBg)
 
-            // 正文输入
+            // 视频卡片 + 类型（视频帖）
+            if (video != null) {
+                VideoCard(video = video, onRemove = { vm.removeVideo() })
+                HorizontalDivider(thickness = 1.dp, color = AppBg)
+                CreationTypeRow(selected = state.creationType, onSelect = vm::setCreationType)
+                HorizontalDivider(thickness = 1.dp, color = AppBg)
+            }
+
+            // 正文 / 简介输入
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .defaultMinSize(minHeight = 280.dp)
+                    .defaultMinSize(minHeight = if (isVideoMode) 90.dp else 280.dp)
                     .background(CardBg)
                     .padding(horizontal = 16.dp, vertical = 14.dp)
             ) {
@@ -183,14 +215,17 @@ fun NewPostScreen(
                     modifier      = Modifier.fillMaxWidth(),
                     decorationBox = { inner ->
                         if (content.isEmpty())
-                            Text("分享你的想法...", fontSize = 15.sp, color = TextTertiary)
+                            Text(
+                                if (isVideoMode) "请输入简介（选填）" else "分享你的想法...",
+                                fontSize = 15.sp, color = TextTertiary
+                            )
                         inner()
                     }
                 )
             }
 
             // 图片缩略图条
-            if (state.images.isNotEmpty()) {
+            if (!isVideoMode && state.images.isNotEmpty()) {
                 HorizontalDivider(thickness = 1.dp, color = AppBg)
                 LazyRow(
                     modifier            = Modifier
@@ -289,4 +324,97 @@ private fun ImageThumbnailItem(item: ImageItem, onRemove: () -> Unit) {
         )
     }
     } // end Column
+}
+
+@Composable
+private fun VideoCard(video: VideoItem, onRemove: () -> Unit) {
+    Column(Modifier.fillMaxWidth().background(CardBg).padding(12.dp)) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f)
+                .clip(RoundedCornerShape(10.dp))
+                .background(Color.Black)
+        ) {
+            if (video.coverUrl != null) {
+                AsyncImage(
+                    model              = video.coverUrl,
+                    contentDescription = null,
+                    contentScale       = ContentScale.Crop,
+                    modifier           = Modifier.fillMaxSize()
+                )
+            }
+            when (video.status) {
+                VideoItem.Status.Uploading -> Box(
+                    Modifier.fillMaxSize().background(Color.Black.copy(0.5f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(30.dp), color = Color.White, strokeWidth = 2.dp)
+                        Spacer(Modifier.height(8.dp))
+                        Text("视频上传中…", color = Color.White, fontSize = 12.sp)
+                    }
+                }
+                VideoItem.Status.Error -> Box(
+                    Modifier.fillMaxSize().background(Color(0xAA000000)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        video.errorMsg ?: "视频上传失败，点右上角移除后重试",
+                        color = Color.White, fontSize = 12.sp,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+                VideoItem.Status.Done -> Icon(
+                    Icons.Default.PlayCircle, contentDescription = null,
+                    tint = Color.White.copy(0.9f),
+                    modifier = Modifier.size(48.dp).align(Alignment.Center)
+                )
+            }
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .size(24.dp)
+                    .background(Color.Black.copy(0.55f), CircleShape)
+                    .clickable(onClick = onRemove),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Close, contentDescription = "移除视频",
+                    tint = Color.White, modifier = Modifier.size(15.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun CreationTypeRow(selected: String, onSelect: (String) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().background(CardBg).padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("类型", fontSize = 14.sp, color = TextSecondary)
+        Spacer(Modifier.width(16.dp))
+        TypePill("转载", selected == "REPRINT") { onSelect("REPRINT") }
+        Spacer(Modifier.width(10.dp))
+        TypePill("原创", selected == "ORIGINAL") { onSelect("ORIGINAL") }
+    }
+}
+
+@Composable
+private fun TypePill(label: String, selected: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (selected) HupuRed else AppBg)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+    ) {
+        Text(
+            label, fontSize = 13.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            color = if (selected) Color.White else TextSecondary
+        )
+    }
 }

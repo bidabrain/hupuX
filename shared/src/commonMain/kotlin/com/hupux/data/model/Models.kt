@@ -174,6 +174,7 @@ data class Comment(
     val time: String,
     val location: String,
     val isAuthor: Boolean,
+    val authorPuid: String = "",         // 发言人 puid，用于打开其个人主页（空=未知）
     val quoteUsername: String? = null,
     val quoteContent: String? = null,
     val quotePid: String? = null,        // 被引用的父评论 pid

@@ -7,6 +7,7 @@ import com.hupux.data.model.PostDetail
 import com.hupux.data.scraper.HupuDesktopScraper
 import com.hupux.data.scraper.HupuImageUploader
 import com.hupux.data.scraper.HupuScraper
+import com.hupux.data.scraper.VideoUploadResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -57,6 +58,26 @@ class PostRepository constructor(
 
     suspend fun uploadImageForReply(uri: Uri): String =
         withContext(Dispatchers.IO) { imageUploader.upload(uri, "reply-oss", "/reply") }
+
+    /** 上传视频（module=editor-video-oss），返回 videoUrl + objectKey */
+    suspend fun uploadVideo(uri: Uri): VideoUploadResult =
+        withContext(Dispatchers.IO) { imageUploader.uploadVideo(uri) }
+
+    /** 用 videoUrl 换取封面地址 */
+    suspend fun getVideoCover(videoUrl: String): String =
+        withContext(Dispatchers.IO) { desktopScraper.getVideoCover(videoUrl) }
+
+    /** 发视频帖。format.videoInfo.key = base64(objectKey + 毫秒时间戳) 在此算好 */
+    suspend fun createVideoThread(
+        topicId: Int, title: String, desc: String,
+        videoUrl: String, coverUrl: String, objectKey: String,
+        creationType: String, containsAi: Int
+    ): Long = withContext(Dispatchers.IO) {
+        val key = android.util.Base64.encodeToString(
+            (objectKey + System.currentTimeMillis()).toByteArray(), android.util.Base64.NO_WRAP)
+        desktopScraper.createVideoThread(
+            topicId, title, desc, videoUrl, coverUrl, key, creationType, containsAi)
+    }
 
     suspend fun submitReply(
         tid: String, fid: String, topicId: String,
