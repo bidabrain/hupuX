@@ -19,12 +19,14 @@ import com.hupux.data.scraper.HupuDesktopScraper
 import com.hupux.desktop.data.DesktopCookieStorage
 import com.hupux.desktop.data.DesktopImageUploader
 import com.hupux.desktop.data.pickImageFile
+import com.hupux.desktop.data.pickVideoFile
 import com.hupux.desktop.ui.theme.CardBg
 import com.hupux.desktop.ui.theme.TextPrimary
 import com.hupux.desktop.ui.theme.TextSecondary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Base64
 
 @Composable
 fun ZoneDetailScreen(
@@ -43,6 +45,7 @@ fun ZoneDetailScreen(
     var loading by remember { mutableStateOf(true) }
     var loadingMore by remember { mutableStateOf(false) }
     var showNewPostDialog by remember { mutableStateOf(false) }
+    var showNewVideoDialog by remember { mutableStateOf(false) }
     val followedIds by followedRepo.getAllIds().collectAsState(initial = emptySet())
     val isFollowed = topicId in followedIds
     val scope = rememberCoroutineScope()
@@ -77,6 +80,29 @@ fun ZoneDetailScreen(
         )
     }
 
+    if (showNewVideoDialog) {
+        NewVideoDialog(
+            zoneName       = name,
+            imageUploader  = imageUploader,
+            desktopScraper = desktopScraper,
+            onDismiss      = { showNewVideoDialog = false },
+            onSend         = { title, desc, videoUrl, coverUrl, objectKey, creationType ->
+                scope.launch {
+                    try {
+                        val newTid = withContext(Dispatchers.IO) {
+                            val key = Base64.getEncoder()
+                                .encodeToString((objectKey + System.currentTimeMillis()).toByteArray())
+                            desktopScraper.createVideoThread(
+                                topicId, title, desc, videoUrl, coverUrl, key, creationType, 0)
+                        }
+                        showNewVideoDialog = false
+                        onPostClick(newTid.toString())
+                    } catch (_: Exception) {}
+                }
+            }
+        )
+    }
+
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically) {
@@ -93,6 +119,11 @@ fun ZoneDetailScreen(
                 Button(onClick = { showNewPostDialog = true },
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)) {
                     Text("+ 发帖")
+                }
+                Spacer(Modifier.width(8.dp))
+                OutlinedButton(onClick = { showNewVideoDialog = true },
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)) {
+                    Text("+ 视频")
                 }
             }
         }
@@ -221,6 +252,94 @@ private fun NewPostDialog(
                     onSend(title.trim(), htmlContent)
                 },
                 enabled = title.trim().length >= 4 && content.isNotBlank() && !uploading
+            ) { Text("发布") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
+    )
+}
+
+@Composable
+private fun NewVideoDialog(
+    zoneName: String,
+    imageUploader: DesktopImageUploader,
+    desktopScraper: HupuDesktopScraper,
+    onDismiss: () -> Unit,
+    onSend: (title: String, desc: String, videoUrl: String, coverUrl: String, objectKey: String, creationType: String) -> Unit
+) {
+    var title by remember { mutableStateOf("") }
+    var desc by remember { mutableStateOf("") }
+    var creationType by remember { mutableStateOf("REPRINT") }
+    var videoUrl by remember { mutableStateOf<String?>(null) }
+    var coverUrl by remember { mutableStateOf<String?>(null) }
+    var objectKey by remember { mutableStateOf<String?>(null) }
+    var uploading by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("在「$zoneName」发视频") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedButton(
+                        onClick = {
+                            scope.launch(Dispatchers.IO) {
+                                uploading = true; status = "选择视频中…"
+                                val file = pickVideoFile()
+                                if (file == null) { uploading = false; status = null; return@launch }
+                                status = "上传中…（视频较大，请耐心等待）"
+                                try {
+                                    val up = imageUploader.uploadVideo(file)
+                                    status = "获取封面中…"
+                                    val cover = desktopScraper.getVideoCover(up.videoUrl)
+                                    videoUrl = up.videoUrl; coverUrl = cover; objectKey = up.objectKey
+                                    status = "✓ 视频已就绪"
+                                } catch (e: Exception) {
+                                    status = "上传失败：${e.message}"
+                                }
+                                uploading = false
+                            }
+                        },
+                        enabled = !uploading
+                    ) {
+                        Text(if (videoUrl != null) "重新选择视频" else if (uploading) "处理中…" else "选择视频")
+                    }
+                    status?.let {
+                        Spacer(Modifier.width(8.dp))
+                        Text(it, fontSize = 12.sp,
+                            color = if (it.startsWith("✓")) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                OutlinedTextField(value = title, onValueChange = { title = it },
+                    label = { Text("标题（4-40字）") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                OutlinedTextField(value = desc, onValueChange = { desc = it },
+                    label = { Text("简介（选填）") }, modifier = Modifier.fillMaxWidth().height(80.dp), maxLines = 4)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("类型：", fontSize = 13.sp)
+                    Spacer(Modifier.width(8.dp))
+                    if (creationType == "REPRINT")
+                        Button(onClick = { creationType = "REPRINT" },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp)) { Text("转载") }
+                    else
+                        OutlinedButton(onClick = { creationType = "REPRINT" },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp)) { Text("转载") }
+                    Spacer(Modifier.width(8.dp))
+                    if (creationType == "ORIGINAL")
+                        Button(onClick = { creationType = "ORIGINAL" },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp)) { Text("原创") }
+                    else
+                        OutlinedButton(onClick = { creationType = "ORIGINAL" },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp)) { Text("原创") }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onSend(title.trim(), desc.trim(), videoUrl!!, coverUrl!!, objectKey!!, creationType) },
+                enabled = title.trim().length >= 4 && videoUrl != null && coverUrl != null &&
+                          objectKey != null && !uploading
             ) { Text("发布") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }

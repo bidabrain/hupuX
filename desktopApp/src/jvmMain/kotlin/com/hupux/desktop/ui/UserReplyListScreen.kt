@@ -27,7 +27,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 @Composable
-fun UserReplyListScreen(uid: String, scraper: HupuDesktopScraper, onPostClick: (String) -> Unit) {
+fun UserReplyListScreen(uid: String, scraper: HupuDesktopScraper, onPostClick: (String) -> Unit, showHeader: Boolean = true) {
     var replies by remember { mutableStateOf<List<UserReply>>(emptyList()) }
     var hasMore by remember { mutableStateOf(false) }
     var nextMaxTime by remember { mutableStateOf(0L) }
@@ -45,9 +45,11 @@ fun UserReplyListScreen(uid: String, scraper: HupuDesktopScraper, onPostClick: (
     }
 
     Column(Modifier.fillMaxSize()) {
-        Text("我的回帖", fontWeight = FontWeight.Bold, fontSize = 18.sp,
-            modifier = Modifier.padding(16.dp))
-        HorizontalDivider()
+        if (showHeader) {
+            Text("我的回帖", fontWeight = FontWeight.Bold, fontSize = 18.sp,
+                modifier = Modifier.padding(16.dp))
+            HorizontalDivider()
+        }
         Box(Modifier.fillMaxSize()) {
             if (loading) {
                 CircularProgressIndicator(Modifier.align(Alignment.Center))

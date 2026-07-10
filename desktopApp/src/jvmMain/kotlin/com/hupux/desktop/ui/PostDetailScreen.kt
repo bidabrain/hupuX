@@ -55,7 +55,8 @@ fun PostDetailScreen(
     scraper: HupuScraper,
     desktopScraper: HupuDesktopScraper,
     cookieStorage: DesktopCookieStorage,
-    imageUploader: DesktopImageUploader
+    imageUploader: DesktopImageUploader,
+    onOpenUser: (puid: String) -> Unit = {}
 ) {
     var post by remember { mutableStateOf<PostDetail?>(null) }
     var loading by remember { mutableStateOf(true) }
@@ -280,6 +281,9 @@ fun PostDetailScreen(
                                 comment      = comment,
                                 isLiked      = comment.pid in likedPids,
                                 isLiking     = comment.pid in likingPids,
+                                onUserClick  = if (comment.authorPuid.isNotEmpty() && comment.desktopPage > 0) {
+                                    { onOpenUser(comment.authorPuid) }
+                                } else null,
                                 onReplyClick = if (comment.replyCount > 0) {
                                     { showReplies(comment.pid) }
                                 } else null,
@@ -548,7 +552,8 @@ fun PostDetailScreen(
                 } else null,
                 onReply      = if (cookieStorage.isLoggedIn) { comment ->
                     replyingTo = comment; replyText = ""; dismissReplies()
-                } else null
+                } else null,
+                onOpenUser   = onOpenUser
             )
         }
     }
@@ -565,7 +570,8 @@ private fun SubRepliesSheet(
     onBack: () -> Unit,
     onReplyClick: (String) -> Unit,
     onLike: ((Comment) -> Unit)? = null,
-    onReply: ((Comment) -> Unit)? = null
+    onReply: ((Comment) -> Unit)? = null,
+    onOpenUser: (String) -> Unit = {}
 ) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
         Row(
@@ -605,7 +611,8 @@ private fun SubRepliesSheet(
                         showQuote    = false,
                         onReplyClick = if (reply.replyCount > 0) ({ onReplyClick(reply.pid) }) else null,
                         onLike       = onLike?.let { { it(reply) } },
-                        onReply      = onReply?.let { { it(reply) } }
+                        onReply      = onReply?.let { { it(reply) } },
+                        onUserClick  = if (reply.authorPuid.isNotEmpty() && reply.desktopPage > 0) ({ onOpenUser(reply.authorPuid) }) else null
                     )
                 }
                 if (subReplies.size < totalCount) {
@@ -632,7 +639,8 @@ private fun CommentCard(
     showQuote: Boolean = true,
     onReplyClick: (() -> Unit)? = null,
     onReply: (() -> Unit)?,
-    onLike: (() -> Unit)?
+    onLike: (() -> Unit)?,
+    onUserClick: (() -> Unit)? = null
 ) {
     val text   = remember(comment.content) { Jsoup.parse(comment.content).text() }
     val images = remember(comment.content) { extractImages(comment.content) }
@@ -645,7 +653,8 @@ private fun CommentCard(
                 // 小圆头像占位
                 Box(
                     Modifier.size(44.dp).clip(CircleShape)
-                        .background(if (comment.isAuthor) HupuRed else BgGray),
+                        .background(if (comment.isAuthor) HupuRed else BgGray)
+                        .then(if (onUserClick != null) Modifier.clickable(onClick = onUserClick) else Modifier),
                     contentAlignment = Alignment.Center
                 ) {
                     if (comment.avatar.isNotEmpty()) {
@@ -664,7 +673,8 @@ private fun CommentCard(
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(comment.username, fontSize = 13.sp, fontWeight = FontWeight.Medium,
-                            color = if (comment.isAuthor) HupuRed else TextPrimary)
+                            color = if (comment.isAuthor) HupuRed else TextPrimary,
+                            modifier = if (onUserClick != null) Modifier.clickable(onClick = onUserClick) else Modifier)
                         if (comment.isAuthor) {
                             Spacer(Modifier.width(5.dp))
                             Surface(color = HupuRed, shape = RoundedCornerShape(4.dp)) {

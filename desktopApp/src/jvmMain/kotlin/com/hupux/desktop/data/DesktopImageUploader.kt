@@ -11,6 +11,7 @@ import java.io.File
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.concurrent.TimeUnit
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import javax.imageio.ImageIO
@@ -23,22 +24,43 @@ private const val HSS_MODULE   = "editor-oss"
 private const val HSS_PATH     = "/editor"
 private const val HSS_ACTION   = "1"
 
+/** 视频上传结果：videoUrl + objectKey（用于 format.videoInfo.key） */
+data class VideoUploadResult(val videoUrl: String, val objectKey: String)
+
 class DesktopImageUploader(
     private val client: OkHttpClient,
     private val cookieStorage: DesktopCookieStorage
 ) {
+    // 视频等大文件 OSS 直传需要长写超时（默认写超时太短会中断）
+    private val uploadClient by lazy {
+        client.newBuilder()
+            .writeTimeout(5, TimeUnit.MINUTES)
+            .readTimeout(5, TimeUnit.MINUTES)
+            .build()
+    }
+
     /** 上传本地图片文件，返回 CDN URL */
     fun upload(file: File, module: String = HSS_MODULE, path: String = HSS_PATH): String {
         val bytes = file.readBytes()
         val ext = when (file.extension.lowercase()) {
             "png" -> "png"; "gif" -> "gif"; "webp" -> "webp"; else -> "jpeg"
         }
-        val contentType = "image/$ext"
-
         val img = ImageIO.read(ByteArrayInputStream(bytes))
-        val width  = img?.width  ?: 0
-        val height = img?.height ?: 0
+        return runUpload(bytes, ext, "image/$ext", module, path, img?.width ?: 0, img?.height ?: 0).first
+    }
 
+    /** 上传视频（module=editor-video-oss），返回 videoUrl + objectKey */
+    fun uploadVideo(file: File): VideoUploadResult {
+        val bytes = file.readBytes()
+        val (videoUrl, objectKey) = runUpload(bytes, "mp4", "video/mp4", "editor-video-oss", "/editor", 0, 0)
+        return VideoUploadResult(videoUrl, objectKey)
+    }
+
+    /** 通用上传链路：凭证 → OSS V1 PUT → uploadStatus，返回 (fileSrc, objectKey) */
+    private fun runUpload(
+        bytes: ByteArray, ext: String, contentType: String,
+        module: String, path: String, width: Int, height: Int
+    ): Pair<String, String> {
         val md5       = md5Hex(bytes)
         val timestamp = System.currentTimeMillis().toString()
 
@@ -76,11 +98,17 @@ class DesktopImageUploader(
             error("获取上传凭证失败: ${credRoot.get("msg")?.asString}")
 
         val data = credRoot.getAsJsonObject("data")
-        if (data.get("status")?.asString != "processing")
-            return data.get("fileSrc")?.asString ?: error("缺少 fileSrc")
+        val objectKeyFromCred = data.get("objectKey")?.takeIf { !it.isJsonNull }?.asString
 
+        if (data.get("status")?.asString != "processing") {
+            // 服务端去重：可能无 objectKey，则从 fileSrc 路径推导
+            val fileSrc = data.get("fileSrc")?.asString ?: error("缺少 fileSrc")
+            val objectKey = objectKeyFromCred ?: fileSrc.substringAfter("://").substringAfter('/')
+            return fileSrc to objectKey
+        }
+
+        val objectKey = objectKeyFromCred ?: error("缺少 objectKey")
         val bucket    = data.get("bucket").asString
-        val objectKey = data.get("objectKey").asString
         val accessKey = data.get("accessKey").asString
         val secretKey = data.get("secretKey").asString
         val token     = data.get("token").asString
@@ -89,7 +117,7 @@ class DesktopImageUploader(
             .also { it.timeZone = TimeZone.getTimeZone("GMT") }.format(Date())
         val auth = ossAuthorization(accessKey, secretKey, token, contentType, date, bucket, objectKey)
 
-        val ossResp = client.newCall(Request.Builder()
+        val ossResp = uploadClient.newCall(Request.Builder()
             .url("https://$bucket.oss-cn-hangzhou.aliyuncs.com/$objectKey")
             .header("Date", date).header("Content-Type", contentType)
             .header("x-oss-security-token", token).header("Authorization", auth)
@@ -107,9 +135,10 @@ class DesktopImageUploader(
             .post("""{"fileHash":"$md5"}""".toRequestBody("application/json".toMediaType()))
             .build()).execute().use { it.body!!.string() }
 
-        return JsonParser.parseString(statusJson).asJsonObject
+        val fileSrc = JsonParser.parseString(statusJson).asJsonObject
             .getAsJsonObject("data")?.get("fileSrc")?.asString
-            ?: error("获取图片地址失败")
+            ?: error("获取上传地址失败")
+        return fileSrc to objectKey
     }
 
     private fun md5Hex(bytes: ByteArray): String =
@@ -143,6 +172,14 @@ fun pickImageFile(): File? {
         name.lowercase().let { it.endsWith(".jpg") || it.endsWith(".jpeg") ||
             it.endsWith(".png") || it.endsWith(".gif") || it.endsWith(".webp") }
     }
+    dialog.isVisible = true
+    return dialog.file?.let { File(dialog.directory, it) }
+}
+
+/** AWT 原生视频选择器（阻塞调用，需在 Dispatchers.IO 上执行） */
+fun pickVideoFile(): File? {
+    val dialog = java.awt.FileDialog(null as java.awt.Frame?, "选择视频", java.awt.FileDialog.LOAD)
+    dialog.setFilenameFilter { _, name -> name.lowercase().endsWith(".mp4") }
     dialog.isVisible = true
     return dialog.file?.let { File(dialog.directory, it) }
 }

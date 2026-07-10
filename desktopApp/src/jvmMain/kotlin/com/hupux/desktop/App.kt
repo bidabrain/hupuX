@@ -44,6 +44,7 @@ private sealed class Screen {
     data class UserThreadList(val uid: String) : Screen()
     data class UserReplyList(val uid: String) : Screen()
     data class UserRecommendList(val uid: String) : Screen()
+    data class UserSpace(val uid: String) : Screen()
     object UserFavoriteList : Screen()
 }
 
@@ -214,7 +215,8 @@ fun App(
                     scraper = scraper,
                     desktopScraper = desktopScraper,
                     cookieStorage = cookieStorage,
-                    imageUploader = imageUploader
+                    imageUploader = imageUploader,
+                    onOpenUser = { puid -> push(Screen.UserSpace(puid)) }
                 )
 
                 is Screen.UserThreadList -> UserThreadListScreen(
@@ -230,6 +232,12 @@ fun App(
                 )
 
                 is Screen.UserRecommendList -> UserRecommendListScreen(
+                    uid = s.uid,
+                    scraper = desktopScraper,
+                    onPostClick = { tid -> push(Screen.PostDetail(tid)) }
+                )
+
+                is Screen.UserSpace -> UserSpaceScreen(
                     uid = s.uid,
                     scraper = desktopScraper,
                     onPostClick = { tid -> push(Screen.PostDetail(tid)) }
