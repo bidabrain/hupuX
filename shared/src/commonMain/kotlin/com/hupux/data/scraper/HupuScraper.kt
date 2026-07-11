@@ -1,12 +1,14 @@
 package com.hupux.data.scraper
 
-import com.google.gson.JsonArray
-import com.google.gson.JsonObject
-import com.google.gson.JsonParser
+import com.fleeksoft.ksoup.Ksoup
 import com.hupux.data.model.*
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import org.jsoup.Jsoup
+import io.ktor.client.HttpClient
+import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.encodeURLQueryComponent
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 
 private const val BASE_URL = "https://m.hupu.com"
 private val NEXT_DATA_REGEX = Regex(
@@ -14,56 +16,34 @@ private val NEXT_DATA_REGEX = Regex(
     RegexOption.DOT_MATCHES_ALL
 )
 
-// Safe Gson accessors — return null when key missing OR value is JSON null
-private fun JsonObject.obj(key: String): JsonObject? =
-    get(key)?.takeIf { !it.isJsonNull }?.asJsonObject
+class HupuScraper(private val client: HttpClient) {
 
-private fun JsonObject.arr(key: String): JsonArray? =
-    get(key)?.takeIf { !it.isJsonNull }?.asJsonArray
-
-private fun JsonObject.str(key: String): String? =
-    get(key)?.takeIf { !it.isJsonNull }?.asString
-
-private fun JsonObject.int_(key: String): Int? =
-    get(key)?.takeIf { !it.isJsonNull }?.asInt
-
-private fun JsonObject.long_(key: String): Long? =
-    get(key)?.takeIf { !it.isJsonNull }?.asLong
-
-private fun JsonObject.bool_(key: String): Boolean? =
-    get(key)?.takeIf { !it.isJsonNull }?.asBoolean
-
-class HupuScraper(private val client: OkHttpClient) {
-
-    private fun fetch(url: String): String {
-        val request = Request.Builder()
-            .url(url)
-            .header(
+    private suspend fun fetch(url: String): String =
+        client.get(url) {
+            header(
                 "User-Agent",
                 "Mozilla/5.0 (Linux; Android 12; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36"
             )
-            .header("Accept-Language", "zh-CN,zh;q=0.9")
-            .build()
-        return client.newCall(request).execute().use { it.body!!.string() }
-    }
+            header("Accept-Language", "zh-CN,zh;q=0.9")
+        }.bodyAsText()
 
     private fun parseNextData(html: String): JsonObject {
         val json = NEXT_DATA_REGEX.find(html)?.groupValues?.get(1)
             ?: error("__NEXT_DATA__ not found")
-        return JsonParser.parseString(json).asJsonObject
-            .getAsJsonObject("props")
-            .getAsJsonObject("pageProps")
+        return parseJsonObject(json)
+            .obj("props")?.obj("pageProps")
+            ?: error("props.pageProps not found")
     }
 
-    fun fetchHome(): List<Post> {
+    suspend fun fetchHome(): List<Post> {
         val html = fetch(BASE_URL)
         val pp = parseNextData(html)
         val arr = pp.arr("res") ?: return emptyList()
         return arr.mapNotNull { el ->
-            val o = el.asJsonObject
+            val o = el.obj
             val tid = o.str("tid") ?: return@mapNotNull null
             val images = mutableListOf<String>()
-            o.arr("source")?.forEach { images.add(it.asString) }
+            o.arr("source")?.forEach { it.asStr?.let(images::add) }
             Post(
                 tid = tid,
                 title = o.str("title") ?: "",
@@ -78,14 +58,14 @@ class HupuScraper(private val client: OkHttpClient) {
         }
     }
 
-    fun fetchZoneList(): List<ZoneCategory> {
+    suspend fun fetchZoneList(): List<ZoneCategory> {
         val html = fetch("$BASE_URL/zone")
         val pp = parseNextData(html)
         val arr = pp.arr("data") ?: return emptyList()
         return arr.map { el ->
-            val o = el.asJsonObject
+            val o = el.obj
             val topics = o.arr("topicList")?.map { t ->
-                val to = t.asJsonObject
+                val to = t.obj
                 Zone(
                     topicId = to.int_("topicId") ?: 0,
                     topicName = to.str("topicName") ?: "",
@@ -102,14 +82,14 @@ class HupuScraper(private val client: OkHttpClient) {
         }
     }
 
-    fun fetchZone(topicId: Int, cursor: String? = null): ZonePage {
+    suspend fun fetchZone(topicId: Int, cursor: String? = null): ZonePage {
         // cursor format: null = initial load; "page|rawCursor" for subsequent pages
         if (cursor != null) {
             val pipe = cursor.indexOf('|')
             val page = cursor.substring(0, pipe).toIntOrNull() ?: 2
             val rawCursor = cursor.substring(pipe + 1)
             val url = "$BASE_URL/api/v2/bbs/topicThreads?topicId=$topicId&page=$page&cursor=$rawCursor"
-            val data = JsonParser.parseString(fetch(url)).asJsonObject.obj("data")
+            val data = parseJsonObject(fetch(url)).obj("data")
                 ?: return ZonePage(ZoneDetail(topicId, "", "", "", "", "", "#EA0E20"), emptyList(), null)
             val threads = data.arr("topicThreads") ?: return ZonePage(ZoneDetail(topicId, "", "", "", "", "", "#EA0E20"), emptyList(), null)
             val rawNext = data.str("nextCursor")
@@ -141,7 +121,7 @@ class HupuScraper(private val client: OkHttpClient) {
 
     private fun parseZoneThreads(threads: JsonArray, topicId: Int): List<Post> =
         threads.mapNotNull { el ->
-            val o = el.asJsonObject
+            val o = el.obj
             val tid = o.int_("tid")?.toString() ?: return@mapNotNull null
             Post(
                 tid = tid,
@@ -156,7 +136,7 @@ class HupuScraper(private val client: OkHttpClient) {
             )
         }
 
-    fun fetchPost(tid: String): PostDetail {
+    suspend fun fetchPost(tid: String): PostDetail {
         val html = fetch("$BASE_URL/bbs/$tid.html")
         val pp = parseNextData(html)
 
@@ -187,12 +167,12 @@ class HupuScraper(private val client: OkHttpClient) {
         val location = threadData.str("location") ?: ""
 
         val repliesData = pp.obj("initialRepliesData")
-        val lightReplies = repliesData?.arr("lightReplies") ?: JsonArray()
-        val initialReplies = repliesData?.arr("initialReplies") ?: JsonArray()
+        val lightReplies = repliesData?.arr("lightReplies") ?: EmptyJsonArray
+        val initialReplies = repliesData?.arr("initialReplies") ?: EmptyJsonArray
         val hasMore = repliesData?.bool_("initialHasMore") ?: false
 
         val allComments = (lightReplies.toList() + initialReplies.toList()).map { el ->
-            parseComment(el.asJsonObject)
+            parseComment(el.obj)
         }
 
         return PostDetail(
@@ -213,39 +193,38 @@ class HupuScraper(private val client: OkHttpClient) {
     }
 
     /** 移动端评论列表翻页，返回 (评论列表, 是否还有更多) */
-    fun fetchReplyList(tid: String, page: Int): Pair<List<Comment>, Boolean> {
+    suspend fun fetchReplyList(tid: String, page: Int): Pair<List<Comment>, Boolean> {
         val url = "$BASE_URL/api/v2/reply/list/$tid?page=$page"
-        val data = JsonParser.parseString(fetch(url)).asJsonObject.obj("data")
+        val data = parseJsonObject(fetch(url)).obj("data")
             ?: return Pair(emptyList(), false)
         val list = data.arr("list") ?: return Pair(emptyList(), false)
         val current = data.int_("current") ?: page
         val total   = data.int_("total") ?: 1
-        return Pair(list.mapNotNull { parseComment(it.asJsonObject) }, current < total)
+        return Pair(list.mapNotNull { parseComment(it.obj) }, current < total)
     }
 
     /** 获取指定评论的子回复列表 */
-    fun fetchSubReplies(tid: String, parentPid: String): List<Comment> {
+    suspend fun fetchSubReplies(tid: String, parentPid: String): List<Comment> {
         val url = "$BASE_URL/api/v2/reply/sub_list/$tid?pid=$parentPid&page=1&size=20"
-        val request = Request.Builder().url(url)
-            .header("User-Agent", "Mozilla/5.0 (Linux; Android 12; Pixel 6) AppleWebKit/537.36")
-            .build()
-        val body = client.newCall(request).execute().use { it.body!!.string() }
-        val root = JsonParser.parseString(body).asJsonObject
+        val body = client.get(url) {
+            header("User-Agent", "Mozilla/5.0 (Linux; Android 12; Pixel 6) AppleWebKit/537.36")
+        }.bodyAsText()
+        val root = parseJsonObject(body)
         val list = root.obj("data")?.arr("list") ?: return emptyList()
-        return list.map { parseComment(it.asJsonObject) }
+        return list.map { parseComment(it.obj) }
     }
 
-    fun fetchHot(): List<HotItem> {
+    suspend fun fetchHot(): List<HotItem> {
         val html = fetch("$BASE_URL/hot")
         val pp = parseNextData(html)
         val arr = pp.arr("res") ?: return emptyList()
         return arr.mapNotNull { el ->
-            val o = el.asJsonObject
+            val o = el.obj
             HotItem(
                 rank = o.int_("rank") ?: return@mapNotNull null,
-                tagId = o.get("tagId")?.takeIf { !it.isJsonNull }?.asLong ?: return@mapNotNull null,
+                tagId = o.long_("tagId") ?: return@mapNotNull null,
                 tagName = o.str("tagName") ?: "",
-                heat = o.get("heat")?.takeIf { !it.isJsonNull }?.asLong ?: 0L,
+                heat = o.long_("heat") ?: 0L,
                 competitionType = o.str("competitionType") ?: "",
                 icon = o.str("icon") ?: ""
             )
@@ -256,7 +235,7 @@ class HupuScraper(private val client: OkHttpClient) {
      * 热榜话题下的帖子列表。
      * page=1 走 SSR（/tag/{tagId}，含话题头部信息）；page2+ 走 REST API（只有帖子列表）。
      */
-    fun fetchTopicThreads(tagId: Long, page: Int = 1): TopicThreadPage {
+    suspend fun fetchTopicThreads(tagId: Long, page: Int = 1): TopicThreadPage {
         if (page <= 1) {
             val html = fetch("$BASE_URL/tag/$tagId")
             val pp = parseNextData(html)
@@ -271,23 +250,23 @@ class HupuScraper(private val client: OkHttpClient) {
                 pv        = top?.long_("pv") ?: 0
             )
             val ttl = pp.obj("topicThreadList")
-            val threads = ttl?.arr("threadList") ?: JsonArray()
+            val threads = ttl?.arr("threadList") ?: EmptyJsonArray
             val hasNext = ttl?.bool_("nextPage") ?: false
             return TopicThreadPage(info, parseTopicThreads(threads), if (hasNext) 2 else null)
         }
         val url = "$BASE_URL/api/v2/bbs/tagThreads?tagId=$tagId&page=$page"
-        val data = JsonParser.parseString(fetch(url)).asJsonObject.obj("data")
+        val data = parseJsonObject(fetch(url)).obj("data")
             ?: return TopicThreadPage(TopicInfo(tagId, ""), emptyList(), null)
-        val threads = data.arr("threadList") ?: JsonArray()
+        val threads = data.arr("threadList") ?: EmptyJsonArray
         val hasNext = data.bool_("nextPage") ?: false
         return TopicThreadPage(TopicInfo(tagId, ""), parseTopicThreads(threads), if (hasNext) page + 1 else null)
     }
 
     private fun parseTopicThreads(threads: JsonArray): List<Post> =
         threads.mapNotNull { el ->
-            val o = el.asJsonObject
+            val o = el.obj
             val tid = o.long_("tid")?.toString() ?: return@mapNotNull null
-            val images = o.arr("picList")?.mapNotNull { it.asJsonObject.str("url") } ?: emptyList()
+            val images = o.arr("picList")?.mapNotNull { it.obj.str("url") } ?: emptyList()
             Post(
                 tid          = tid,
                 title        = o.str("title") ?: "",
@@ -297,18 +276,18 @@ class HupuScraper(private val client: OkHttpClient) {
                 username     = o.str("userName") ?: "",
                 time         = o.str("time") ?: "",
                 images       = images,
-                isVideo      = o.get("video")?.let { !it.isJsonNull } ?: false
+                isVideo      = o.has("video")
             )
         }
 
-    fun fetchSearch(query: String): List<Post> {
-        val encoded = java.net.URLEncoder.encode(query, "UTF-8")
+    suspend fun fetchSearch(query: String): List<Post> {
+        val encoded = query.encodeURLQueryComponent()
         val html = fetch("$BASE_URL/search?kw=$encoded")
         return try {
             val pp = parseNextData(html)
             val arr = pp.arr("res") ?: return emptyList()
             arr.mapNotNull { el ->
-                val o = el.asJsonObject
+                val o = el.obj
                 val tid = o.str("tid") ?: return@mapNotNull null
                 Post(
                     tid     = tid,
@@ -330,7 +309,7 @@ class HupuScraper(private val client: OkHttpClient) {
     private fun fixLazyImages(html: String): String {
         if (!html.contains("img", ignoreCase = true)) return html
         return try {
-            val doc = Jsoup.parseBodyFragment(html)
+            val doc = Ksoup.parseBodyFragment(html)
             // 标准懒加载
             doc.select("img").forEach { img ->
                 val actual = img.attr("data-src").takeIf { it.isNotEmpty() }
@@ -357,7 +336,7 @@ class HupuScraper(private val client: OkHttpClient) {
      * 这样能大幅减少误抓推荐区、热榜区等无关图片。
      */
     private fun extractMediaHtml(pageHtml: String): String = try {
-        val doc = Jsoup.parse(pageHtml)
+        val doc = Ksoup.parse(pageHtml)
         // 移除已知非正文区块
         doc.select("header, nav, footer, script, style, noscript").remove()
         doc.select("[class*='reply' i],[class*='comment' i],[class*='Reply' i],[class*='Comment' i]").remove()

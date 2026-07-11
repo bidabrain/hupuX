@@ -44,6 +44,7 @@ kotlin {
                 implementation(libs.okhttp)
                 implementation(libs.jsoup)
                 implementation(libs.gson)
+                implementation(libs.ktor.client.okhttp)
             }
         }
     }

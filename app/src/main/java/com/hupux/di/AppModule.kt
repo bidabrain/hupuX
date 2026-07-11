@@ -33,6 +33,8 @@ import com.hupux.ui.profile.UserWebViewViewModel
 import com.hupux.ui.topic.TopicDetailViewModel
 import com.hupux.ui.zone.ZoneDetailViewModel
 import com.hupux.ui.zone.ZoneListViewModel
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
 import okhttp3.OkHttpClient
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
@@ -47,6 +49,16 @@ val appModule = module {
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
             .build()
+    }
+    single<HttpClient> {
+        HttpClient(OkHttp) {
+            engine {
+                config {
+                    connectTimeout(15, TimeUnit.SECONDS)
+                    readTimeout(20, TimeUnit.SECONDS)
+                }
+            }
+        }
     }
     single<SqlDriver> {
         AndroidSqliteDriver(

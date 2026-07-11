@@ -3,8 +3,15 @@ build/
 app/build/
 **/build/
 
-# ── Gradle 缓存 ───────────────────────────────────────────
+# ── Gradle / Kotlin 缓存 ──────────────────────────────────
 .gradle/
+.kotlin/
+
+# ── Xcode（iOS）────────────────────────────────────────────
+xcuserdata/
+*.xcuserstate
+ios/**/build/
+DerivedData/
 
 # ── 本地配置（含 SDK 路径，每台机器不同）────────────────────
 local.properties

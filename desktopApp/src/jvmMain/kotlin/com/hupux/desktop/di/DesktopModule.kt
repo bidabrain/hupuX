@@ -14,6 +14,8 @@ import com.hupux.data.scraper.HupuScraper
 import com.hupux.desktop.data.DesktopCookieStorage
 import com.hupux.desktop.data.DesktopImageUploader
 import com.hupux.shared.db.HupuDatabase
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
 import okhttp3.OkHttpClient
 import org.koin.dsl.module
 import java.io.File
@@ -26,6 +28,16 @@ val desktopModule = module {
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
             .build()
+    }
+    single<HttpClient> {
+        HttpClient(OkHttp) {
+            engine {
+                config {
+                    connectTimeout(15, TimeUnit.SECONDS)
+                    readTimeout(20, TimeUnit.SECONDS)
+                }
+            }
+        }
     }
 
     single<DesktopCookieStorage> { DesktopCookieStorage() }

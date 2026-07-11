@@ -1,8 +1,10 @@
-# HupuX 多平台迁移计划（Android → Android + Windows + macOS）
+# HupuX 多平台迁移计划（Android → Android + 桌面端 + iOS）
 
 ## 目标
 
-基于 **Compose Multiplatform**，在保持 Android 版功能完整的前提下，新增 Windows 和 macOS 桌面端支持。
+第一阶段（Phase 1–5）：基于 **Compose Multiplatform**，在保持 Android 功能完整的前提下新增 Windows / macOS / Linux 桌面端。
+
+第二阶段（Phase 6）：新增 **iOS** 支持——共享层去 JVM 化后编译到 Kotlin/Native，iOS 端用原生 **SwiftUI** 复用同一套业务逻辑。
 
 ## 分支
 
@@ -33,9 +35,10 @@ hupuX/
 | Room | SQLDelight 2.x | 高 | Phase 4 |
 | Coil 2 | Coil 3 | 低 | Phase 3 |
 | DataStore | multiplatform-settings | 低 | Phase 3 |
-| OkHttp | 保持不变（JVM 通用） | 无 | Phase 2 |
-| Jsoup | 保持不变（JVM 通用） | 无 | Phase 2 |
-| Android WebView | 桌面用 JCEF（Java CEF） | 中 | Phase 5 |
+| OkHttp | JVM 阶段保持不变；**Phase 6 全量换 Ktor Client** | 无 → 高 | Phase 2 / 6 |
+| Jsoup | JVM 阶段保持不变；**Phase 6 全量换 Ksoup** | 无 → 中 | Phase 2 / 6 |
+| Gson | JVM 阶段保持不变；**Phase 6 全量换 kotlinx.serialization** | 无 → 中 | Phase 2 / 6 |
+| Android WebView | 桌面用 Jsoup 渲染；iOS 用 WKWebView | 中 | Phase 5 / 6 |
 
 ---
 
@@ -151,13 +154,44 @@ hupuX/
 
 ---
 
+### Phase 6 — iOS 支持（SwiftUI + 共享逻辑）✅
+
+**目标：** 共享层去 JVM 化后编译到 Kotlin/Native，iOS 端用原生 SwiftUI 复用同一套 scraper / repository。
+
+**阶段 0 — 依赖去 JVM 化（三端统一，让 commonMain 真正跨平台）：**
+- [x] OkHttp → **Ktor Client**（common 用 `ktor-client-core`；Android/Desktop 用 OkHttp 引擎、iOS 用 Darwin 引擎）；scraper 请求全部改 `suspend`
+- [x] Jsoup → **Ksoup**（`com.fleeksoft.ksoup`，注意版本要匹配 Kotlin 2.0.21）
+- [x] Gson 树遍历 → **kotlinx.serialization**（访问器抽到 `JsonExt.kt`）
+- [x] `System.currentTimeMillis()` → kotlinx-datetime；`URLEncoder` → ktor `encodeURLQueryComponent`
+- [x] `Dispatchers.IO`（Native 上不可见）→ `expect/actual val ioDispatcher`
+- [x] 移除 shared 未使用的 Compose 依赖（否则 Compose 编译器插件在 iOS 编译报错）
+- [x] 回归验证 Android + Desktop 不破坏
+
+**阶段 1 — 加 iOS target + framework 导出：**
+- [x] `iosX64 / iosArm64 / iosSimulatorArm64` + `binaries.framework { baseName = "Shared" }`
+- [x] iosMain 依赖：`ktor-client-darwin`、sqldelight `native-driver`
+
+**阶段 2 — iOS 平台实现：**
+- [x] `IosCookieStorage`（NSUserDefaults）、`IosDependencies`（手工装配依赖图，暴露给 Swift）
+
+**阶段 3 — SwiftUI 逐屏还原：**
+- [x] Xcode 工程 `ios/HupuX/`，Run Script 调 `embedAndSignAppleFrameworkForXcode` 集成 framework
+- [x] 首页（推荐/热榜/关注 + 轮播）、发现、搜索、收藏、我的、专区/话题/帖子详情、消息、设置、登录、发帖
+- [x] 登录后切桌面版 API 解锁点赞/收藏/推荐/回复；图片/视频 OSS 上传（CryptoKit 签名）
+
+**技术说明：**
+- Kotlin `suspend` → Swift `async/await` 自动桥接，无需 SKIE；返回 Flow 的少数方法改用一次性 `getAllOnce()` 快照
+- iOS 编译/链接需完整 Xcode（非 Command Line Tools）
+
+---
+
 ## 当前进度
 
-> **所有阶段完成 🎉**
-> 
-> Android + macOS/Windows 桌面端均可构建运行。
-> 桌面端：`./gradlew :desktopApp:run`（开发调试）、`./gradlew :desktopApp:packageDmg`（macOS 打包）、`./gradlew :desktopApp:packageMsi`（Windows 打包）。
-> 后续迭代参见 Phase 5「待后续迭代」清单。
+> **所有阶段完成 🎉 — Android / iOS / macOS / Windows / Linux 全平台可构建运行。**
+>
+> - Android：`./gradlew :app:assembleDebug`
+> - 桌面端：`./gradlew :desktopApp:run` / `packageDmg` / `packageMsi` / `packageDeb`
+> - iOS：Xcode 打开 `ios/HupuX/HupuX.xcodeproj` → Cmd+R（详见 README「iOS」小节，**未签名，需自行签名安装**）
 
 ---
 

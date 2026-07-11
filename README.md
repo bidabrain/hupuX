@@ -1,6 +1,9 @@
 # 虎扑 X
 
-一个基于 Kotlin Multiplatform + Compose Multiplatform 的虎扑第三方客户端，同时支持 **Android** 和 **桌面端（macOS / Windows / Linux）**。界面简洁、无广告、无推送骚扰。
+一个基于 **Kotlin Multiplatform** 的虎扑第三方客户端，同时支持 **Android**、**iOS** 和 **桌面端（macOS / Windows / Linux）**。界面简洁、无广告、无推送骚扰。
+
+- **Android / 桌面端**：Compose Multiplatform 界面
+- **iOS**：原生 SwiftUI 界面，复用同一套 KMP 业务逻辑（`Shared.framework`）
 
 ---
 
@@ -8,95 +11,94 @@
 
 ---
 
+## 平台支持
+
+| 功能 | Android | iOS | 桌面端 |
+|---|:---:|:---:|:---:|
+| 浏览（首页/热榜/关注/专区/话题/搜索） | ✅ | ✅ | ✅ |
+| 帖子详情（正文图文/视频 + 评论） | ✅ | ✅ | ✅ |
+| 楼中楼递归展开 / 评论排序 | ✅ | ✅ | ✅ |
+| 登录（WebView / 粘贴 Cookie） | ✅ | ✅ | ✅ |
+| 点赞 / 收藏 / 推荐 / 回复（带图） | ✅ | ✅ | ✅ |
+| 发帖（图片 / 视频，OSS 直传） | ✅ | ✅ | ⚠️ 只读 |
+| 我的 / 子列表 / 消息中心 | ✅ | ✅ | ✅ |
+| 图片全屏查看 / 长按保存相册 | ✅ | — | — |
+
+---
+
 ## 功能
 
 ### 首页
-- **推荐**：从虎扑首页聚合热门帖子，顶部轮播图展示图文内容（Android）
-- **热榜**：展示虎扑热榜话题（按热度排名），点击话题进入其帖子列表，再点帖子进入详情（Android & 桌面端）
-- **关注**：汇总所有已关注专区的最新动态，按时间排序
-- 右上角设置入口（Android）
+- **推荐**：从虎扑首页聚合热门帖子，顶部图片轮播展示图文内容
+- **热榜**：展示虎扑热榜话题（按热度排名），点击话题进入其帖子列表，再点帖子进入详情
+- **关注**：汇总所有已关注专区的最新动态
+- 右上角设置入口
 
 ### 发现
 - 浏览全部专区分类（篮球、足球、综合等）
 - 进入专区查看帖子列表，支持加载更多
-- **发帖（需要登录）**：进入任意专区后显示发帖入口，填写标题（4-40 字）和正文即可发布；支持插图上传
+- **关注专区（需要登录）**：专区详情页右上角「关注」按钮
+- **发帖（需要登录）**：进入任意专区后显示发帖入口，填写标题和正文即可发布；支持图片 / 视频上传
 
 ### 搜索
-- 关键词搜索帖子（桌面版支持回车触发）
+- 关键词搜索帖子
 
 ### 收藏
 - 一键收藏帖子，本地持久化存储，离线可用
 
 ### 帖子详情
-- 正文完整显示图片（含虎扑自定义 `<center class="hupu-img">` 格式）
-- Android：WebView 渲染正文，支持视频（HTML5 `<video>`）；图片点击全屏查看（双指缩放 / 平移 / GIF 循环播放）
-- 评论列表：显示用户头像、楼主标识、引用回复（桌面端登录后可见）、点赞数
-- 评论支持**倒序**显示（登录后全量加载再倒序，未登录仅对当前页倒序）
-- 点击「X 条回复」展开子回复面板，支持无限递归嵌套展开（Android & 桌面端登录后）
-- Android：正文 / 评论图片点击全屏查看，支持双指缩放；**长按图片可保存至相册**
-- 本地收藏 / 取消收藏
-- Android：分享帖子链接至其他应用；大图查看器内置保存按钮可直接保存至相册
-- **收藏（需要登录）**：主贴下方「收藏」按钮直接同步至虎扑账号，再次点击取消收藏
-- **推荐（需要登录）**：主贴下方「推荐」按钮，已推荐显示灰色
-- **回复（需要登录）**：点击评论卡片上的「回复」按钮发送回复；支持引用指定评论；**支持插图**（回复区加图片按钮，上传后自动嵌入正文）；桌面版底部常驻回复输入框
-- **回复签名（Android & 桌面端）**：设置中可自定义回复末尾自动追加的签名，默认为 `------` 分隔符 + `发自我的超级无敌hupuX客户端`，留空则不追加
+- 正文完整显示图片（含虎扑自定义 `<center class="hupu-img">` 格式）与视频
+- Android / iOS：WebView（WKWebView）渲染正文，支持 HTML5 `<video>`
+- 评论列表：用户头像、楼主标识、引用回复、点赞数、评论内嵌图片
+- **评论排序**：正序 / 倒序 / 最热（按点亮数）
+- 点击「X 条回复」展开子回复面板，支持**无限递归嵌套展开**
+- **收藏 / 推荐 / 回复 / 点赞（需要登录）**：登录后自动切换桌面版 API 解锁；回复支持插图
+- **回复签名**：设置中可自定义回复末尾自动追加的签名
+- Android：图片点击全屏查看（双指缩放 / GIF），长按保存至相册
 
 ### 我的（需要登录）
-- 头像、昵称、等级、地区、注册时长
-- **第一行统计（不可点击）**：关注 / 粉丝 / 赞 / 声望
-- **第二行统计（点击进入列表）**：发帖 / 回帖 / 推荐 / 收藏（显示虎扑账号收藏数）
-- **我的发帖**：本人发布的所有帖子，含专区标签、回复数，分页加载
-- **我的回帖**：本人所有回帖内容，含引用块，分页加载
-- **我的推荐**：本人推荐过的帖子，分页加载
-- **我的收藏**：从虎扑服务端实时拉取的收藏帖子列表，分页加载
-- **我关注的专区**：横滑展示，点击直接进入专区列表
-- **消息中心**：提到我的 / 评论 / 亮了·推荐，显示发送者、内容摘要、所在帖子；有未读时消息入口显示红色气泡数字
-
-### 导航体验
-- Android：底部红色渐变导航栏 + 白色胶囊按钮；双击 Tab 平滑滚回顶部；二次返回退出
-- 桌面端：顶部红色渐变导航栏 + 白色胶囊按钮（与安卓风格统一）；支持多级页面返回
+- 头像、昵称、等级、地区、注册时长、统计数据
+- **我的发帖 / 回帖 / 推荐**：分页加载
+- **消息中心**：回复 / @我 / 点亮，三个分类
 
 ### 登录
-- Android：内嵌 WebView 登录页，登录成功后自动提取 Cookie
-- 桌面端 & Android：在设置中直接粘贴从浏览器复制的 Cookie 字符串
+- WebView 登录（登录成功自动提取 Cookie）
+- 设置中直接粘贴从浏览器复制的 Cookie 字符串（进入设置会回显当前 Cookie）
 
 ---
 
 ## 技术栈
 
-### 共享（Android + 桌面端）
+### 共享层（`shared`，编译到 Android / iOS / 桌面端）
 
 | 层级 | 技术 |
 |---|---|
 | 语言 | Kotlin Multiplatform |
-| UI | Compose Multiplatform + Material 3 |
-| 网络 | OkHttp |
-| 数据解析 | Gson（JSON API）、Jsoup（HTML） |
-| 本地数据库 | SQLDelight |
-| 依赖注入 | Koin |
-| 图片加载 | Coil 3 |
+| 网络 | **Ktor Client**（Android/Desktop：OkHttp 引擎；iOS：Darwin 引擎） |
+| JSON 解析 | **kotlinx.serialization** |
+| HTML 解析 | **Ksoup** |
+| 本地数据库 | SQLDelight（Android/Desktop：JDBC/Android driver；iOS：Native driver） |
+| 依赖注入 | Koin（Android/Desktop）；iOS 用手工装配 `IosDependencies` |
+| 时间 | kotlinx-datetime |
 
-### 仅 Android
+### 各端 UI
 
-| 层级 | 技术 |
-|---|---|
-| 架构 | MVVM（ViewModel + StateFlow） |
-| 依赖注入 | Hilt |
-| 本地数据库 | Room |
-| Cookie 持久化 | DataStore |
-| 导航 | Navigation Compose |
+| 平台 | UI | 说明 |
+|---|---|---|
+| Android | Jetpack Compose + Material 3 | Navigation Compose、Coil 3、WebView |
+| 桌面端 | Compose Desktop | Coil 3 |
+| iOS | **SwiftUI（原生）** | WKWebView（正文/登录）、CryptoKit（OSS 上传签名）、AsyncImage |
+
+> iOS 端通过 `Shared.framework` 调用共享的 scraper / repository；Kotlin 的 `suspend` 函数在 Swift 侧自动桥接为 `async/await`。
 
 ### 数据来源
 
 | 接口类型 | 说明 |
 |---|---|
-| 移动端 SSR（`m.hupu.com`） | 首页、专区列表、专区详情、帖子详情，解析 `__NEXT_DATA__` JSON |
-| 桌面端 SSR（`bbs.hupu.com`） | 登录后帖子评论列表（解析 `__NEXT_DATA__`，每页 20 条） |
-| 桌面端 REST API（`bbs.hupu.com/api/v2/`） | 子回复列表、帖子收藏 / 取消收藏 |
-| 桌面端 REST API（`bbs.hupu.com/pcmapi/`） | 提交回复、发帖、点亮、推荐 |
-| 虎扑图床 + 阿里云 OSS | 发帖 / 回复插图上传（STS 临时凭证直传） |
-| 桌面端 REST API（`my.hupu.com/pcmapi/`） | 个人资料、我的发帖 / 回帖 / 推荐、消息中心（需 Cookie） |
-| 桌面端 HTML（`my.hupu.com`） | 关注专区列表、消息中心初始数据、我的收藏列表 |
+| 移动端 SSR（`m.hupu.com`） | 首页、专区、帖子详情，解析 `__NEXT_DATA__` JSON；**未登录默认走此接口** |
+| 桌面端 SSR / REST（`bbs.hupu.com`） | **登录后自动切换**：评论列表、子回复、收藏、点赞、推荐、回复、发帖 |
+| 桌面端 REST（`my.hupu.com/pcmapi/`） | 个人资料、我的发帖/回帖/推荐、消息中心（需 Cookie） |
+| 虎扑图床 + 阿里云 OSS | 发帖 / 回复插图与视频上传（STS 临时凭证直传，OSS V1 手动签名） |
 
 详细 API 文档见 [`doc/api/`](doc/api/README.md)。
 
@@ -106,85 +108,85 @@
 
 ```
 hupuX/
-├── shared/                    # KMP 共享模块（Android + 桌面端）
-│   └── src/commonMain/kotlin/com/hupux/
-│       ├── data/
-│       │   ├── model/         # 数据模型（Post、Zone、Comment、UserProfile 等）
+├── shared/                    # KMP 共享模块（Android / iOS / 桌面端）
+│   └── src/
+│       ├── commonMain/kotlin/com/hupux/data/
+│       │   ├── model/         # 数据模型
 │       │   ├── repository/    # 数据仓库层
 │       │   └── scraper/       # HupuScraper（移动端）、HupuDesktopScraper（桌面端）
-│       └── CookieStorage.kt
+│       ├── androidMain/       # Android 平台实现（ioDispatcher 等）
+│       ├── desktopMain/       # 桌面平台实现
+│       └── iosMain/kotlin/com/hupux/ios/
+│           ├── IosCookieStorage.kt   # NSUserDefaults Cookie 存储
+│           └── IosDependencies.kt    # iOS 依赖装配（暴露给 Swift）
 │
-├── app/                       # Android 模块
-│   └── src/main/java/com/hupux/
-│       ├── data/local/        # Room 数据库 + DataStore
-│       ├── di/                # Hilt 模块
-│       └── ui/
-│           ├── home/          # 首页
-│           ├── zone/          # 发现 + 专区详情
-│           ├── post/          # 帖子详情 + 评论
-│           ├── search/        # 搜索
-│           ├── favorites/     # 本地收藏
-│           ├── profile/       # 我的（含 WebView 登录、我的收藏列表）
-│           ├── settings/      # 设置
-│           ├── navigation/    # 底部导航 + 路由
-│           └── theme/         # 颜色 / 主题
-│
-└── desktopApp/                # 桌面端模块（Compose Desktop）
-    └── src/jvmMain/kotlin/com/hupux/desktop/
-        ├── App.kt             # 顶部导航 + 路由
-        ├── Main.kt            # 窗口入口
-        ├── data/              # DesktopCookieStorage、DesktopImageUploader
-        ├── di/                # Koin 模块
-        └── ui/
-            ├── HomeScreen.kt
-            ├── ZoneListScreen.kt
-            ├── ZoneDetailScreen.kt
-            ├── PostDetailScreen.kt
-            ├── SearchScreen.kt
-            ├── FavoritesScreen.kt
-            ├── ProfileScreen.kt
-            ├── SettingsScreen.kt
-            ├── MessagesScreen.kt
-            ├── UserThreadListScreen.kt
-            ├── UserReplyListScreen.kt
-            ├── UserRecommendListScreen.kt
-            ├── UserFavoriteListScreen.kt
-            └── theme/         # AppTheme（颜色 / 字体缩放 / 深色模式）
+├── app/                       # Android 模块（Compose）
+├── desktopApp/                # 桌面端模块（Compose Desktop）
+└── ios/                       # iOS 模块（SwiftUI，独立 Xcode 工程）
+    └── HupuX/HupuX/
+        ├── HupuXApp.swift / RootView.swift    # 入口 + 底部 Tab
+        ├── HomeView / ZoneListView / SearchView / FavoritesView / ProfileView
+        ├── PostDetailView / ZoneDetailView / TopicDetailView / MessageView
+        ├── NewPostView / SettingsView / LoginWebView
+        ├── HupuUploader.swift                 # 图片/视频 OSS 上传（CryptoKit 签名）
+        └── Deps.swift / Session.swift / Routes.swift / Theme.swift
 ```
 
 ---
 
 ## 环境要求
 
-### Android
-- Android Studio Hedgehog 或更新版本
-- JDK 17
-- Android SDK：minSdk **26**（Android 8.0）/ targetSdk **35**
-
-### 桌面端
-- JDK 17
-- macOS / Windows / Linux
+| 平台 | 要求 |
+|---|---|
+| Android | Android Studio + JDK 17；minSdk 26（Android 8.0）/ targetSdk 35 |
+| 桌面端 | JDK 17；macOS / Windows / Linux |
+| iOS | **Xcode 16+**（macOS）；部署目标 iOS 16+ |
 
 ---
 
 ## 构建与运行
 
 ```bash
-# 克隆仓库
 git clone https://github.com/bidabrain/hupuX.git
 cd hupuX
 
-# Android：构建 Debug 包
+# Android：构建 Debug 包（APK 位于 app/build/outputs/apk/debug/）
 ./gradlew :app:assembleDebug
-# APK 位于 app/build/outputs/apk/debug/
 
-# 桌面端：直接运行
+# 桌面端：运行 / 打包
 ./gradlew :desktopApp:run
+./gradlew :desktopApp:packageDmg   # macOS .dmg
+./gradlew :desktopApp:packageMsi   # Windows .msi
+./gradlew :desktopApp:packageDeb   # Linux .deb
+```
 
-# 桌面端：打包（macOS 生成 .dmg，Windows 生成 .msi，Linux 生成 .deb）
-./gradlew :desktopApp:packageDmg
-./gradlew :desktopApp:packageMsi
-./gradlew :desktopApp:packageDeb
+### iOS（⚠️ 无签名，需自行签名安装）
+
+> **iOS 客户端不包含开发者签名。** 本项目未加入 Apple Developer Program，CI 产出的是**未签名的 `.ipa`**，**无法直接安装到 iPhone**，需要你用自己的 Apple ID 自行签名后侧载。
+
+**方式一：Xcode 直装（推荐，免费 Apple ID 即可）**
+
+1. 用 Xcode 打开 `ios/HupuX/HupuX.xcodeproj`
+2. 选中 **HupuX** target → **Signing & Capabilities** → 勾选 *Automatically manage signing*，Team 选你自己的 Apple ID（Personal Team）
+3. 连接 iPhone，顶部选中你的设备，**Cmd + R** 直接编译安装
+
+> 首次编译会自动通过 Run Script 调 Gradle 生成 `Shared.framework`（`./gradlew :shared:embedAndSignAppleFrameworkForXcode`），无需手动操作。
+
+**方式二：侧载现成的未签名 `.ipa`**
+
+1. 从 [Releases](https://github.com/bidabrain/hupuX/releases) 下载 `HupuX-unsigned.ipa`
+2. 用 **Sideloadly** / **AltStore** 等工具，输入你的 Apple ID 签名并安装到 iPhone
+
+> 免费 Apple ID 签名的 App 有效期为 **7 天**，到期需重新签名；付费开发者账号为 1 年。
+
+**命令行编译（模拟器，无需签名）**
+
+```bash
+cd ios/HupuX
+xcodebuild -project HupuX.xcodeproj -scheme HupuX \
+  -sdk iphonesimulator \
+  -destination 'platform=iOS Simulator,name=iPhone 16' \
+  build CODE_SIGNING_ALLOWED=NO
 ```
 
 ---
