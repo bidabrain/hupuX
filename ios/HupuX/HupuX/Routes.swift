@@ -60,7 +60,7 @@ struct RedTitleBar<Trailing: View>: View {
         .padding(.bottom, 12)
         .frame(maxWidth: .infinity)
         .background(
-            LinearGradient(colors: [Theme.red, Theme.redDark], startPoint: .top, endPoint: .bottom)
+            LinearGradient(colors: Theme.headerColors, startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea(edges: .top)
         )
     }

@@ -9,18 +9,20 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.core.view.WindowCompat
 import com.hupux.ui.navigation.AppNavigation
 import com.hupux.ui.theme.HupuXTheme
+import com.hupux.ui.theme.ThemeState
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ThemeState.init(this)
         enableEdgeToEdge()
         val insetsController = WindowCompat.getInsetsController(window, window.decorView)
         setContent {
             HupuXTheme {
-                val isDark = isSystemInDarkTheme()
-                // 状态栏/导航栏图标随深浅色动态切换
-                LaunchedEffect(isDark) {
-                    insetsController.isAppearanceLightStatusBars     = !isDark
-                    insetsController.isAppearanceLightNavigationBars = !isDark
+                // AMOLED 纯黑同样按深色处理，状态栏/导航栏用浅色图标
+                val dark = ThemeState.amoled || isSystemInDarkTheme()
+                LaunchedEffect(dark) {
+                    insetsController.isAppearanceLightStatusBars     = !dark
+                    insetsController.isAppearanceLightNavigationBars = !dark
                 }
                 AppNavigation()
             }

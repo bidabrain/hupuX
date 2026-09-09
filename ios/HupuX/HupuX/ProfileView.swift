@@ -101,7 +101,7 @@ struct ProfileView: View {
 
     private func header(_ p: UserProfile) -> some View {
         ZStack(alignment: .bottomLeading) {
-            LinearGradient(colors: [Theme.red, Theme.redDark], startPoint: .top, endPoint: .bottom)
+            LinearGradient(colors: Theme.headerColors, startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea(edges: .top)
             HStack(spacing: 12) {
                 AsyncImage(url: URL(string: p.avatar)) { phase in

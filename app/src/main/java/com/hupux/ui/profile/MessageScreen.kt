@@ -70,13 +70,14 @@ fun MessageScreen(
                     Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    val dark = isSystemInDarkTheme()
+                    val darkLike = ThemeState.amoled || isSystemInDarkTheme()
+                    val selectedBrush = Brush.verticalGradient(listOf(Color.White, Color(0xFFD8D8D8)))
+                    val unselectedBrush = if (darkLike)
+                        Brush.verticalGradient(listOf(Color(0xFF2A2D3A), Color(0xFF1D2028)))
+                    else
+                        Brush.verticalGradient(listOf(Color(0xFFFF3B4C), Color(0xFFBB0012)))
                     TABS.forEach { (key, label) ->
                         val selected = state.selectedTab == key
-                        val unselectedBrush = if (dark)
-                            Brush.verticalGradient(listOf(Color(0xFF2A2D3A), Color(0xFF1D2028)))
-                        else
-                            Brush.verticalGradient(listOf(Color.White, Color(0xFFD8D8D8)))
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
@@ -85,8 +86,7 @@ fun MessageScreen(
                                 .shadow(if (selected) 6.dp else 2.dp, RoundedCornerShape(18.dp),
                                     ambientColor = Color.Black.copy(.25f), spotColor = Color.Black.copy(.25f))
                                 .background(
-                                    if (selected) unselectedBrush
-                                    else Brush.verticalGradient(listOf(Color(0xFFFF3B4C), Color(0xFFBB0012))),
+                                    if (selected) selectedBrush else unselectedBrush,
                                     RoundedCornerShape(18.dp))
                                 .clickable { vm.selectTab(key) }
                         ) {

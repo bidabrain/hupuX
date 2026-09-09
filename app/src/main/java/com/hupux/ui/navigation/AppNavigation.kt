@@ -99,9 +99,7 @@ fun AppNavigation() {
                     Modifier
                         .fillMaxWidth()
                         .background(
-                            brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                                listOf(Color(0xFFCC000E), HupuRed)
-                            ),
+                            brush = NavBarBrush,
                             shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
                         )
                         .navigationBarsPadding()

@@ -21,20 +21,41 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.hupux.ui.theme.AppBg
 import com.hupux.ui.theme.HupuRed
+import com.hupux.ui.theme.HeaderBrush
+import com.hupux.ui.theme.ThemeState
 
 private val POST_URL_REGEX = Regex("""m\.hupu\.com/bbs/(\d+)(?:\.html)?""")
 
-// 注入深色 CSS：整页 invert+hue-rotate，再对图片双重 invert 恢复原色
+// 注入深色 CSS：黑底、文字变浅、所有元素背景透明（顺带消除结果页左侧白色竖条），
+// 关键词/标签 chip 单独设为灰底白字。用 [class*=] 前缀匹配，抗 CSS-module 哈希变化。
+// SPA 路由切换可能重建 DOM，用 MutationObserver 让样式自愈（丢了就重新插回）。
 private const val JS_ENABLE_DARK = """(function(){
-  var el = document.getElementById('__hx_dark__');
-  if (!el) { el = document.createElement('style'); el.id='__hx_dark__'; document.head.appendChild(el); }
-  el.textContent =
-    'html{filter:invert(1) hue-rotate(180deg) !important;background:#0f1118 !important}' +
-    'img,video,canvas,iframe{filter:invert(1) hue-rotate(180deg) !important}';
+  var CSS =
+    'html,body{background:#000 !important}' +
+    'body *{background-color:transparent !important;border-color:#2a2d3a !important;box-shadow:none !important}' +
+    'body *:not(svg):not(use):not(path):not(img){color:#e4e8f2 !important}' +
+    '[class*="keyword"],[class*="tag"],[class*="hot-word"],[class*="history-item"]{background-color:#2a2d3a !important;border-radius:6px !important}' +
+    '[class*="keyword"] *,[class*="tag"] *,[class*="hot-word"] *,[class*="history-item"] *{color:#fff !important}' +
+    'input,textarea{background-color:#1a1a1a !important;color:#fff !important}' +
+    'a{color:#5b9bd5 !important}';
+  function apply(){
+    var el = document.getElementById('__hx_dark__');
+    if (!el) {
+      el = document.createElement('style'); el.id='__hx_dark__';
+      (document.head || document.documentElement).appendChild(el);
+    }
+    if (el.textContent !== CSS) el.textContent = CSS;
+  }
+  apply();
+  if (!window.__hx_obs__) {
+    window.__hx_obs__ = new MutationObserver(apply);
+    window.__hx_obs__.observe(document.documentElement, {childList:true, subtree:true});
+  }
 })();"""
 
-// 移除深色 CSS
+// 移除深色 CSS：先停掉自愈 observer，再移除样式
 private const val JS_DISABLE_DARK = """(function(){
+  if (window.__hx_obs__) { window.__hx_obs__.disconnect(); window.__hx_obs__ = null; }
   var el = document.getElementById('__hx_dark__');
   if (el) el.remove();
 })();"""
@@ -43,7 +64,7 @@ private const val JS_DISABLE_DARK = """(function(){
 @Composable
 fun SearchScreen(onPostClick: (String) -> Unit) {
     val onPostClickRef = rememberUpdatedState(onPostClick)
-    val isDark         = isSystemInDarkTheme()
+    val isDark         = ThemeState.amoled || isSystemInDarkTheme()
     val isDarkRef      = rememberUpdatedState(isDark)
     val bgColor        = AppBg
 
@@ -61,7 +82,7 @@ fun SearchScreen(onPostClick: (String) -> Unit) {
             Modifier
                 .fillMaxWidth()
                 .background(
-                    Brush.verticalGradient(listOf(HupuRed, Color(0xFFCC000E))),
+                    HeaderBrush,
                     RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
                 )
                 .statusBarsPadding()

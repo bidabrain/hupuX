@@ -51,7 +51,7 @@ fun ZoneListScreen(
         Box(
             Modifier
                 .fillMaxWidth()
-                .background(Brush.verticalGradient(listOf(HupuRed, Color(0xFFCC000E))),
+                .background(HeaderBrush,
                     RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
                 .statusBarsPadding()
         ) {
@@ -237,12 +237,13 @@ private fun ZoneRow(
 
 @Composable
 private fun FollowChip(onClick: () -> Unit) {
+    val chipBg = if (ThemeState.amoled) Color(0xFF2A2D3A) else HupuRed
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .height(30.dp)
             .defaultMinSize(minWidth = 64.dp)
-            .background(HupuRed, RoundedCornerShape(15.dp))
+            .background(chipBg, RoundedCornerShape(15.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp)
     ) {

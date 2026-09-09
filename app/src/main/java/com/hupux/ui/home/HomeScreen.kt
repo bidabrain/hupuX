@@ -20,6 +20,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -92,7 +94,7 @@ fun HomeScreen(
                 Modifier
                     .fillMaxWidth()
                     .background(
-                        Brush.verticalGradient(listOf(HupuRed, Color(0xFFCC000E))),
+                        HeaderBrush,
                         RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
                     )
                     .statusBarsPadding()
@@ -109,6 +111,14 @@ fun HomeScreen(
                         Text("虎扑", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold,
                             color = Color.White)
                         Spacer(Modifier.weight(1f))
+                        IconButton(onClick = { ThemeState.toggle() }) {
+                            Icon(
+                                if (ThemeState.amoled) Icons.Outlined.LightMode
+                                else Icons.Outlined.DarkMode,
+                                contentDescription = if (ThemeState.amoled) "关闭省电黑主题" else "开启省电黑主题",
+                                tint = Color.White
+                            )
+                        }
                         IconButton(onClick = onSettingsClick) {
                             Icon(Icons.Outlined.Settings, contentDescription = "设置", tint = Color.White)
                         }
@@ -242,13 +252,15 @@ private fun PlasticTabRow(selectedIndex: Int, followedCount: Int, onSelect: (Int
         Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        val dark = isSystemInDarkTheme()
+        val darkLike = ThemeState.amoled || isSystemInDarkTheme()
+        // 选中：白塑料（黑底上醒目）；未选中：深色主题用深灰、浅色主题用红
+        val selectedBrush = Brush.verticalGradient(listOf(Color.White, Color(0xFFD8D8D8)))
+        val unselectedBrush = if (darkLike)
+            Brush.verticalGradient(listOf(Color(0xFF2A2D3A), Color(0xFF1D2028)))
+        else
+            Brush.verticalGradient(listOf(Color(0xFFFF3B4C), Color(0xFFBB0012)))
         labels.forEachIndexed { i, label ->
             val sel = i == selectedIndex
-            val unselectedBrush = if (dark)
-                Brush.verticalGradient(listOf(Color(0xFF2A2D3A), Color(0xFF1D2028)))
-            else
-                Brush.verticalGradient(listOf(Color.White, Color(0xFFD8D8D8)))
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
@@ -257,8 +269,7 @@ private fun PlasticTabRow(selectedIndex: Int, followedCount: Int, onSelect: (Int
                     .shadow(if (sel) 6.dp else 2.dp, RoundedCornerShape(18.dp),
                         ambientColor = Color.Black.copy(.25f), spotColor = Color.Black.copy(.25f))
                     .background(
-                        if (sel) unselectedBrush
-                        else Brush.verticalGradient(listOf(Color(0xFFFF3B4C), Color(0xFFBB0012))),
+                        if (sel) selectedBrush else unselectedBrush,
                         RoundedCornerShape(18.dp))
                     .clickable { onSelect(i) }
             ) {

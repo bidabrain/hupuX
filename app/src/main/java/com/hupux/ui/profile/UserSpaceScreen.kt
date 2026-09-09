@@ -71,17 +71,18 @@ fun UserSpaceScreen(
 @Composable
 private fun UserSpacePills(selectedIndex: Int, onSelect: (Int) -> Unit) {
     val labels = listOf("发帖", "回帖")
-    val dark = isSystemInDarkTheme()
+    val darkLike = ThemeState.amoled || isSystemInDarkTheme()
+    val selBrush = Brush.verticalGradient(listOf(Color.White, Color(0xFFD8D8D8)))
+    val unselBrush = if (darkLike)
+        Brush.verticalGradient(listOf(Color(0xFF2A2D3A), Color(0xFF1D2028)))
+    else
+        Brush.verticalGradient(listOf(Color(0xFFFF3B4C), Color(0xFFBB0012)))
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         labels.forEachIndexed { i, label ->
             val sel = i == selectedIndex
-            val selBrush = if (dark)
-                Brush.verticalGradient(listOf(Color(0xFF2A2D3A), Color(0xFF1D2028)))
-            else
-                Brush.verticalGradient(listOf(Color.White, Color(0xFFD8D8D8)))
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
@@ -92,8 +93,7 @@ private fun UserSpacePills(selectedIndex: Int, onSelect: (Int) -> Unit) {
                         ambientColor = Color.Black.copy(.25f), spotColor = Color.Black.copy(.25f)
                     )
                     .background(
-                        if (sel) selBrush
-                        else Brush.verticalGradient(listOf(Color(0xFFFF3B4C), Color(0xFFBB0012))),
+                        if (sel) selBrush else unselBrush,
                         RoundedCornerShape(18.dp)
                     )
                     .clickable { onSelect(i) }

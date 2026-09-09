@@ -5,7 +5,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 
 // ── 品牌色（不随主题变化）────────────────────────────────────────────────────
 val HupuRed     = Color(0xFFEA0E20)
@@ -39,6 +41,20 @@ private val DarkScheme = darkColorScheme(
     surfaceVariant   = Color(0xFF1E2330),   // chip/tag bg dark
 )
 
+// AMOLED 省电配色：背景/卡片纯黑，红色仅作小面积强调，防烧屏
+private val AmoledScheme = darkColorScheme(
+    primary          = HupuRed,
+    onPrimary        = Color.White,
+    background       = Color(0xFF000000),   // 纯黑背景
+    surface          = Color(0xFF000000),   // 纯黑卡片
+    onBackground     = Color(0xFFE4E8F2),
+    onSurface        = Color(0xFFE4E8F2),
+    onSurfaceVariant = Color(0xFF8A90A0),
+    outline          = Color(0xFF5A6070),
+    outlineVariant   = Color(0xFF1A1A1A),   // 极暗分割线
+    surfaceVariant   = Color(0xFF121212),   // chip/tag bg（近黑）
+)
+
 // ── 自适应颜色属性（所有 Screen 直接使用，无需改动）────────────────────────────
 //    因为全部在 @Composable 函数内部调用，Kotlin 允许 @Composable getter
 
@@ -57,13 +73,33 @@ val DividerColor  @Composable get() = MaterialTheme.colorScheme.outlineVariant
 /** Chip / Tag 背景 */
 val BgGray        @Composable get() = MaterialTheme.colorScheme.surfaceVariant
 
+// ── 顶栏/导航栏品牌背景（AMOLED 下变纯黑，防大块红色烧屏）──────────────────────
+
+/** 顶部 Header 的品牌渐变（AMOLED 模式为纯黑）*/
+val HeaderBrush: Brush
+    @Composable get() = if (ThemeState.amoled)
+        SolidColor(Color.Black)
+    else
+        Brush.verticalGradient(listOf(HupuRed, Color(0xFFCC000E)))
+
+/** 底部导航栏品牌渐变（AMOLED 模式为纯黑）*/
+val NavBarBrush: Brush
+    @Composable get() = if (ThemeState.amoled)
+        SolidColor(Color.Black)
+    else
+        Brush.verticalGradient(listOf(Color(0xFFCC000E), HupuRed))
+
 // ── 主题入口 ──────────────────────────────────────────────────────────────────
 
 @Composable
 fun HupuXTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
+    val scheme = when {
+        ThemeState.amoled     -> AmoledScheme
+        isSystemInDarkTheme() -> DarkScheme
+        else                  -> LightScheme
+    }
     MaterialTheme(
-        colorScheme = if (dark) DarkScheme else LightScheme,
+        colorScheme = scheme,
         content     = content
     )
 }

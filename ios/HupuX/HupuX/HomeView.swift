@@ -48,6 +48,11 @@ struct HomeView: View {
                     .font(.system(size: 24, weight: .heavy))
                     .foregroundStyle(.white)
                 Spacer()
+                Button { ThemeSettings.shared.toggle() } label: {
+                    Image(systemName: ThemeSettings.shared.amoled ? "sun.max" : "moon.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.white)
+                }
                 Button { showSettings = true } label: {
                     Image(systemName: "gearshape")
                         .font(.system(size: 20))
@@ -67,7 +72,7 @@ struct HomeView: View {
         .padding(.bottom, 12)
         .frame(maxWidth: .infinity)
         .background(
-            LinearGradient(colors: [Theme.red, Theme.redDark],
+            LinearGradient(colors: Theme.headerColors,
                            startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea(edges: .top)
         )
@@ -81,15 +86,10 @@ struct HomeView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
             .background {
-                if selected {
-                    Capsule().fill(
-                        LinearGradient(colors: [.white, Color(hex: 0xD8D8D8)],
-                                       startPoint: .top, endPoint: .bottom))
-                } else {
-                    Capsule().fill(
-                        LinearGradient(colors: [Theme.pillRed, Theme.pillRedDark],
-                                       startPoint: .top, endPoint: .bottom))
-                }
+                Capsule().fill(
+                    LinearGradient(colors: selected ? Theme.pillSelectedColors
+                                                    : Theme.pillUnselectedColors,
+                                   startPoint: .top, endPoint: .bottom))
             }
             .contentShape(Capsule())
             .onTapGesture {

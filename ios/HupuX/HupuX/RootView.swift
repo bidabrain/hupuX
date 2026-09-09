@@ -9,11 +9,17 @@
 import SwiftUI
 
 struct RootView: View {
+    @StateObject private var theme = ThemeSettings.shared
+
     init() {
-        // 红底白图标的底部 TabBar，贴近安卓观感
+        Self.applyTabBarAppearance()
+    }
+
+    /// 底部 TabBar 外观：默认红底、AMOLED 下纯黑底，白图标贴近安卓观感。
+    static func applyTabBarAppearance() {
         let appearance = UITabBarAppearance()
         appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = UIColor(Theme.red)
+        appearance.backgroundColor = UIColor(Theme.tabBarColor)
 
         let item = UITabBarItemAppearance()
         item.normal.iconColor = UIColor.white.withAlphaComponent(0.65)
@@ -44,5 +50,9 @@ struct RootView: View {
         // 导航栏按钮/返回箭头用红色（之前误用 .white 导致浅色栏上看不见）。
         // 底部 TabBar 的白色图标由上面的 UITabBarAppearance 显式控制，不受此影响。
         .tint(Theme.red)
+        // 切换 AMOLED 时：整树重建 + 刷新 TabBar 外观 + 系统组件跟随深浅色
+        .id(theme.amoled)
+        .preferredColorScheme(theme.amoled ? .dark : .light)
+        .onChange(of: theme.amoled) { Self.applyTabBarAppearance() }
     }
 }

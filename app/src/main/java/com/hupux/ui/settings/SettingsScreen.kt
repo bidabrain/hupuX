@@ -81,7 +81,7 @@ fun SettingsScreen(
             Modifier
                 .fillMaxWidth()
                 .background(
-                    Brush.verticalGradient(listOf(HupuRed, Color(0xFFCC000E))),
+                    HeaderBrush,
                     RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
                 )
                 .statusBarsPadding()

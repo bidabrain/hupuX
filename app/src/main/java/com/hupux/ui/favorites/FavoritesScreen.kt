@@ -33,7 +33,7 @@ fun FavoritesScreen(
         Box(
             Modifier
                 .fillMaxWidth()
-                .background(Brush.verticalGradient(listOf(HupuRed, Color(0xFFCC000E))),
+                .background(HeaderBrush,
                     RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
                 .statusBarsPadding()
         ) {

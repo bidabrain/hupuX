@@ -37,7 +37,7 @@ struct HTMLBodyView: UIViewRepresentable {
         <!DOCTYPE html><html><head>
         <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
         <style>
-        body{background:transparent;color:#1A1C2E;font-size:15px;line-height:1.65;
+        body{background:transparent;color:\(Theme.bodyTextHex);font-size:15px;line-height:1.65;
              margin:0;padding:0;word-break:break-word}
         p{margin:6px 0}a{color:#EA0E20}
         img{max-width:100%;height:auto;display:block;margin:8px 0;border-radius:4px}

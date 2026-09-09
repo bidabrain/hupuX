@@ -28,6 +28,9 @@ local.properties
 # ── 签名 keystore（包含私钥，绝对不能上传）────────────────
 *.jks
 *.keystore
+# 例外：app/release.keystore 是本 app 专用的自签名 key，
+# 提交进仓库是为了让 CI 每次用同一把 key 签名，用户可直接覆盖升级。
+!app/release.keystore
 
 # ── 性能分析 / 截图抓取 ───────────────────────────────────
 captures/

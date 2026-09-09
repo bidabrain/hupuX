@@ -19,9 +19,19 @@ android {
         versionName = appVersion
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("release.keystore")
+            storePassword = "hupux2024"
+            keyAlias = "hupux"
+            keyPassword = "hupux2024"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
