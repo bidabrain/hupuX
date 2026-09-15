@@ -69,7 +69,10 @@ GET https://hss.hupu.com/kaleido/hss/app/file/credentials
   - 客户端也可用**标准 OSS `PutObject` 单请求 PUT**（OSS 单对象上限 5GB，普通视频足够），复用图片的 OSS V1 手签逻辑，无需引入 ali-oss SDK。
 - 上传成功后 `POST /kaleido/hss/uploadStatus {fileHash}` → 拿到最终 `fileSrc`，即 **`videoUrl`（`https://v.hoopchina.com.cn/...`）**；`baseName` = 上传时的对象名。
 
-> ⚠️ 视频没有可复用去重的把握时，`width/height` 传 0 即可（它们不参与签名）。
+> ⚠️ **视频不要传 `width/height`**（2026-09 实测）。它们虽然不参与签名，但会被拼进 objectKey：
+> 传 `width=0&height=0` 得到 `editor/<md5>_w_0_h_0_.mp4`，不传才是干净的 `editor/<md5>.mp4`（网页端就不传）。
+> 用随机 hash 连测三次可复现：
+> `width=0&height=0` → `_w_0_h_0_`；不传 → 无后缀；`width=1280&height=720` → `_w_1280_h_720_`。
 
 ## ②（可选）发视频权限校验
 
@@ -120,7 +123,11 @@ Body: {"videoUrl":"<上一步的 videoUrl>"}
 字段确认（★=抓包新确认）：
 - **`title`** = 视频标题，校验 `length >= 4` 且非空白。
 - **`content`** = 「简介」文本，可为空；为空时网页填占位 `<span data-time=<ms> style="display:none"></span>`。
-- **`videoUrl`** 必填 = 上传后的视频地址，**`https://v.hoopchina.com.cn/bbs-editor-web/<视频md5>.mp4?auth_key=<ts>-2-0-<sig>`**。★ 带 `auth_key` 签名参数，直接用 `uploadStatus` 返回值。
+- **`videoUrl`** 必填 = 上传后的视频地址。抓包里带 `?auth_key=<ts>-2-0-<sig>`，但 **`auth_key` 不是必须的**（2026-09 实测）：
+  直接提交 `uploadStatus` 返回的裸地址 `https://v.hoopchina.com.cn/editor/<md5>.mp4` 也能发帖成功，
+  **虎扑在渲染帖子页时会自己给视频地址补签名**（帖子页里同时出现裸地址和带 `auth_key` 的地址，后者可正常播放）。
+  网页端之所以带 `auth_key`，是因为它上传后调了 `GET /pcmapi/pc/bbs/v1/video/auth?url=<urlencode>&h5Nosign=1&scene=pcpreview`
+  → `data.src`（拿签名地址给编辑器里的 `<video>` 做本地预览），顺手把它当成了 videoUrl。客户端可以跳过这一步。
 - **`videoSnapshotUrl`** = 封面，**`https://i5.hoopchina.com.cn/bbs-editor-web/<ts>.jpg`**（`/api/v1/video/cover` 返回的 `data.videoCover`）。★
 - **`videoSource`** = `""`（空）。★
 - **`topicId`** = 专区 id（这里 184）；`zoneId` = 0；`tagIdList` = `""`。
@@ -144,20 +151,48 @@ Body: {"videoUrl":"<上一步的 videoUrl>"}
 ## Android 实现（已完成，2026-07）
 
 - **选视频**：`NewPostScreen` 底栏加「摄像机」按钮 → `PickVisualMedia(VideoOnly)`；视频与图片**互斥**（发视频帖时禁用图片，反之亦然）。
-- **上传**：`HupuImageUploader.uploadVideo(uri)` → 复用通用链路 `runUpload(bytes, "mp4", "video/mp4", "editor-video-oss", "/editor", 0, 0)`，
-  返回 `VideoUploadResult(videoUrl, objectKey)`。**新增长超时 client（write/read 5min）**做 OSS PUT，避免默认 10s 写超时。
+- **上传**：`HupuImageUploader.uploadVideo(uri, onProgress)` → 取凭证后，**超过 4MB 走 OSS 分片并发上传**
+  （2MB 分片 × 5 线程），≤4MB 仍走单次 PUT。按分片偏移读文件（`md5` 也是流式算的），
+  内存占用 = 分片大小 × 并发数，不再把整个视频读进内存。分片失败重试 3 次；
+  每传完一片把 `partNumber`+`ETag` 写进 SharedPreferences 存档，失败后重传同一文件可续传
+  （**不能用 ListParts 恢复**，STS 策略拒绝该动作）。视频**不传** width/height。
 - **封面**：`HupuDesktopScraper.getVideoCover(videoUrl)` → `POST bbs.hupu.com/api/v1/video/cover {videoUrl}` → `data.videoCover`。
 - **UI**：选完视频 → 上传进度卡片 → 类型（转载/原创 pill，默认转载）→ 标题 + 简介输入 → 「发布」。
 - **提交**：`HupuDesktopScraper.createVideoThread(...)`（独立于文字 `createThread`），
   `format.videoInfo.key` = `base64(objectKey + 毫秒)` 在 `PostRepository`（Android 层，用 `android.util.Base64`）算好传入；
   `containsAi` 暂固定 `0`（内容无需标注）；`shumeiId` 传 `""`（app 无数美 SDK）。
 
+- **进度**：`uploadVideo` 的 `onProgress(uploaded, total)` 回调按已完成分片上报，UI 显示真实百分比。
+
 涉及文件：`HupuImageUploader.kt`(uploadVideo)、`HupuDesktopScraper.kt`(getVideoCover/createVideoThread)、
 `PostRepository.kt`、`NewPostViewModel.kt`、`NewPostScreen.kt`。
+桌面端同构实现在 `DesktopImageUploader.kt`（存档落 `~/.hupux/upload-checkpoints/<md5>.json`），
+iOS 在 `HupuUploader.swift`（`uploadVideo(fileURL:onProgress:)`，`PickedVideo` 把选中的视频落到临时文件再分片读，
+存档走 UserDefaults）。
 
-> ⚠️ 尚未端到端实弹验证：视频上传/封面/发布分别打到 `hss.hupu.com`、`bbs.hupu.com`，
-> 当前出口 IP 的 `bbs.hupu.com` 被 WAF 限流，`cover`/`createThread` 联调需等冷却或换网络；
-> 且发布会公开一条视频帖。`shumeiId=""` 是否被视频风控接受、`getVideoCover` 是否确为 POST，均待实测确认。
+## 端到端实测结论（2026-09-16）
+
+已用真实账号跑通全链路并成功发帖（tid 642435454，足球话题区），确认：
+
+- `shumeiId` 传 `""` **视频风控接受**，不影响发帖成功；
+- `getVideoCover` 确为 **POST** `/api/v1/video/cover`，响应 `code` 是 **200**（不是 `1`），取 `data.videoCover`；
+- `createThread` 的 body 结构与本文一致，**裸 videoUrl（无 auth_key）也被接受**，帖子页视频可正常播放；
+- `topicId` 用不存在的值会返回 `code:2311 / PC070001`（可作为不真发帖的探测手段）。
+
+## 上传性能与限制（2026-09-16 实测）
+
+| 观测项 | 实测值 |
+|---|---|
+| STS 凭证有效期 | **900 秒**，且**不可续期**——同一 `fileHash` 重复取凭证返回的是**同一个 token 和同一个 expiration**（服务端按 hash 缓存） |
+| 单次 PUT 吞吐 | 16.1MB / 498s ≈ **32 KB/s**（单连接被限速） |
+| 单个分片吞吐 | 4MB / 65s ≈ **63 KB/s** |
+| **2MB 分片 × 5 并发（现实现）** | 同一个 16.1MB 文件 **113s ≈ 139 KB/s**，比单次 PUT 快 **4.4 倍** |
+| `oss:ListParts` | **被 STS 会话策略拒绝**（`AccessDenied / ImplicitDeny`），续传只能自己在本地记分片 ETag |
+
+结论：单次 PUT 在 15 分钟窗口内只能传约 **28MB**，大视频必然超时；换成 2MB×5 并发后同一条线路可传约 **120MB**。
+客户端应走 **OSS 分片并发上传**
+（`InitiateMultipartUpload` / `UploadPart` / `CompleteMultipartUpload` 手签，STS 凭证允许这三个动作），
+2MB 分片 + 5 并发，并把已完成分片的 `partNumber`+`ETag` 存在本地做断点续传。
 
 ---
 

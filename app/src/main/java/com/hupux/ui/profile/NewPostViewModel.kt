@@ -28,7 +28,9 @@ data class VideoItem(
     val videoUrl: String? = null,
     val coverUrl: String? = null,
     val objectKey: String? = null,
-    val errorMsg: String? = null
+    val errorMsg: String? = null,
+    /** 上传进度 0f~1f，分片上传时按已完成分片实时更新 */
+    val progress: Float = 0f
 ) {
     enum class Status { Uploading, Done, Error }
 }
@@ -59,7 +61,13 @@ class NewPostViewModel constructor(
         _state.update { it.copy(video = VideoItem(uri, VideoItem.Status.Uploading), error = null) }
         videoJob = viewModelScope.launch {
             runCatching {
-                val up    = postRepo.uploadVideo(uri)
+                val up    = postRepo.uploadVideo(uri) { uploaded, total ->
+                    // 分片并发上传，回调来自多个线程；只做一次原子 update
+                    val p = if (total > 0) uploaded.toFloat() / total else 0f
+                    _state.update { s ->
+                        s.copy(video = s.video?.takeIf { it.uri == uri }?.copy(progress = p) ?: s.video)
+                    }
+                }
                 val cover = postRepo.getVideoCover(up.videoUrl)
                 Triple(up.videoUrl, cover, up.objectKey)
             }.onSuccess { (videoUrl, cover, objectKey) ->

@@ -350,10 +350,20 @@ private fun VideoCard(video: VideoItem, onRemove: () -> Unit) {
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(30.dp), color = Color.White, strokeWidth = 2.dp)
+                        if (video.progress > 0f) {
+                            CircularProgressIndicator(
+                                progress = { video.progress },
+                                modifier = Modifier.size(30.dp), color = Color.White, strokeWidth = 2.dp)
+                        } else {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(30.dp), color = Color.White, strokeWidth = 2.dp)
+                        }
                         Spacer(Modifier.height(8.dp))
-                        Text("视频上传中…", color = Color.White, fontSize = 12.sp)
+                        Text(
+                            if (video.progress > 0f) "视频上传中 ${(video.progress * 100).toInt()}%"
+                            else "视频上传中…",
+                            color = Color.White, fontSize = 12.sp
+                        )
                     }
                 }
                 VideoItem.Status.Error -> Box(

@@ -288,9 +288,12 @@ private fun NewVideoDialog(
                                 uploading = true; status = "选择视频中…"
                                 val file = pickVideoFile()
                                 if (file == null) { uploading = false; status = null; return@launch }
-                                status = "上传中…（视频较大，请耐心等待）"
+                                status = "上传中… 0%"
                                 try {
-                                    val up = imageUploader.uploadVideo(file)
+                                    val up = imageUploader.uploadVideo(file) { uploaded, total ->
+                                        val pct = if (total > 0) uploaded * 100 / total else 0
+                                        status = "上传中… $pct%"
+                                    }
                                     status = "获取封面中…"
                                     val cover = desktopScraper.getVideoCover(up.videoUrl)
                                     videoUrl = up.videoUrl; coverUrl = cover; objectKey = up.objectKey

@@ -59,9 +59,12 @@ class PostRepository constructor(
     suspend fun uploadImageForReply(uri: Uri): String =
         withContext(Dispatchers.IO) { imageUploader.upload(uri, "reply-oss", "/reply") }
 
-    /** 上传视频（module=editor-video-oss），返回 videoUrl + objectKey */
-    suspend fun uploadVideo(uri: Uri): VideoUploadResult =
-        withContext(Dispatchers.IO) { imageUploader.uploadVideo(uri) }
+    /** 上传视频（module=editor-video-oss），返回 videoUrl + objectKey。[onProgress] 回调来自上传线程池。 */
+    suspend fun uploadVideo(
+        uri: Uri,
+        onProgress: ((uploaded: Long, total: Long) -> Unit)? = null
+    ): VideoUploadResult =
+        withContext(Dispatchers.IO) { imageUploader.uploadVideo(uri, onProgress) }
 
     /** 用 videoUrl 换取封面地址 */
     suspend fun getVideoCover(videoUrl: String): String =

@@ -8,6 +8,8 @@
 import SwiftUI
 import PhotosUI
 import Shared
+import CoreTransferable
+import UniformTypeIdentifiers
 
 struct NewPostView: View {
     let topicId: Int32
@@ -23,6 +25,7 @@ struct NewPostView: View {
     @State private var coverUrl: String?
     @State private var objectKey: String?
     @State private var uploadingVideo = false
+    @State private var videoProgress: Double = 0     // 0~1，分片上传实时进度
     @State private var creationType = "REPRINT"   // REPRINT=转载, ORIGINAL=原创
 
     @State private var posting = false
@@ -110,11 +113,17 @@ struct NewPostView: View {
                 }
             } else {
                 PhotosPicker(selection: $videoItem, matching: .videos) {
-                    Label(uploadingVideo ? "视频上传中…" : "添加视频", systemImage: "video")
+                    Label(uploadingVideo ? "视频上传中 \(Int(videoProgress * 100))%" : "添加视频", systemImage: "video")
                         .font(.system(size: 14)).foregroundStyle(uploadingVideo ? Theme.textTertiary : Theme.red)
                 }
                 .disabled(uploadingVideo)
-                if uploadingVideo { ProgressView().controlSize(.small) }
+                if uploadingVideo {
+                    if videoProgress > 0 {
+                        ProgressView(value: videoProgress).controlSize(.small).frame(width: 80)
+                    } else {
+                        ProgressView().controlSize(.small)
+                    }
+                }
             }
         }
         .onChange(of: videoItem) { item in
@@ -136,10 +145,22 @@ struct NewPostView: View {
 
     private func handleVideo(_ item: PhotosPickerItem) async {
         uploadingVideo = true
+        videoProgress = 0
         errorText = nil
+        // 落到临时文件再分片上传，避免把整个视频读进内存（大视频会 OOM）
+        var tempURL: URL?
+        defer {
+            if let tempURL { try? FileManager.default.removeItem(at: tempURL) }
+        }
         do {
-            guard let data = try await item.loadTransferable(type: Data.self) else { uploadingVideo = false; return }
-            let up = try await HupuUploader().uploadVideo(data)
+            guard let movie = try await item.loadTransferable(type: PickedVideo.self) else {
+                uploadingVideo = false; return
+            }
+            tempURL = movie.url
+            let up = try await HupuUploader().uploadVideo(fileURL: movie.url) { uploaded, total in
+                let p = total > 0 ? Double(uploaded) / Double(total) : 0
+                Task { @MainActor in videoProgress = p }
+            }
             let cover = try await Deps.shared.desktopScraper.getVideoCover(videoUrl: up.videoUrl)
             videoUrl = up.videoUrl
             objectKey = up.objectKey
@@ -173,6 +194,24 @@ struct NewPostView: View {
         } catch {
             errorText = error.localizedDescription
             posting = false
+        }
+    }
+}
+
+/// PhotosPicker 选中的视频以**文件**形式导入到临时目录，供分片上传按需读取，
+/// 避免 `loadTransferable(type: Data.self)` 把整个视频读进内存。
+struct PickedVideo: Transferable {
+    let url: URL
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(contentType: .movie) { video in
+            SentTransferredFile(video.url)
+        } importing: { received in
+            let dst = FileManager.default.temporaryDirectory
+                .appendingPathComponent("hupux-upload-\(UUID().uuidString).mp4")
+            try? FileManager.default.removeItem(at: dst)
+            try FileManager.default.copyItem(at: received.file, to: dst)
+            return PickedVideo(url: dst)
         }
     }
 }
