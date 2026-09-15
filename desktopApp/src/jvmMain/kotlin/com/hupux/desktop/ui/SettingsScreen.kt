@@ -15,20 +15,30 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.hupux.data.GITHUB_RELEASES_URL
+import com.hupux.data.UpdateChecker
 import com.hupux.desktop.BuildConfig
 import com.hupux.desktop.data.DesktopCookieStorage
 import com.hupux.desktop.ui.theme.*
+import kotlinx.coroutines.launch
 import java.awt.Desktop
 import java.net.URI
 
 private const val GITHUB_URL = "https://github.com/bidabrain/hupuX"
 
 @Composable
-fun SettingsScreen(cookieStorage: DesktopCookieStorage) {
+fun SettingsScreen(cookieStorage: DesktopCookieStorage, updateChecker: UpdateChecker) {
     var cookieInput by remember { mutableStateOf(cookieStorage.cookie) }
     var saved by remember { mutableStateOf(false) }
     var signatureInput by remember { mutableStateOf(cookieStorage.replySignature) }
     var signatureSaved by remember { mutableStateOf(false) }
+
+    // 检查更新
+    val scope = rememberCoroutineScope()
+    var checking by remember { mutableStateOf(false) }
+    var updateMsg by remember { mutableStateOf<String?>(null) }
+    var hasUpdate by remember { mutableStateOf(false) }
+    var releaseUrl by remember { mutableStateOf(GITHUB_RELEASES_URL) }
 
     Column(
         Modifier
@@ -162,6 +172,48 @@ fun SettingsScreen(cookieStorage: DesktopCookieStorage) {
                     Text("版本", fontSize = 14.sp, color = TextSecondary)
                     Spacer(Modifier.weight(1f))
                     Text(BuildConfig.VERSION_NAME, fontSize = 14.sp, color = TextPrimary)
+                    Spacer(Modifier.width(4.dp))
+                    TextButton(
+                        enabled = !checking,
+                        onClick = {
+                            checking = true
+                            updateMsg = null
+                            scope.launch {
+                                val r = updateChecker.check(BuildConfig.VERSION_NAME)
+                                hasUpdate  = r.hasUpdate
+                                releaseUrl = r.releaseUrl
+                                updateMsg = when {
+                                    r.error != null -> "检查失败：${r.error}"
+                                    r.hasUpdate     -> "有新版本 ${r.latest}"
+                                    else            -> "已更新至最新版本"
+                                }
+                                checking = false
+                            }
+                        }
+                    ) {
+                        if (checking) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(14.dp), color = HupuRed, strokeWidth = 2.dp)
+                        } else {
+                            Text("检查更新", color = HupuRed, fontWeight = FontWeight.Medium)
+                        }
+                    }
+                }
+                updateMsg?.let { msg ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            msg, fontSize = 12.sp,
+                            color = if (hasUpdate) HupuRed else TextSecondary,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (hasUpdate) {
+                            TextButton(onClick = {
+                                runCatching { Desktop.getDesktop().browse(URI(releaseUrl)) }
+                            }) {
+                                Text("去下载", color = HupuRed, fontWeight = FontWeight.Medium)
+                            }
+                        }
+                    }
                 }
                 HorizontalDivider(Modifier.padding(vertical = 10.dp), color = DividerColor)
                 Row(verticalAlignment = Alignment.CenterVertically) {

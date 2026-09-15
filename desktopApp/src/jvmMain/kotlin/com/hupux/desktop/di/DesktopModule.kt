@@ -3,6 +3,7 @@ package com.hupux.desktop.di
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import com.hupux.data.CookieStorage
+import com.hupux.data.UpdateChecker
 import com.hupux.data.repository.FavoritesRepository
 import com.hupux.data.repository.FollowedZonesRepository
 import com.hupux.data.repository.HomeRepository
@@ -54,6 +55,7 @@ val desktopModule = module {
     single { DesktopImageUploader(get(), get<DesktopCookieStorage>()) }
     single { HupuScraper(get()) }
     single { HupuDesktopScraper(get(), get<CookieStorage>()) }
+    single { UpdateChecker(get()) }
 
     single { HomeRepository(get()) }
     single { ZoneRepository(get()) }

@@ -18,6 +18,12 @@ struct SettingsView: View {
     @State private var signatureSaved = false
     @State private var cookieSaved = false
 
+    // 检查更新
+    @State private var checkingUpdate = false
+    @State private var updateMessage: String?
+    @State private var hasUpdate = false
+    @State private var releaseUrl = "https://github.com/bidabrain/hupuX/releases/latest"
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -149,10 +155,29 @@ struct SettingsView: View {
         card {
             VStack(alignment: .leading, spacing: 12) {
                 Text("关于").font(.system(size: 16, weight: .bold)).foregroundStyle(Theme.textPrimary)
-                HStack {
+                HStack(spacing: 8) {
                     Text("版本").font(.system(size: 14)).foregroundStyle(Theme.textSecondary)
                     Spacer()
                     Text(appVersion).font(.system(size: 14)).foregroundStyle(Theme.textPrimary)
+                    if checkingUpdate {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Button("检查更新") { Task { await checkUpdate() } }
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Theme.red)
+                    }
+                }
+                if let msg = updateMessage {
+                    HStack {
+                        Text(msg).font(.system(size: 12))
+                            .foregroundStyle(hasUpdate ? Theme.red : Theme.textSecondary)
+                        Spacer()
+                        if hasUpdate, let url = URL(string: releaseUrl) {
+                            Link("去下载", destination: url)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(Theme.red)
+                        }
+                    }
                 }
                 HStack {
                     Text("开源地址").font(.system(size: 14)).foregroundStyle(Theme.textSecondary)
@@ -169,6 +194,33 @@ struct SettingsView: View {
         let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
         let b = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
         return "\(v) (\(b))"
+    }
+
+    /// 只取 CFBundleShortVersionString 参与比较（不含 build 号）
+    private var shortVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    }
+
+    /// 对比 GitHub 最新 release 的 tag 与当前版本
+    private func checkUpdate() async {
+        checkingUpdate = true
+        updateMessage = nil
+        do {
+            let r = try await Deps.shared.updateChecker.check(currentVersion: shortVersion)
+            hasUpdate = r.hasUpdate
+            releaseUrl = r.releaseUrl
+            if let err = r.error {
+                updateMessage = "检查失败：\(err)"
+            } else if r.hasUpdate {
+                updateMessage = "有新版本 \(r.latest)"
+            } else {
+                updateMessage = "已更新至最新版本"
+            }
+        } catch {
+            hasUpdate = false
+            updateMessage = "检查失败：\(error.localizedDescription)"
+        }
+        checkingUpdate = false
     }
 
     private func card<Content: View>(@ViewBuilder content: () -> Content) -> some View {

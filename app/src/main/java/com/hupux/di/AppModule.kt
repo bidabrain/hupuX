@@ -14,6 +14,7 @@ import com.hupux.data.repository.MessageRepository
 import com.hupux.data.repository.PostRepository
 import com.hupux.data.repository.ProfileRepository
 import com.hupux.data.repository.ZoneRepository
+import com.hupux.data.UpdateChecker
 import com.hupux.data.scraper.HupuDesktopScraper
 import com.hupux.data.scraper.HupuImageUploader
 import com.hupux.data.scraper.HupuScraper
@@ -77,6 +78,7 @@ val appModule = module {
     // ── Scrapers ──────────────────────────────────────────────────────────────
     single { HupuScraper(get()) }
     single { HupuDesktopScraper(get(), get<CookieStorage>()) }
+    single { UpdateChecker(get()) }
     single { HupuImageUploader(get(), get<CookiePreferences>(), androidContext()) }
 
     // ── Repositories ──────────────────────────────────────────────────────────
@@ -101,7 +103,7 @@ val appModule = module {
     viewModel { (handle: SavedStateHandle) -> UserReplyListViewModel(get(), handle) }
     viewModel { (handle: SavedStateHandle) -> UserThreadListViewModel(get(), handle) }
     viewModel { UserWebViewViewModel(get<CookiePreferences>()) }
-    viewModel { SettingsViewModel(get<CookiePreferences>(), androidContext()) }
+    viewModel { SettingsViewModel(get<CookiePreferences>(), androidContext(), get()) }
     viewModel { ZoneDetailViewModel(get(), get<CookiePreferences>()) }
     viewModel { ZoneListViewModel(get(), get()) }
     viewModel { TopicDetailViewModel(get()) }

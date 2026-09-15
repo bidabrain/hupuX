@@ -46,6 +46,7 @@ fun SettingsScreen(
     val saved          by vm.saved.collectAsState()
     val signature      by vm.signature.collectAsState()
     val signatureSaved by vm.signatureSaved.collectAsState()
+    val updateState    by vm.updateState.collectAsState()
     val context = LocalContext.current
 
     // 权限 launcher（仅 API 26-28 需要）
@@ -265,6 +266,39 @@ fun SettingsScreen(
                         Text("版本", fontSize = 14.sp, color = TextSecondary)
                         Spacer(Modifier.weight(1f))
                         Text("${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", fontSize = 14.sp, color = TextPrimary)
+                        Spacer(Modifier.width(4.dp))
+                        TextButton(
+                            onClick = { vm.checkUpdate() },
+                            enabled = !updateState.checking
+                        ) {
+                            if (updateState.checking) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(14.dp), color = HupuRed, strokeWidth = 2.dp)
+                            } else {
+                                Text("检查更新", color = HupuRed, fontWeight = FontWeight.Medium)
+                            }
+                        }
+                    }
+                    updateState.message?.let { msg ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                msg, fontSize = 12.sp,
+                                color = if (updateState.hasUpdate) HupuRed else TextSecondary,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (updateState.hasUpdate) {
+                                TextButton(onClick = {
+                                    context.startActivity(
+                                        Intent(Intent.ACTION_VIEW, Uri.parse(updateState.releaseUrl))
+                                    )
+                                }) {
+                                    Text("去下载", color = HupuRed, fontWeight = FontWeight.Medium)
+                                }
+                            }
+                        }
                     }
                     Spacer(Modifier.height(10.dp))
                     HorizontalDivider(color = AppBg)

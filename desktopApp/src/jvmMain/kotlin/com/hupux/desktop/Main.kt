@@ -12,6 +12,7 @@ import com.hupux.data.repository.HomeRepository
 import com.hupux.data.repository.MessageRepository
 import com.hupux.data.repository.ProfileRepository
 import com.hupux.data.repository.ZoneRepository
+import com.hupux.data.UpdateChecker
 import com.hupux.data.scraper.HupuDesktopScraper
 import com.hupux.data.scraper.HupuScraper
 import com.hupux.desktop.data.DesktopCookieStorage
@@ -39,7 +40,8 @@ fun main() {
                 scraper        = koin.get<HupuScraper>(),
                 desktopScraper = koin.get<HupuDesktopScraper>(),
                 imageUploader  = koin.get<DesktopImageUploader>(),
-                cookieStorage  = koin.get<DesktopCookieStorage>()
+                cookieStorage  = koin.get<DesktopCookieStorage>(),
+                updateChecker  = koin.get<UpdateChecker>()
             )
         }
     }

@@ -24,6 +24,7 @@ import com.hupux.data.repository.HomeRepository
 import com.hupux.data.repository.MessageRepository
 import com.hupux.data.repository.ProfileRepository
 import com.hupux.data.repository.ZoneRepository
+import com.hupux.data.UpdateChecker
 import com.hupux.data.scraper.HupuDesktopScraper
 import com.hupux.data.scraper.HupuScraper
 import com.hupux.desktop.data.DesktopCookieStorage
@@ -67,7 +68,8 @@ fun App(
     scraper:        HupuScraper,
     desktopScraper: HupuDesktopScraper,
     imageUploader:  DesktopImageUploader,
-    cookieStorage:  DesktopCookieStorage
+    cookieStorage:  DesktopCookieStorage,
+    updateChecker:  UpdateChecker
 ) {
     val backStack = remember { mutableStateListOf<Screen>(Screen.Home) }
     val current by derivedStateOf { backStack.last() }
@@ -206,7 +208,7 @@ fun App(
                     }
                 )
 
-                is Screen.Settings -> SettingsScreen(cookieStorage)
+                is Screen.Settings -> SettingsScreen(cookieStorage, updateChecker)
 
                 is Screen.Messages -> MessagesScreen(messageRepo) { tid -> push(Screen.PostDetail(tid)) }
 

@@ -1,6 +1,7 @@
 package com.hupux.ios
 
 import app.cash.sqldelight.driver.native.NativeSqliteDriver
+import com.hupux.data.UpdateChecker
 import com.hupux.data.repository.FavoritesRepository
 import com.hupux.data.repository.FollowedZonesRepository
 import com.hupux.data.repository.HomeRepository
@@ -36,6 +37,7 @@ class IosDependencies {
 
     val hupuScraper = HupuScraper(httpClient)
     val desktopScraper = HupuDesktopScraper(httpClient, cookieStorage)
+    val updateChecker = UpdateChecker(httpClient)
 
     val homeRepository = HomeRepository(hupuScraper)
     val zoneRepository = ZoneRepository(hupuScraper)
