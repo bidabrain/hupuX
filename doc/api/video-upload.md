@@ -204,3 +204,20 @@ iOS 在 `HupuUploader.swift`（`uploadVideo(fileURL:onProgress:)`，`PickedVideo
 - **封面接口**：`getVideoCover → request("/api/v1/video/cover",{videoUrl})`，成功取 `data.videoCover`。
 - **提交体**：源码 `submit()` 确认 `{title, content, videoSnapshotUrl, videoUrl, videoSource, topicId, tagIdList, shumeiId, zoneId, creationType, containsAi, format}` → `createThread`。
 - ⚠️ 未做实弹发帖验证（会公开发一条视频帖，且当前出口 IP 的 `bbs.hupu.com` 被阿里云 WAF 限流，服务端联调需等冷却或换网络）。
+
+## 踩坑记录：OkHttp 的 Content-Type charset（2026-09-16）
+
+合并分片（`CompleteMultipartUpload`）报 `403 SignatureDoesNotMatch`，原因是
+**OkHttp 的 `String.toRequestBody(mediaType)` 会把 Content-Type 补成
+`application/xml; charset=utf-8`**，而 OSS V1 签名里签的是 `application/xml`，两者对不上。
+
+curl 实证（同一个 uploadId 连发两次）：
+
+| 签名值 | 实际发送的 Content-Type | 结果 |
+|---|---|---|
+| `application/xml` | `application/xml; charset=utf-8` | `SignatureDoesNotMatch` |
+| `application/xml` | `application/xml` | 成功 |
+
+修法：用 `xml.toByteArray().toRequestBody("application/xml".toMediaType())`，
+`ByteArray` 版不会追加 charset。图片上传一直正常就是因为它走的 `ByteArray` 版。
+iOS 用 URLSession 手动 `setValue` header，不受影响。

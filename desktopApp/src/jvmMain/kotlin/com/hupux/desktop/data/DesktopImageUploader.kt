@@ -244,7 +244,9 @@ class DesktopImageUploader(
         val resp = ossCall(
             Request.Builder()
                 .url("${cred.host}/${cred.objectKey}$sub")
-                .post(xml.toRequestBody("application/xml".toMediaType()))
+                // 必须用 ByteArray 版：String.toRequestBody 会把 Content-Type 补成
+                // "application/xml; charset=utf-8"，与签名里的 "application/xml" 对不上 → SignatureDoesNotMatch
+                .post(xml.toByteArray().toRequestBody("application/xml".toMediaType()))
                 .ossHeaders(cred, date, "application/xml", "POST", sub)
                 .build()
         )
