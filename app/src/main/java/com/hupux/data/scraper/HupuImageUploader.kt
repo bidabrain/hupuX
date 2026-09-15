@@ -180,7 +180,7 @@ class HupuImageUploader constructor(
 
         val pool = Executors.newFixedThreadPool(PART_CONCURRENCY)
         try {
-            val tasks = (1..partCount).filter { it !in done }.map { part ->
+            val tasks = (1..partCount).filter { !done.containsKey(it) }.map { part ->
                 Callable<Unit> {
                     val offset = (part - 1).toLong() * PART_SIZE
                     val len    = partLength(part, partCount, size)
