@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
@@ -39,6 +40,7 @@ import androidx.compose.ui.unit.sp
 import org.koin.androidx.compose.koinViewModel
 import coil3.compose.AsyncImage
 import androidx.compose.material.icons.outlined.Settings
+import com.hupux.data.model.HomeMatch
 import com.hupux.data.model.HotItem
 import com.hupux.data.model.Post
 import com.hupux.ui.theme.*
@@ -56,6 +58,7 @@ fun HomeScreen(
 ) {
     val state         by vm.state.collectAsState()
     val followedCount by vm.followedCount.collectAsState()
+    val homeMatches   by vm.homeMatches.collectAsState()
 
     val recommendListState = rememberLazyListState()
     val hotListState       = rememberLazyListState()
@@ -124,6 +127,12 @@ fun HomeScreen(
                     } else if (state.isLoading) {
                         Box(Modifier.fillMaxWidth().height(220.dp)
                             .background(BgGray))
+                    }
+
+                    // 今日比分横条（在 hero 与 Tab 之间，随 header 一起上滑隐藏）
+                    if (homeMatches.isNotEmpty()) {
+                        Spacer(Modifier.height(10.dp))
+                        TodayScoreStrip(homeMatches)
                     }
 
                     // Plastic tabs
@@ -529,5 +538,72 @@ fun PillButton(label: String, onClick: () -> Unit) {
             .padding(horizontal = 28.dp)
     ) {
         Text(label, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+    }
+}
+
+// ─── 今日比分横条 ─────────────────────────────────────────────────────────────
+// 数据来自虎扑首页内联的 cardDataList，联赛覆盖比赛程接口全（含西甲/德甲/意甲等），
+// 但没有 matchId，所以只展示、不可点。
+
+@Composable
+private fun TodayScoreStrip(matches: List<HomeMatch>) {
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(matches.size) { i -> ScoreChip(matches[i]) }
+    }
+}
+
+@Composable
+private fun ScoreChip(match: HomeMatch) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = CardBg,
+        shadowElevation = 1.dp,
+        modifier = Modifier.width(150.dp)
+    ) {
+        Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    match.leagueType, fontSize = 10.sp, color = TextTertiary,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    if (match.hasScore) match.status else match.desc.substringAfter("号 ", match.desc),
+                    fontSize = 10.sp,
+                    color = if (match.hasScore) TextTertiary else HupuRed
+                )
+            }
+            Spacer(Modifier.height(6.dp))
+            TeamLine(match.homeLogo, match.homeName, match.homeScore)
+            Spacer(Modifier.height(4.dp))
+            TeamLine(match.awayLogo, match.awayName, match.awayScore)
+        }
+    }
+}
+
+@Composable
+private fun TeamLine(logo: String, name: String, score: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        AsyncImage(
+            model = logo, contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.size(16.dp).clip(CircleShape)
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            name, fontSize = 12.sp, color = TextPrimary,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        Spacer(Modifier.width(4.dp))
+        Text(
+            score.ifEmpty { "-" },
+            fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary
+        )
     }
 }

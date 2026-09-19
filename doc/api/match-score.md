@@ -150,3 +150,38 @@ data.pageResult.data[]          被评分的条目
 
 Android UI 在 `app/src/main/java/com/hupux/ui/score/`，底部导航第 3 项「评分」。
 当前为**只读版**：只展示评分与统计，不含打分和评论（那部分需要登录态与提交接口）。
+
+---
+
+## 五、首页「今日比分」横条（www.hupu.com）
+
+**没有独立接口**：数据是服务端渲染进 `https://www.hupu.com/` 首页 HTML 的内联
+`vdata`，键名 `cardDataList`。首页 JS（`pc-hupuhome-web/bbsIndex_*.js`）只是从
+`vdata` 里读这个字段，不存在任何客户端请求，所以只能抓 HTML 解析。
+
+```json
+{"matchTime":"2026-11-01 19:35:00","leagueType":"CBA","matchStatusChinese":"未开始",
+ "homeScore":null,"awayScore":null,"homeTeamName":"吉林","awayTeamName":"广州",
+ "homeTeamLogo":"...","awayTeamLogo":"...","currentQuarter":"1","desc":"11月1号 19:35"}
+```
+
+一次约 **278 场**，时间跨度可达数月（不止「最近两日」，页面只是截取展示）。
+
+### 价值：联赛覆盖比赛程接口全得多
+
+实测含 **CBA / NBA / 英超 / 西甲 / 德甲 / 意甲 / 法甲 / 中超 / 欧联 / 英联杯 /
+亚冠二级 / 美职联 / 北冠杯 / 亚运男女足 / U20女世界杯**——
+正好补上了赛程接口找不到 businessId 的那些联赛。
+
+`matchStatusChinese` 观测到 `未开始` / `已结束` / `已经取消`；
+字段里有 `currentQuarter` 和实时比分位，**进行中的比赛应该能看到实时比分**
+（抓取时无进行中比赛，未能验证）。
+
+### 限制：没有 matchId
+
+每条只有队名、队标、比分、时间，**没有任何 id 或链接**，因此
+**无法据此打开评分页**（评分需要 `scoreOutBizType` / `scoreOutBizNo` 业务键）。
+所以它只是展示用的补充，替代不了赛程接口。
+
+hupuX 里由 `HupuMatchScraper.fetchHomeMatches()` 抓取，展示在首页 hero 与
+推荐 Tab 之间的横向滚动条里（随 header 一起上滑隐藏）。

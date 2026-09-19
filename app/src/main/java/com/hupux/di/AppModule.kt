@@ -92,7 +92,7 @@ val appModule = module {
     single { PostRepository(get(), get(), get<CookiePreferences>(), get()) }
 
     // ── ViewModels ────────────────────────────────────────────────────────────
-    viewModel { HomeViewModel(get(), get(), get()) }
+    viewModel { HomeViewModel(get(), get(), get(), get()) }
     viewModel { PostDetailViewModel(get(), get<CookiePreferences>()) }
     viewModel { LoginWebViewViewModel(get<CookiePreferences>()) }
     viewModel { MessageViewModel(get()) }

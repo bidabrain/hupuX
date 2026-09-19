@@ -66,3 +66,32 @@ data class MatchScoreBoard(
     val raterText: String,
     val items: List<ScoredItem>
 )
+
+/**
+ * 虎扑首页顶部滚动条里的比分卡片。
+ *
+ * 与 [MatchItem] 的区别：这份数据来自 www.hupu.com 首页内联的 `cardDataList`，
+ * **联赛覆盖更全**（含西甲/德甲/意甲/法甲/中超等赛程接口没有的联赛），
+ * 但**没有 matchId / 业务键**，所以只能展示、点不进评分。
+ */
+data class HomeMatch(
+    /** "CBA" / "英超第5轮" / "西甲第6轮" */
+    val leagueType: String,
+    /** "未开始" / "已结束" / "已经取消" */
+    val status: String,
+    /** "11月1号 19:35" */
+    val desc: String,
+    /** "2026-11-01 19:35:00" */
+    val matchTime: String,
+    val homeName: String,
+    val awayName: String,
+    val homeLogo: String,
+    val awayLogo: String,
+    /** 未开赛为空 */
+    val homeScore: String,
+    val awayScore: String
+) {
+    val hasScore: Boolean get() = homeScore.isNotEmpty() && awayScore.isNotEmpty()
+    /** yyyy-MM-dd */
+    val date: String get() = matchTime.substringBefore(' ')
+}

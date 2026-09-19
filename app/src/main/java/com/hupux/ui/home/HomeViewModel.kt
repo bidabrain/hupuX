@@ -2,11 +2,13 @@ package com.hupux.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hupux.data.model.HomeMatch
 import com.hupux.data.model.HotItem
 import com.hupux.data.model.Post
 import com.hupux.data.repository.FollowedZonesRepository
 import com.hupux.data.repository.HomeRepository
 import com.hupux.data.repository.ZoneRepository
+import com.hupux.data.scraper.HupuMatchScraper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.*
@@ -34,7 +36,8 @@ data class HomeUiState(
 class HomeViewModel constructor(
     private val homeRepo:     HomeRepository,
     private val zoneRepo:     ZoneRepository,
-    private val followedRepo: FollowedZonesRepository
+    private val followedRepo: FollowedZonesRepository,
+    private val matchScraper: HupuMatchScraper
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(HomeUiState())
@@ -45,7 +48,22 @@ class HomeViewModel constructor(
         .map { it.size }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
-    init { loadRecommend() }
+    /** 首页顶部「今日比分」横条。独立于 HomeUiState，避免 loadRecommend 整体重置时被清空。 */
+    private val _homeMatches = MutableStateFlow<List<HomeMatch>>(emptyList())
+    val homeMatches = _homeMatches.asStateFlow()
+
+    init {
+        loadRecommend()
+        loadHomeMatches()
+    }
+
+    /** 比分条属于锦上添花，抓取失败就静默留空，不影响首页其余内容 */
+    private fun loadHomeMatches() {
+        viewModelScope.launch {
+            runCatching { matchScraper.fetchHomeMatches() }
+                .onSuccess { _homeMatches.value = it }
+        }
+    }
 
     fun loadRecommend() {
         viewModelScope.launch {

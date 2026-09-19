@@ -1,5 +1,6 @@
 package com.hupux.data.scraper
 
+import com.hupux.data.model.HomeMatch
 import com.hupux.data.model.MatchDay
 import com.hupux.data.model.MatchItem
 import com.hupux.data.model.MatchScoreBoard
@@ -9,6 +10,12 @@ import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
+import kotlinx.datetime.Clock
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
+import kotlinx.datetime.plus
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 
@@ -127,18 +134,19 @@ class HupuMatchScraper(private val client: HttpClient) {
             "https://m.hupu.com/"
         )
         val data = parseJsonObject(body).obj("data") ?: return MatchScoreBoard("", "", emptyList())
-        val self = data.obj("self")
-        val title = self?.obj("node")?.str("name") ?: ""
-        val raters = self?.long_("summedScorePersonCount") ?: 0L
+        // 注意：评分字段（scoreAvg / scorePersonCount / commentCount）都在 node 里面，
+        // 不在条目顶层——条目顶层只有 groupId / nodeId / node / subNodes 这些结构字段。
+        val selfNode = data.obj("self")?.obj("node")
+        val title  = selfNode?.str("name") ?: ""
+        val raters = selfNode?.long_("summedScorePersonCount") ?: 0L
 
         val list = data.obj("pageResult")?.arr("data") ?: EmptyJsonArray
         val items = list.mapNotNull { el ->
-            val entry = el.obj
-            val node  = entry.obj("node") ?: return@mapNotNull null
-            val info  = node.obj("infoJson")
-            val score = entry.str("scoreAvg")?.toDoubleOrNull() ?: 0.0
+            val node = el.obj.obj("node") ?: return@mapNotNull null
+            val info = node.obj("infoJson")
+            val score = node.str("scoreAvg")?.toDoubleOrNull() ?: 0.0
             // 未开分（0 分且无人评）的条目不展示，避免一堆空行
-            val count = entry.int_("scorePersonCount") ?: 0
+            val count = node.int_("scorePersonCount") ?: 0
             if (score <= 0.0 && count == 0) return@mapNotNull null
             ScoredItem(
                 name         = node.str("name") ?: "",
@@ -146,7 +154,7 @@ class HupuMatchScraper(private val client: HttpClient) {
                 teamLogo     = info?.firstOf("teamLogo") ?: "",
                 score        = score,
                 scoreCount   = count,
-                commentCount = entry.int_("commentCount") ?: 0,
+                commentCount = node.int_("commentCount") ?: 0,
                 stats        = info?.let { buildStats(it) } ?: "",
                 label        = info?.labelText() ?: ""
             )
@@ -157,6 +165,87 @@ class HupuMatchScraper(private val client: HttpClient) {
             raterText = if (raters > 0) "${formatCount(raters)}人参与评分" else "",
             items     = items
         )
+    }
+
+    // ── 首页「今日比分」横条 ──────────────────────────────────────────────
+
+    /**
+     * 抓 www.hupu.com 首页里内联的 `cardDataList`（服务端渲染，没有独立接口）。
+     *
+     * 只保留「昨天 / 今天 / 明天」的比赛；若这三天一场都没有，
+     * 退回到离当前时间最近的若干场，保证横条不会空着。
+     */
+    suspend fun fetchHomeMatches(limit: Int = 30): List<HomeMatch> {
+        val html = fetch("https://www.hupu.com/", "https://www.hupu.com/")
+        val json = extractJsonArray(html, "\"cardDataList\":") ?: return emptyList()
+        val all = HupuJson.parseToJsonElement(json).let { it as? JsonArray ?: return emptyList() }
+            .mapNotNull { el ->
+                val o = el as? JsonObject ?: return@mapNotNull null
+                val home = o.str("homeTeamName") ?: return@mapNotNull null
+                HomeMatch(
+                    leagueType = o.str("leagueType") ?: "",
+                    status     = o.str("matchStatusChinese") ?: "",
+                    desc       = o.str("desc") ?: "",
+                    matchTime  = o.str("matchTime") ?: "",
+                    homeName   = home,
+                    awayName   = o.str("awayTeamName") ?: "",
+                    homeLogo   = o.str("homeTeamLogo") ?: "",
+                    awayLogo   = o.str("awayTeamLogo") ?: "",
+                    homeScore  = o.str("homeScore") ?: "",
+                    awayScore  = o.str("awayScore") ?: ""
+                )
+            }
+            .sortedBy { it.matchTime }
+        if (all.isEmpty()) return emptyList()
+
+        val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+        val window = setOf(
+            today.minus(1, DateTimeUnit.DAY).toString(),
+            today.toString(),
+            today.plus(1, DateTimeUnit.DAY).toString()
+        )
+        val near = all.filter { it.date in window }
+        if (near.isNotEmpty()) return near.take(limit)
+
+        // 这三天没有比赛：取离今天最近的一批（首页数据跨度可达数月）
+        val todayStr = today.toString()
+        return all.sortedBy { d(it.date, todayStr) }.take(limit).sortedBy { it.matchTime }
+    }
+
+    /** 粗略的日期距离：按字符串比较足够用于排序取「最近」 */
+    private fun d(a: String, b: String): Int {
+        val x = a.replace("-", "").toIntOrNull() ?: return Int.MAX_VALUE
+        val y = b.replace("-", "").toIntOrNull() ?: return Int.MAX_VALUE
+        return if (x > y) x - y else y - x
+    }
+
+    /** 从 HTML 里按方括号配对截出 `key` 后面的那个 JSON 数组 */
+    private fun extractJsonArray(html: String, key: String): String? {
+        val at = html.indexOf(key).takeIf { it >= 0 } ?: return null
+        val start = html.indexOf('[', at).takeIf { it >= 0 } ?: return null
+        var depth = 0
+        var inStr = false
+        var esc = false
+        for (i in start until html.length) {
+            val c = html[i]
+            if (inStr) {
+                when {
+                    esc      -> esc = false
+                    c == '\\' -> esc = true
+                    c == '"' -> inStr = false
+                }
+                continue
+            }
+            when (c) {
+                '"'      -> inStr = true
+                '[', '{' -> depth++
+                ']', '}' -> {
+                    depth--
+                    if (depth == 0) return html.substring(start, i + 1)
+                }
+            }
+        }
+        return null
     }
 
     /** 条目节点 → 所属比赛节点；拿不到就退回条目本身 */
