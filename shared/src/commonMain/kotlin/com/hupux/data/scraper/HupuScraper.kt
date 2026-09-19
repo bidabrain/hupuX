@@ -11,6 +11,10 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 
 private const val BASE_URL = "https://m.hupu.com"
+
+// 比赛战报（帖子正文是 iframe-match 卡片时用它取真正的内容），匿名可用
+private const val BATTLE_REPORT_API =
+    "https://games.mobileapi.hupu.com/1/7.5.36/basketballapi/news/battleReport"
 private val NEXT_DATA_REGEX = Regex(
     """<script id="__NEXT_DATA__" type="application/json">(.*?)</script>""",
     RegexOption.DOT_MATCHES_ALL
@@ -147,8 +151,10 @@ class HupuScraper(private val client: HttpClient) {
 
         val title = modules?.obj("title")?.obj("moduleContent")?.str("title") ?: ""
         val rawText = modules?.obj("content")?.obj("moduleContent")?.str("content") ?: ""
+        // 正文偶尔不是 HTML，而是一段描述嵌入卡片的 JSON（比赛战报），要另外取数据渲染
+        val expanded = expandEmbed(rawText) ?: rawText
         // 先把 JSON 正文里的懒加载属性 data-src/data-original 修复为 src
-        val textContent = fixLazyImages(rawText)
+        val textContent = fixLazyImages(expanded)
         // 若 JSON 正文已含图片，直接用（精确）；否则才从整页 HTML 提取（兜底，可能有杂图）
         val content = if (textContent.contains("<img", ignoreCase = true))
             textContent
@@ -191,6 +197,80 @@ class HupuScraper(private val client: HttpClient) {
             hasMoreComments = hasMore
         )
     }
+
+    // ── 嵌入卡片正文 ─────────────────────────────────────────────────────────
+
+    /**
+     * 有些帖子的正文压根不是 HTML，而是一段描述嵌入卡片的 JSON，例如比赛战报：
+     *
+     * ```json
+     * {"team":"football","type":"iframe-match",
+     *  "url":"…/football_recap?matchId=3861182-HALF_BATTLE_REPORT",
+     *  "matchId":"3861182-HALF_BATTLE_REPORT"}
+     * ```
+     *
+     * 原样丢给 WebView 就会把这段 JSON 直接显示给用户。虎扑自家移动端也是拿这里的
+     * `matchId` 去调战报接口、再自己渲染的（`url` 里那个 H5 页单独打开是空的，
+     * 它依赖 App 环境），所以这里照做：取回数据拼成 HTML，交给原有的正文渲染。
+     *
+     * 展开失败就返回 null，调用方退回原文，不至于因此整个帖子打不开。
+     */
+    private suspend fun expandEmbed(raw: String): String? {
+        val t = raw.trim()
+        if (!t.startsWith("{") || !t.contains("\"iframe-match\"")) return null
+        return try {
+            // matchId 形如 "3861182-HALF_BATTLE_REPORT"，前半是 relationId，后半是 relationType
+            val matchId      = parseJsonObject(t).str("matchId") ?: return null
+            val relationId   = matchId.substringBefore('-')
+            val relationType = matchId.substringAfter('-', "")
+            if (relationId.isEmpty() || relationType.isEmpty()) return null
+            val body = fetch(
+                "$BATTLE_REPORT_API?relationId=$relationId&relationType=$relationType"
+            )
+            buildBattleReportHtml(parseJsonObject(body).obj("result") ?: return null)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun buildBattleReportHtml(r: JsonObject): String? {
+        val sb = StringBuilder()
+        r.str("beginContent")?.takeIf { it.isNotBlank() }
+            ?.let { sb.append("<p>").append(escapeHtml(it)).append("</p>") }
+        appendEvents(sb, "关键事件", r.arr("keyEvent"))
+        appendEvents(sb, "常规事件", r.arr("normalEvent"))
+        r.str("teamLineup")?.takeIf { it.isNotBlank() }?.let {
+            sb.append("<p><b>出场阵容</b></p><p>")
+                .append(escapeHtml(it).replace("\n", "<br>"))
+                .append("</p>")
+        }
+        return sb.toString().ifEmpty { null }
+    }
+
+    /** 事件条目：`31' 连场进球，格罗斯世界波破门！布莱顿1-0阿森纳` + 若干 GIF */
+    private fun appendEvents(sb: StringBuilder, heading: String, list: JsonArray?) {
+        val items = (list ?: return).mapNotNull { it as? JsonObject }
+            .filter { !it.str("title").isNullOrBlank() }
+        if (items.isEmpty()) return
+        sb.append("<p><b>").append(heading).append("</b></p>")
+        items.forEach { e ->
+            val time = e.str("eventTimeStr").orEmpty()
+            // title 里已经带了比分（「布莱顿1-0阿森纳」），不再重复拼 score 字段
+            val text = escapeHtml(e.str("title").orEmpty())
+            sb.append("<p>")
+            if (time.isNotEmpty()) sb.append(escapeHtml(time)).append(' ')
+            sb.append(text).append("</p>")
+            (e.arr("gifImgs") ?: EmptyJsonArray).mapNotNull { it.asStr }
+                .filter { it.isNotBlank() }
+                .forEach { sb.append("<img src=\"").append(escapeHtml(it)).append("\">") }
+        }
+    }
+
+    private fun escapeHtml(s: String): String = s
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
 
     /** 移动端评论列表翻页，返回 (评论列表, 是否还有更多) */
     suspend fun fetchReplyList(tid: String, page: Int): Pair<List<Comment>, Boolean> {

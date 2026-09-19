@@ -139,6 +139,56 @@ Accept-Language: zh-CN,zh;q=0.9
 - 懒加载图片 `<img data-src="...">` → 需调 `fixLazyImages()` 转为标准 `<img src>`
 - 虎扑自定义图片节点 `<center class="hupu-img" src="...">` → 同样需要处理
 
+### ⚠️ 正文不一定是 HTML：嵌入卡片
+
+有的帖子这个字段**根本不是 HTML，而是一段 JSON**，描述一张嵌入卡片：
+
+```json
+{"team":"football","type":"iframe-match",
+ "url":"https://games.mobileapi.hupu.com/football#/football/football_recap?matchId=3861182-HALF_BATTLE_REPORT",
+ "matchId":"3861182-HALF_BATTLE_REPORT"}
+```
+
+不处理的话就会把这段 JSON 原样显示给用户（例：`bbs/642501311`）。
+
+`url` 里那个 H5 页**单独打开是空的**（实测只渲染出「技术统计 VS」），它依赖 App 环境。
+虎扑自家移动端的做法是：拿 `matchId` 去调下面的战报接口，再自己渲染 —— 页面上没有
+任何 iframe，战报也不在 SSR 的 HTML 里，是客户端 XHR 拉的。
+
+#### 战报接口（匿名可用，不要 Referer）
+
+```
+GET https://games.mobileapi.hupu.com/1/7.5.36/basketballapi/news/battleReport
+      ?relationId=3861182&relationType=HALF_BATTLE_REPORT
+```
+
+`matchId` 以第一个 `-` 切开就是这两个参数。`relationType` 观测到
+`HALF_BATTLE_REPORT`（半场）和 `BATTLE_REPORT`（全场）；比赛还没踢完时
+请求全场战报会返回 `result: null`。注意路径里是 `basketballapi`，**足球比赛也走它**。
+
+`result` 结构：
+
+```
+beginContent      导语（纯文本）
+img               赛事背景图
+keyEvent[]        关键事件
+normalEvent[]     常规事件
+  ├ title         "连场进球，格罗斯世界波破门！布莱顿1-0阿森纳"（已含比分）
+  ├ eventTimeStr  "31'"
+  ├ gifImgs[]     事件 GIF，可有多张
+  ├ eventCode     GOAL / …
+  ├ score         "1-0"（title 里已经有了，不必重复展示）
+  └ postCode      对应的帖子 tid
+teamLineup        出场阵容（纯文本，用 \n 分段）
+matchTeamStats    技术统计 ★常为 null
+matchPlayerTop    球员数据 ★常为 {}
+videoHighLights   视频集锦 ★未观测到非空
+```
+
+hupuX 里由 `HupuScraper.expandEmbed()` 识别并展开，拼成 HTML 后交给原有的正文
+WebView 渲染（这样 GIF、点击看大图都直接复用）。展开失败就退回原文，
+不会因此整个帖子打不开。
+
 **作者信息路径：** `moduleConfigList.user.moduleContent`
 | 字段 | 类型 | 说明 |
 |------|------|------|

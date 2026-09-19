@@ -43,6 +43,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import coil3.Image
 import coil3.asDrawable
 import coil3.imageLoader
@@ -615,6 +616,10 @@ fun HtmlText(html: String, imageScale: Float = 1.0f, modifier: Modifier = Modifi
     val textColor    = TextPrimary.toArgb()
     val context      = LocalContext.current
     val onImageClick = LocalImageClick.current
+    // 用 BoxWithConstraints 拿可用宽度：图片尺寸要在 Html.fromHtml 那一刻就算好，
+    // 那时 TextView 还没测量过（width == 0），只能靠 Compose 这边给。
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+    val availWidthPx = with(LocalDensity.current) { maxWidth.roundToPx() }
     AndroidView(
         factory = { ctx ->
             TextView(ctx).apply {
@@ -626,7 +631,7 @@ fun HtmlText(html: String, imageScale: Float = 1.0f, modifier: Modifier = Modifi
         },
         update = { tv ->
             val processedHtml = fixLazyImages(html)
-            val getter  = CoilImageGetter(context, WeakReference(tv), imageScale)
+            val getter  = CoilImageGetter(context, WeakReference(tv), imageScale, availWidthPx)
             val spanned = Html.fromHtml(processedHtml, Html.FROM_HTML_MODE_COMPACT, getter, null)
             // 给每个 ImageSpan 叠加 ClickableSpan，实现点击大图
             val sb = SpannableStringBuilder(spanned)
@@ -642,8 +647,9 @@ fun HtmlText(html: String, imageScale: Float = 1.0f, modifier: Modifier = Modifi
             }
             tv.text = sb
         },
-        modifier = modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth()
     )
+    }
 }
 
 // 将懒加载属性 data-src / data-original 替换为 src，使 Html.fromHtml 能找到图片 URL
@@ -668,13 +674,29 @@ private fun fixLazyImages(html: String): String {
 private class CoilImageGetter(
     private val context: Context,
     private val tvRef: WeakReference<TextView>,
-    private val imageScale: Float = 1.0f
+    private val imageScale: Float = 1.0f,
+    private val availWidthPx: Int = 0
 ) : Html.ImageGetter {
 
+    /**
+     * `Html.ImageGetter` 是**同步**接口：`ImageSpan` 在这里就按返回 drawable 的 bounds 定尺寸。
+     *
+     * 以前的做法是先返回 1×1 占位、等图片下载完再改 bounds，但那时 TextView 已经按 1×1
+     * 量过行高了，于是表情/图片显示不正常，非得等下一次重组（比如点开大图再退回来、
+     * 这时图片已进内存缓存、尺寸能同步拿到）重建 span 才对——这正是「看一次大图就好了」的原因。
+     *
+     * 虎扑的图片 URL 里都带着原始尺寸（`..._o_w_86_h_70_xxx.GIF`），所以尺寸在这一刻
+     * 就能算出来，根本不用等图片。
+     */
     override fun getDrawable(source: String): Drawable {
         val url = if (source.startsWith("//")) "https:$source" else source
         val wrap = WrapDrawable()
-        wrap.setBounds(0, 0, 1, 1)
+
+        val w = targetWidth()
+        // URL 里读不到尺寸时只能先按正方形占位，等图片下来再校正
+        val ratio = ratioFromUrl(url)
+        val h = (w * (ratio ?: 1f)).toInt().coerceAtLeast(1)
+        wrap.setBounds(0, 0, w, h)
 
         context.imageLoader.enqueue(
             ImageRequest.Builder(context)
@@ -685,23 +707,50 @@ private class CoilImageGetter(
                         if (tv != null) {
                             // asDrawable 在 Coil 3 返回 BitmapDrawable（ARGB_8888），不用 hardware bitmap
                             val result = image.asDrawable(context.resources)
-                            val availW = tv.width - tv.paddingLeft - tv.paddingRight
-                            val baseW = if (availW > 0) availW
-                                        else context.resources.displayMetrics.widthPixels - 64
-                            val maxW = (baseW * imageScale).toInt().coerceAtLeast(1)
-                            val iw = result.intrinsicWidth.coerceAtLeast(1)
-                            val ih = result.intrinsicHeight.coerceAtLeast(1)
-                            val dh = (ih.toFloat() / iw * maxW).toInt().coerceAtLeast(1)
-                            result.setBounds(0, 0, maxW, dh)
+                            val realH = if (ratio != null) h else {
+                                val iw = result.intrinsicWidth.coerceAtLeast(1)
+                                val ih = result.intrinsicHeight.coerceAtLeast(1)
+                                (ih.toFloat() / iw * w).toInt().coerceAtLeast(1)
+                            }
+                            result.setBounds(0, 0, w, realH)
                             wrap.inner = result
-                            wrap.setBounds(0, 0, maxW, dh)
-                            tv.text = tv.text
+                            if (realH == wrap.bounds.height()) {
+                                // 尺寸和占位一致，重画即可，不用重新排版
+                                tv.invalidate()
+                            } else {
+                                wrap.setBounds(0, 0, w, realH)
+                                tv.text = tv.text
+                            }
                         }
                     }
                 )
                 .build()
         )
         return wrap
+    }
+
+    /** 正文可用宽度 × [imageScale]；Compose 没给宽度时退回屏宽估一个 */
+    private fun targetWidth(): Int {
+        val tv = tvRef.get()
+        val baseW = when {
+            availWidthPx > 0 -> availWidthPx
+            tv != null && tv.width > 0 -> tv.width - tv.paddingLeft - tv.paddingRight
+            else -> context.resources.displayMetrics.widthPixels - 64
+        }
+        return (baseW * imageScale).toInt().coerceAtLeast(1)
+    }
+
+    /** 从 URL 里的原始尺寸算高宽比；读不到返回 null */
+    private fun ratioFromUrl(url: String): Float? {
+        val m = SIZE_IN_URL.find(url) ?: return null
+        val w = m.groupValues[1].toFloatOrNull() ?: return null
+        val h = m.groupValues[2].toFloatOrNull() ?: return null
+        return if (w > 0f && h > 0f) h / w else null
+    }
+
+    companion object {
+        /** 虎扑图片 URL 里都带原始尺寸，形如 `..._w_86_h_70_xxx.GIF` / `..._w_690_h_1035_.webp` */
+        private val SIZE_IN_URL = Regex("""_w_(\d+)_h_(\d+)[_.]""")
     }
 
     private class WrapDrawable : Drawable() {

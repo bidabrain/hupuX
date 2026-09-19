@@ -35,8 +35,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import org.koin.androidx.compose.koinViewModel
 import coil3.compose.AsyncImage
 import androidx.compose.material.icons.outlined.Settings
@@ -59,6 +62,19 @@ fun HomeScreen(
     val state         by vm.state.collectAsState()
     val followedCount by vm.followedCount.collectAsState()
     val homeMatches   by vm.homeMatches.collectAsState()
+
+    // 比分是会变的，但 HomeViewModel 只在冷启动时建一次，光靠 init 抓一次
+    // 会让挂后台一整天回来还显示昨天的比分。这里在每次回到前台时补一刀，
+    // 真正要不要发请求由 VM 按时间节流决定。
+    // addObserver 会把观察者同步到当前状态，所以首次进入首页也会走到 ON_RESUME。
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) vm.refreshHomeMatches()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     val recommendListState = rememberLazyListState()
     val hotListState       = rememberLazyListState()
