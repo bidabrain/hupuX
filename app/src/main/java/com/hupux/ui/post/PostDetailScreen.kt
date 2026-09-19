@@ -734,26 +734,44 @@ private fun PostBodyWebView(html: String, modifier: Modifier = Modifier) {
 
     AndroidView(
         factory = { ctx ->
-            WebView(ctx).apply {
+            val wv = WebView(ctx)
+            wv.apply {
                 setBackgroundColor(bgColor)
                 isScrollContainer = false
                 isVerticalScrollBarEnabled = false
                 settings.apply {
                     javaScriptEnabled = true
-                    useWideViewPort = true
-                    loadWithOverviewMode = true
+                    // 这两项必须关：开着时 WebView 会按「宽视口 + 缩放到屏宽」渲染，
+                    // 页面 1 CSS px 就不再等于 1 dp，而 JS 量到的高度是 CSS px，
+                    // 直接当 dp 用会把容器撑出一大片空白。关掉后布局宽度就是控件宽度，
+                    // CSS px 与 dp 严格 1:1。
+                    useWideViewPort = false
+                    loadWithOverviewMode = false
                     setSupportZoom(false)
                     displayZoomControls = false
                     mediaPlaybackRequiresUserGesture = true
                 }
                 // JS → Kotlin 回调
                 addJavascriptInterface(object : Any() {
+                    /**
+                     * @param cssPx 正文高度（CSS px）
+                     * @param cssWidth 页面布局宽度（CSS px），用来把 cssPx 换算成 dp——
+                     *        上面已保证 1:1，这里再按实际宽度校一次，
+                     *        免得某些机型 / WebView 版本仍然自作主张缩放。
+                     */
                     @JavascriptInterface
-                    fun onHeight(cssPx: Int) {
+                    fun onHeight(cssPx: Int, cssWidth: Int) {
                         Handler(Looper.getMainLooper()).post {
+                            val density = wv.resources.displayMetrics.density
+                            val viewDp  = if (density > 0) wv.width / density else 0f
+                            val scale   = if (cssWidth > 0 && viewDp > 0) viewDp / cssWidth else 1f
                             // Compose 布局最大约 262143 px；以 dp 计上限取 60000 留足余量
-                            val h = (cssPx + 24).coerceAtMost(60000)
-                            if (h > heightState.intValue) heightState.intValue = h
+                            val h = (cssPx * scale + 24).toInt().coerceIn(1, 60000)
+                            // 允许变矮：只增不减的话，任何一次偏大的测量都会永久留下空白。
+                            // 4dp 阈值用来吃掉亚像素抖动，避免来回改高度。
+                            if (kotlin.math.abs(h - heightState.intValue) > 4) {
+                                heightState.intValue = h
+                            }
                         }
                     }
                     @JavascriptInterface
@@ -767,6 +785,7 @@ private fun PostBodyWebView(html: String, modifier: Modifier = Modifier) {
                     override fun shouldOverrideUrlLoading(view: WebView, url: String) = true
                 }
             }
+            wv
         },
         update = { wv ->
             // AndroidView.update 在每次 recomposition 后都会执行；
@@ -776,15 +795,24 @@ private fun PostBodyWebView(html: String, modifier: Modifier = Modifier) {
                 wv.tag = pageKey
                 val heightScript = """<script>
 (function(){
-  function report(){
+  var sent=-1, timer=null;
+  // 量到的高度会回写成容器高度，容器变高又会触发 ResizeObserver，
+  // 所以去抖一下，等版面稳定了再报，免得图片加载途中的中间值被当成最终值。
+  function flush(){
     var h=document.body.getBoundingClientRect().height||0;
     if(h<=0) h=document.body.scrollHeight||document.body.offsetHeight||0;
-    if(h>10) App.onHeight(Math.ceil(h));
+    h=Math.ceil(h);
+    if(h>10&&h!==sent){ sent=h; App.onHeight(h, document.documentElement.clientWidth||0); }
   }
+  function report(){ if(timer) clearTimeout(timer); timer=setTimeout(flush,120); }
   if(typeof ResizeObserver!=='undefined'){
     new ResizeObserver(report).observe(document.body);
   }
   document.querySelectorAll('img').forEach(function(img){
+    // 虎扑图片 URL 自带原始尺寸（..._w_2000_h_1333_.png），据此先占好位，
+    // 图片加载前后版面高度就不会来回跳，量到的高度一开始就是对的
+    var m=/_w_(\d+)_h_(\d+)_/.exec(img.getAttribute('src')||'');
+    if(m&&+m[1]>0&&+m[2]>0) img.style.aspectRatio=m[1]+' / '+m[2];
     img.addEventListener('load', report);
     img.addEventListener('error', report);
     img.style.cursor='pointer';
