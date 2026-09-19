@@ -10,7 +10,7 @@
 GET https://match-api.hupu.com/1/8.2.10/matchallapi/bff/standard/getScheduleListByTagForH5
       ?businessType=common
       &datasource=navigation
-      &businessId=<nba|cba|epl|worldcup|lol|kog>
+      &businessId=<见下表>
 Header: User-Agent 用移动端 UA，Referer: https://bbs.hupu.com/
 ```
 
@@ -20,10 +20,22 @@ Header: User-Agent 用移动端 UA，Referer: https://bbs.hupu.com/
 
 businessId 是**按赛事**而非按运动划分的：`epl` 只含「英超联赛」，`worldcup` 只含世界杯各轮次。
 
-实测**有数据**：`nba` / `cba` / `epl`（英超，201 场）/ `worldcup`（100 场）/ `lol` / `kog`。
+实测**有数据**（12 个）：
+
+| 分类 | businessId |
+|---|---|
+| 篮球 | `nba` `wnba` `cba` `cuba` |
+| 足球 | `epl`（英超）`worldcup`（世界杯） |
+| 电竞 | `lol` `lpl` `lck` `kog` `pubg` |
+| 其它 | `tennis` |
 
 实测**返回空**：`football` / `soccer` / `laliga` / `seriea` / `bundesliga` / `ligue1` / `ucl` /
-`uel` / `csl` / `cfa` / `euro` / `championship` / `afc` 等 30+ 种常见写法。
+`uel` / `csl` / `cfa` / `euro` / `championship` / `afc` / `fifa` / `spain` / `italy` / `germany` /
+`france` 等 60+ 种写法，以及仓库 `ZoneSlugMap` 里全部 131 个专区 slug
+（含 `xijia` / `dejia` / `yijia` / `frfootball` / `china-soccer` 这些拼音 slug）。
+
+> **足球只有英超和世界杯**。西甲/德甲/意甲/法甲/中超的 id 未能找到，
+> 这个 H5 接口很可能只开放了部分赛事。要拿到完整导航需抓官方 App 的流量。
 
 > ⚠️ **无法靠探测穷举**：无效 id 不报错，只返回 `dayGameData: []`，和「有效但无数据」
 > 完全无法区分（`businessId=xxxxx` 与 `businessId=laliga` 响应一模一样）。

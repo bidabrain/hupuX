@@ -31,7 +31,13 @@ enum class MatchTag(val businessId: String, val label: String) {
     EPL("epl", "英超"),
     WORLD_CUP("worldcup", "世界杯"),
     LOL("lol", "英雄联盟"),
-    KOG("kog", "王者荣耀")
+    LPL("lpl", "LPL"),
+    LCK("lck", "LCK"),
+    KOG("kog", "王者荣耀"),
+    PUBG("pubg", "绝地求生"),
+    TENNIS("tennis", "网球"),
+    WNBA("wnba", "WNBA"),
+    CUBA("cuba", "CUBA")
 }
 
 /**
