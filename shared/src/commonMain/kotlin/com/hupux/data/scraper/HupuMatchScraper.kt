@@ -1,15 +1,25 @@
 package com.hupux.data.scraper
 
+import com.hupux.data.CookieStorage
 import com.hupux.data.model.HomeMatch
 import com.hupux.data.model.MatchDay
 import com.hupux.data.model.MatchItem
 import com.hupux.data.model.MatchScoreBoard
 import com.hupux.data.model.MatchSide
+import com.hupux.data.model.ScoreComment
+import com.hupux.data.model.ScoreCommentPage
+import com.hupux.data.model.ScoreItemDetail
 import com.hupux.data.model.ScoredItem
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
+import com.hupux.data.compareVersions
+import com.hupux.data.nowMillis
 import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
@@ -18,12 +28,24 @@ import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 private const val MATCH_API = "https://match-api.hupu.com/1/8.2.10/matchallapi/bff/standard"
-private const val SCORE_API = "https://games.mobileapi.hupu.com/1/8.0.99/bplcommentapi/bpl/score_tree"
+private const val SCORE_API   = "https://games.mobileapi.hupu.com/1/8.0.99/bplcommentapi/bpl/score_tree"
+private const val COMMENT_API = "https://games.mobileapi.hupu.com/1/8.0.99/bplcommentapi/bpl/comment"
+
+// 写接口的起始版本号。虎扑按 URL 里的版本拦截旧客户端，打分那条实测必须 8.2.99
+// （8.0.99 会被判「应用版本过旧」），其余写接口 8.0.99 可用。
+private const val BASE_WRITE_VERSION  = "8.0.99"
+private const val SCORE_WRITE_VERSION = "8.2.99"
 
 private const val MOBILE_UA =
     "Mozilla/5.0 (Linux; Android 12; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36"
+
+// www.hupu.com 见到移动端 UA 会 302 跳去 m.hupu.com（那边没有 cardDataList），必须用桌面 UA
+private const val DESKTOP_UA =
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
 /**
  * 赛程分区。businessId 是**按赛事**而非按运动划分的（`epl` 只含英超）。
@@ -58,11 +80,17 @@ enum class MatchTag(val businessId: String, val label: String) {
  * 赛程给的评分业务键是**条目级**（basketball_item，即当场最高分那个人），
  * 要拿整场评分得先由它找到父节点（basketball_match）再取其子节点，故 [fetchScoreBoard] 是两跳。
  */
-class HupuMatchScraper(private val client: HttpClient) {
+class HupuMatchScraper(
+    private val client: HttpClient,
+    private val cookieStorage: CookieStorage
+) {
 
-    private suspend fun fetch(url: String, referer: String): String =
+    /** 被服务端接受过的写接口版本号，命中后本次进程复用，避免每次都从头试 */
+    private var healedVersion: String? = null
+
+    private suspend fun fetch(url: String, referer: String, ua: String = MOBILE_UA): String =
         client.get(url) {
-            header("User-Agent", MOBILE_UA)
+            header("User-Agent", ua)
             header("Accept", "application/json, text/plain, */*")
             header("Referer", referer)
         }.bodyAsText()
@@ -149,6 +177,8 @@ class HupuMatchScraper(private val client: HttpClient) {
             val count = node.int_("scorePersonCount") ?: 0
             if (score <= 0.0 && count == 0) return@mapNotNull null
             ScoredItem(
+                bizType      = node.str("bizType") ?: "",
+                bizNo        = node.str("bizId") ?: "",
                 name         = node.str("name") ?: "",
                 avatar       = node.arr("image")?.firstOrNull()?.asStr ?: "",
                 teamLogo     = info?.firstOf("teamLogo") ?: "",
@@ -176,7 +206,7 @@ class HupuMatchScraper(private val client: HttpClient) {
      * 退回到离当前时间最近的若干场，保证横条不会空着。
      */
     suspend fun fetchHomeMatches(limit: Int = 30): List<HomeMatch> {
-        val html = fetch("https://www.hupu.com/", "https://www.hupu.com/")
+        val html = fetch("https://www.hupu.com/", "https://www.hupu.com/", DESKTOP_UA)
         val json = extractJsonArray(html, "\"cardDataList\":") ?: return emptyList()
         val all = HupuJson.parseToJsonElement(json).let { it as? JsonArray ?: return emptyList() }
             .mapNotNull { el ->
@@ -296,5 +326,236 @@ class HupuMatchScraper(private val client: HttpClient) {
         n >= 10_000 -> "${(n / 1000) / 10.0}万"
         else        -> n.toString()
     }
-}
 
+    // ── 打分 / 评论（需要登录）──────────────────────────────────────────────
+    //
+    // 写接口都在 games.mobileapi.hupu.com/<prefix>/<version>/bplcommentapi 下，
+    // **不需要签名**，带 Cookie + Referer/Origin 即可。
+    // 但服务端会按 URL 里的版本号拦截「应用版本过旧」，所以写操作带版本阶梯重试。
+
+    /** 拉取单个评分条目的详情（带登录态时会回显自己的打分 userScore） */
+    suspend fun fetchItemDetail(bizType: String, bizNo: String): ScoreItemDetail {
+        val body = authGet("$SCORE_API/getSelfByBizKey?outBizType=$bizType&outBizNo=$bizNo")
+        val node = parseJsonObject(body).obj("data")?.obj("detail")
+            ?: return ScoreItemDetail(bizType, bizNo, "", "", "", "", "", 0.0, 0, 0, 0, false, false)
+        val info = node.obj("infoJson")
+        return ScoreItemDetail(
+            bizType      = bizType,
+            bizNo        = bizNo,
+            name         = node.str("name") ?: "",
+            avatar       = node.arr("image")?.firstOrNull()?.asStr ?: "",
+            teamLogo     = info?.firstOf("teamLogo") ?: "",
+            stats        = info?.let { buildStats(it) } ?: "",
+            label        = info?.labelText() ?: "",
+            scoreAvg     = node.str("scoreAvg")?.toDoubleOrNull() ?: 0.0,
+            scoreCount   = node.int_("scorePersonCount") ?: 0,
+            commentCount = node.int_("commentCount") ?: 0,
+            myScore      = node.int_("userScore") ?: 0,
+            canScore     = node.bool_("canScore") ?: false,
+            canComment   = node.bool_("canComment") ?: false
+        )
+    }
+
+    /** 打分。score 为 1~10 的整数（界面是五星，每星 2 分）。成功返回 null，失败返回提示文案 */
+    suspend fun saveScore(bizType: String, bizNo: String, score: Int): String? {
+        val body = buildJsonObject {
+            put("outBizKey", buildJsonObject {
+                put("outBizType", bizType)
+                put("outBizNo", bizNo)
+            })
+            put("score", score)
+            put("source", "")
+        }.toString()
+        return writeWithVersionHealing("/bpl/score/save", body, SCORE_WRITE_VERSION)
+    }
+
+    /** 取消自己的打分。成功返回 null */
+    suspend fun deleteScore(bizType: String, bizNo: String): String? {
+        val body = buildJsonObject {
+            put("outBizType", bizType)
+            put("outBizNo", bizNo)
+            put("type", "score")
+        }.toString()
+        return writeWithVersionHealing("/bpl/user/record/comment/delete", body, BASE_WRITE_VERSION)
+    }
+
+    /**
+     * 发评论或回复。
+     * @param parentCommentId 回复时传被回复评论的 commentId，发新评论留空
+     * @param subjectId 回复时传**被回复评论自带的 subjectId**（≠ bizNo），发新评论留空
+     */
+    suspend fun publishComment(
+        bizType: String,
+        bizNo: String,
+        content: String,
+        parentCommentId: String = "",
+        subjectId: String = ""
+    ): String? {
+        val body = buildJsonObject {
+            put("content", content)
+            put("outBizKey", buildJsonObject {
+                put("outBizType", bizType)
+                put("outBizNo", bizNo)
+            })
+            put("subjectId", subjectId)
+            put("source", "m")
+            if (parentCommentId.isNotEmpty()) put("parentCommentId", parentCommentId)
+        }.toString()
+        return writeWithVersionHealing("/bpl/comment/m/publish", body, BASE_WRITE_VERSION)
+    }
+
+    /** 点亮 / 取消点亮评论。[subjectId] 取自评论自身的 commentKey.subjectId */
+    suspend fun lightComment(subjectId: String, commentId: String, on: Boolean): String? {
+        val body = buildJsonObject {
+            put("commentKey", buildJsonObject {
+                put("subjectId", subjectId)
+                put("commentId", commentId)
+            })
+        }.toString()
+        val path = if (on) "/bpl/comment/light" else "/bpl/comment/cancelLight"
+        return writeWithVersionHealing(path, body, BASE_WRITE_VERSION)
+    }
+
+    /** 拉取评论列表。[cursor] 传上一页返回的 cursor 继续翻页；[earliest] 为按时间正序 */
+    suspend fun fetchComments(
+        bizType: String,
+        bizNo: String,
+        cursor: Long = 0L,
+        earliest: Boolean = false
+    ): ScoreCommentPage {
+        val queryType = if (earliest) "earliest" else "latest"
+        val order     = if (earliest) "asc" else "desc"
+        val publishTime = when {
+            cursor > 0 -> cursor
+            earliest   -> 0L
+            else       -> nowMillis()
+        }
+        val body = authGet(
+            "$COMMENT_API/list/primarySingleRow" +
+                "?outBizType=$bizType&outBizNo=$bizNo&order=$order&queryType=$queryType" +
+                "&publishTime=$publishTime&page=1&pageSize=20&clientCode=&cid="
+        )
+        val data = parseJsonObject(body).obj("data")
+            ?: return ScoreCommentPage(emptyList(), 0, 0, false)
+        val comments = (data.arr("comments") ?: EmptyJsonArray).mapNotNull { parseComment(it.obj) }
+        val next = data.obj("cursor")?.long_("publishTime") ?: 0L
+        return ScoreCommentPage(
+            comments   = comments,
+            totalCount = data.long_("commentCount") ?: 0L,
+            cursor     = next,
+            // 服务端自己给 hasMore；没给时退回「有游标且这页非空」
+            hasMore    = (data.bool_("hasMore") ?: (next > 0)) && comments.isNotEmpty()
+        )
+    }
+
+    private fun parseComment(c: JsonObject): ScoreComment? {
+        val id = c.str("commentId") ?: return null
+        val content = c.str("commentContent") ?: ""
+        // 附件不止图片（还有语音），只取 IMAGE，否则语音 URL 会被当图片渲染
+        val images = (c.arr("commentContentImages") ?: EmptyJsonArray).mapNotNull { el ->
+            val a = el.obj
+            if (a.str("commentContentType") != "IMAGE") return@mapNotNull null
+            a.str("commentContent")?.takeIf { it.isNotBlank() && it != "null" }
+        }
+        if (content.isBlank() && images.isEmpty()) return null
+        return ScoreComment(
+            commentId       = id,
+            userName        = c.str("commentUserName")?.ifEmpty { null } ?: "虎扑JR",
+            userHead        = c.str("commentUserHeadImg") ?: "",
+            userId          = c.str("commentUserId") ?: "",
+            content         = content,
+            images          = images,
+            score           = c.int_("score") ?: 0,
+            lightCount      = c.long_("lightCount") ?: 0L,
+            date            = c.str("commentDate") ?: "",
+            ipLocation      = c.str("ipLocation") ?: "",
+            subCommentCount = c.int_("subCommentCount") ?: 0,
+            parentCommentId = c.str("parentCommentId") ?: "",
+            subjectId       = c.obj("commentKey")?.str("subjectId")?.ifEmpty { null }
+                ?: c.str("subjectId") ?: "",
+            hasLight        = c.bool_("hasLight") ?: false
+        )
+    }
+
+    // ── 带登录态的请求 ──────────────────────────────────────────────────────
+
+    private suspend fun authGet(url: String): String =
+        client.get(url) {
+            header("User-Agent", DESKTOP_UA)
+            header("Accept", "application/json, text/plain, */*")
+            header("Referer", "https://m.hupu.com/score/detail.html")
+            val ck = cookieStorage.effectiveCookie
+            if (ck.isNotEmpty()) header("Cookie", ck)
+        }.bodyAsText()
+
+    /**
+     * 写请求 +「应用版本过旧」自愈。
+     *
+     * 服务端按 URL 里的版本号拒绝旧客户端；被拒时请求未被受理（无副作用），
+     * 因此可以安全地抬高版本号重试。命中的版本记在内存里，本次进程后续复用。
+     */
+    private suspend fun writeWithVersionHealing(path: String, body: String, base: String): String? {
+        // 各接口的最低版本不同，愈合到的版本比本接口基准低时仍要用基准，少跑一趟
+        val start = healedVersion?.takeIf { compareVersions(it, base) >= 0 } ?: base
+        val candidates = listOf(start) + versionLadder(start)
+        var lastError: String? = null
+        for (v in candidates) {
+            val resp = try {
+                postJson("https://games.mobileapi.hupu.com/1/$v/bplcommentapi$path", body)
+            } catch (e: Exception) {
+                return e.message ?: "网络异常，请稍后再试"
+            }
+            val root = try {
+                parseJsonObject(resp)
+            } catch (_: Exception) {
+                return "返回内容无法解析"
+            }
+            val err = errorOf(root)
+            if (err == null) {
+                healedVersion = v
+                return null
+            }
+            if (!isVersionTooOld(err)) return err
+            lastError = err
+        }
+        return lastError ?: "操作失败"
+    }
+
+    private suspend fun postJson(url: String, body: String): String =
+        client.post(url) {
+            header("User-Agent", DESKTOP_UA)
+            header("Referer", "https://m.hupu.com/score/detail.html")
+            header("Origin", "https://m.hupu.com")
+            contentType(ContentType.Application.Json)
+            val ck = cookieStorage.effectiveCookie
+            if (ck.isNotEmpty()) header("Cookie", ck)
+            setBody(body)
+        }.bodyAsText()
+
+    /** 成功返回 null，失败返回提示文案 */
+    private fun errorOf(root: JsonObject): String? {
+        val code = root.int_("code") ?: -1
+        if (code == 1 || code == 200) return null
+        if (root.str("type") == "LOGIN" || code == 401) return "请先登录"
+        return root.str("msg")?.ifEmpty { null }
+            ?: root.str("message")?.ifEmpty { null }
+            ?: "操作失败（code=$code）"
+    }
+
+    private fun isVersionTooOld(msg: String) =
+        msg.contains("版本过旧") || msg.contains("升级到最新版本")
+
+    /** 版本阶梯：minor 逐级抬高，再抬 major（沿用虎扑 8.x.99 的习惯） */
+    private fun versionLadder(base: String): List<String> {
+        val p = base.split(".")
+        if (p.size != 3) return emptyList()
+        val major = p[0].toIntOrNull() ?: return emptyList()
+        val minor = p[1].toIntOrNull() ?: return emptyList()
+        val patch = p[2]
+        return buildList {
+            for (i in 1..6) add("$major.${minor + i}.$patch")
+            add("${major + 1}.$minor.$patch")
+            add("${major + 2}.$minor.$patch")
+        }
+    }
+}

@@ -11,7 +11,7 @@ doc/api/
 ├── desktop-api.md     桌面版 API（bbs.hupu.com + my.hupu.com）
 ├── image-upload.md    发帖插图 / 图片上传（hss.hupu.com + 阿里云 OSS）
 ├── video-upload.md    发视频帖（OSS 分片上传 + createThread）
-└── match-score.md     赛程与评分（match-api + score_tree，匿名可用）
+└── match-score.md     赛程与评分（match-api + score_tree；读匿名可用，打分/评论需登录）
 ```
 
 ## 快速索引
@@ -32,6 +32,7 @@ doc/api/
 | 转存外链图片 | `/pcapi/all/upload/img` | [image-upload.md](image-upload.md#验证记录) |
 | 赛程 / 比分 | `match-api.hupu.com/.../getScheduleListByTagForH5` | [match-score.md](match-score.md) |
 | 球员评分 / 技术统计 | `games.mobileapi.hupu.com/.../score_tree/` | [match-score.md](match-score.md) |
+| 打分 / 评分区评论 | `games.mobileapi.hupu.com/.../bplcommentapi/bpl/` | [match-score.md](match-score.md) |
 | 用户资料 | `/pcmapi/pc/space/v1/getUserInfo` | [desktop-api.md §1](desktop-api.md#1-用户资料) |
 | 我的回帖 | `/pcmapi/pc/space/v1/getReplyList` | [desktop-api.md §2](desktop-api.md#2-我的回帖列表) |
 | 我的推荐 | `/pcmapi/pc/space/v1/getRecommendList` | [desktop-api.md §3](desktop-api.md#3-我的推荐帖列表) |

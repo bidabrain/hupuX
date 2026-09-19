@@ -25,6 +25,7 @@ import com.hupux.ui.profile.MessageViewModel
 import com.hupux.ui.profile.NewPostViewModel
 import com.hupux.ui.profile.ProfileViewModel
 import com.hupux.ui.score.ScoreDetailViewModel
+import com.hupux.ui.score.ScoreItemViewModel
 import com.hupux.ui.score.ScoreViewModel
 import com.hupux.ui.settings.SettingsViewModel
 import com.hupux.ui.profile.UserFavoriteListViewModel
@@ -80,7 +81,7 @@ val appModule = module {
     single { HupuScraper(get()) }
     single { HupuDesktopScraper(get(), get<CookieStorage>()) }
     single { UpdateChecker(get()) }
-    single { HupuMatchScraper(get()) }
+    single { HupuMatchScraper(get(), get<CookieStorage>()) }
     single { HupuImageUploader(get(), get<CookiePreferences>(), androidContext()) }
 
     // ── Repositories ──────────────────────────────────────────────────────────
@@ -106,6 +107,7 @@ val appModule = module {
     viewModel { SettingsViewModel(get<CookiePreferences>(), androidContext(), get()) }
     viewModel { ScoreViewModel(get()) }
     viewModel { ScoreDetailViewModel(get()) }
+    viewModel { ScoreItemViewModel(get(), get<CookiePreferences>()) }
     viewModel { ZoneDetailViewModel(get(), get<CookiePreferences>()) }
     viewModel { ZoneListViewModel(get(), get()) }
     viewModel { TopicDetailViewModel(get()) }

@@ -47,6 +47,9 @@ data class MatchDay(
 
 /** 单个被评分的对象（球员 / 教练 / 裁判） */
 data class ScoredItem(
+    /** 评分对象自身的 bizKey，用于进入详情页打分/评论；为空表示不可进入 */
+    val bizType: String,
+    val bizNo: String,
     val name: String,
     val avatar: String,
     val teamLogo: String,
@@ -95,3 +98,53 @@ data class HomeMatch(
     /** yyyy-MM-dd */
     val date: String get() = matchTime.substringBefore(' ')
 }
+
+/** 评分条目（球员/教练/裁判）的详情，含当前登录用户自己的打分 */
+data class ScoreItemDetail(
+    val bizType: String,
+    val bizNo: String,
+    val name: String,
+    val avatar: String,
+    val teamLogo: String,
+    /** 技术统计摘要 */
+    val stats: String,
+    val label: String,
+    val scoreAvg: Double,
+    val scoreCount: Int,
+    val commentCount: Int,
+    /** 当前用户的打分，0 表示未打分（10 分制） */
+    val myScore: Int,
+    val canScore: Boolean,
+    val canComment: Boolean
+)
+
+/** 评分区的一条评论 */
+data class ScoreComment(
+    val commentId: String,
+    val userName: String,
+    val userHead: String,
+    val userId: String,
+    val content: String,
+    val images: List<String>,
+    /** 该用户给这个对象打的分，0 表示没打分 */
+    val score: Int,
+    val lightCount: Long,
+    val date: String,
+    val ipLocation: String,
+    val subCommentCount: Int,
+    val parentCommentId: String,
+    /**
+     * 回复这条评论时必须用它自带的 subjectId，**不等于** outBizNo。
+     * 这是参考实现实测踩出来的坑。
+     */
+    val subjectId: String,
+    val hasLight: Boolean
+)
+
+/** 评论分页。[cursor] 为下一页的 publishTime，0 表示没有更多 */
+data class ScoreCommentPage(
+    val comments: List<ScoreComment>,
+    val totalCount: Long,
+    val cursor: Long,
+    val hasMore: Boolean
+)

@@ -38,6 +38,7 @@ import com.hupux.ui.profile.UserReplyListScreen
 import com.hupux.ui.profile.UserSpaceScreen
 import com.hupux.ui.profile.UserThreadListScreen
 import com.hupux.ui.score.ScoreDetailScreen
+import com.hupux.ui.score.ScoreItemScreen
 import com.hupux.ui.score.ScoreScreen
 import com.hupux.ui.search.SearchScreen
 import com.hupux.ui.settings.SettingsScreen
@@ -196,6 +197,20 @@ fun AppNavigation() {
                 )
             ) { entry ->
                 ScoreDetailScreen(
+                    bizType = entry.arguments?.getString("bizType") ?: "",
+                    bizNo   = entry.arguments?.getString("bizNo") ?: "",
+                    onItemClick = { t, n -> navController.navigate("score_item/$t/$n") },
+                    onBack  = { navController.popBackStack() }
+                )
+            }
+            composable(
+                "score_item/{bizType}/{bizNo}",
+                arguments = listOf(
+                    navArgument("bizType") { type = NavType.StringType },
+                    navArgument("bizNo")   { type = NavType.StringType }
+                )
+            ) { entry ->
+                ScoreItemScreen(
                     bizType = entry.arguments?.getString("bizType") ?: "",
                     bizNo   = entry.arguments?.getString("bizNo") ?: "",
                     onBack  = { navController.popBackStack() }

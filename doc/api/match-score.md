@@ -144,12 +144,20 @@ data.pageResult.data[]          被评分的条目
 
 - `fetchSchedule(tag: MatchTag): List<MatchDay>` —— 赛程，按日期分组
 - `fetchScoreBoard(itemBizType, itemBizNo): MatchScoreBoard` —— 整场评分榜
+- `fetchItemDetail(bizType, bizNo): ScoreItemDetail` —— 单个评分对象（含我的打分）
+- `fetchComments(bizType, bizNo, cursor)` —— 评论列表（时间游标翻页）
+- `saveScore` / `deleteScore` / `publishComment` / `lightComment` —— 写操作，见第六节
 
 注意 `fetchScoreBoard` 是**两跳**：赛程给的业务键是条目级（当场最高分那个人），
 要先 `getSelfByBizKey` 找到父比赛节点，再取其子节点才是完整名单。
 
-Android UI 在 `app/src/main/java/com/hupux/ui/score/`，底部导航第 3 项「评分」。
-当前为**只读版**：只展示评分与统计，不含打分和评论（那部分需要登录态与提交接口）。
+Android UI 在 `app/src/main/java/com/hupux/ui/score/`，底部导航第 3 项「评分」：
+
+- `ScoreScreen` —— 赛程列表
+- `ScoreDetailScreen` —— 整场评分榜，点条目进入详情
+- `ScoreItemScreen` —— 单个对象详情：五星打分、取消评分、评论列表、发评论/回复、点亮
+
+打分和评论需要登录（复用「我的」页的 Cookie），未登录时给出提示而不是静默失败。
 
 ---
 
@@ -185,3 +193,111 @@ Android UI 在 `app/src/main/java/com/hupux/ui/score/`，底部导航第 3 项�
 
 hupuX 里由 `HupuMatchScraper.fetchHomeMatches()` 抓取，展示在首页 hero 与
 推荐 Tab 之间的横向滚动条里（随 header 一起上滑隐藏）。
+
+---
+
+## 六、打分与评论（写接口，需要登录）
+
+```
+BASE = https://games.mobileapi.hupu.com/1/<version>/bplcommentapi
+Header: Cookie: <登录 Cookie>
+        Referer: https://m.hupu.com/score/detail.html
+        Origin:  https://m.hupu.com
+        Content-Type: application/json
+```
+
+**不需要签名。** 试过的一切 sign / token / 设备指纹都不是必需的：带上登录 Cookie
+和上面两个来源头就能写成功。返回统一是 `{"code":1,"type":"COMMON","msg":"成功",...}`，
+`code == 1` 即成功。
+
+### 版本号会被拦
+
+URL 里那段 `<version>` 不是装饰，服务端拿它判断「应用版本过旧」：
+
+| 接口 | 实测可用的最低版本 |
+| --- | --- |
+| `/bpl/score/save` | **8.2.99**（8.0.99 会被判版本过旧） |
+| 其余写接口 | 8.0.99 |
+
+被判版本过旧时请求**未被受理**（无副作用），所以可以安全地抬高版本号重试。
+`HupuMatchScraper.writeWithVersionHealing()` 就是这么做的：从基准版本起沿
+minor → major 逐级抬高，命中后把版本记在内存里，本进程后续写操作直接复用。
+
+### 打分
+
+```
+POST {BASE}/bpl/score/save
+{"outBizKey":{"outBizType":"basketball_item","outBizNo":"227118"},"score":8,"source":""}
+```
+
+`score` 是 **1~10 的整数**。虎扑自己的界面是五星，所以一星 = 2 分，
+hupuX 的打分面板同样是五星制、提交 `stars * 2`。重复提交即修改评分。
+
+### 取消打分
+
+```
+POST {BASE}/bpl/user/record/comment/delete
+{"outBizType":"basketball_item","outBizNo":"227118","type":"score"}
+```
+
+### 发评论 / 回复
+
+```
+POST {BASE}/bpl/comment/m/publish
+{"content":"...","outBizKey":{"outBizType":"...","outBizNo":"..."},
+ "subjectId":"","source":"m","parentCommentId":"<回复时才带>"}
+```
+
+> **坑**：回复时的 `subjectId` 要用**被回复评论自带的** `commentKey.subjectId`
+> （例如 `349966029`），它**不等于** `outBizNo`。发新评论时留空即可。
+
+### 点亮 / 取消点亮
+
+```
+POST {BASE}/bpl/comment/light
+POST {BASE}/bpl/comment/cancelLight
+{"commentKey":{"subjectId":"349966029","commentId":"2800370473"}}
+```
+
+### 评论列表（读，登录态可选）
+
+```
+GET {BASE}/bpl/comment/list/primarySingleRow
+      ?outBizType=basketball_item&outBizNo=227118
+      &order=desc&queryType=latest&publishTime=<游标>
+      &page=1&pageSize=20&clientCode=&cid=
+```
+
+翻页用**时间游标**而不是页码：第一页 `publishTime` 传当前毫秒时间戳，
+之后传上一页响应里的 `data.cursor.publishTime`，为 0 表示没有更多。
+按时间正序时 `order=asc&queryType=earliest&publishTime=0`。
+
+响应字段（都带 `comment` 前缀，容易和帖子评论接口搞混）：
+
+```
+data.commentCount                   总数
+data.comments[]
+  ├ commentId / commentUserId
+  ├ commentUserName / commentUserHeadImg
+  ├ commentContent                  正文
+  ├ commentContentImages[].commentContent   图片 URL
+  ├ score                           该用户给这个对象打的分（0 = 没打）
+  ├ lightCount / hasLight            点亮数 / 我是否点亮
+  ├ commentDate / ipLocation
+  ├ subCommentCount / parentCommentId
+  └ commentKey.subjectId            回复和点亮都要用它
+data.cursor.publishTime             下一页游标
+```
+
+### 条目详情（含我自己的打分）
+
+`getSelfByBizKey` 带上登录 Cookie 时，`data.detail` 会多回显：
+
+```
+userScore        我打的分（0 = 没打）
+canScore         是否允许打分（比赛节点是 false，只有条目节点能打）
+canComment       是否允许评论
+```
+
+其余字段（`scoreAvg` / `scorePersonCount` / `commentCount` / `infoJson`）与
+评分树里的条目节点一致，所以详情页一次请求就够。

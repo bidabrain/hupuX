@@ -1,6 +1,7 @@
 package com.hupux.ui.score
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -28,6 +29,7 @@ import java.util.Locale
 fun ScoreDetailScreen(
     bizType: String,
     bizNo: String,
+    onItemClick: (String, String) -> Unit,
     onBack: () -> Unit,
     vm: ScoreDetailViewModel = koinViewModel()
 ) {
@@ -72,11 +74,15 @@ fun ScoreDetailScreen(
                         }
                         // 不设 key：同名条目（如两个「裁判」）会导致 LazyColumn key 冲突崩溃
                         items(board.items) { item ->
-                            ScoredItemRow(item)
+                            ScoredItemRow(
+                                item = item,
+                                onClick = if (item.bizNo.isNotEmpty())
+                                    { { onItemClick(item.bizType, item.bizNo) } } else null
+                            )
                         }
                         item {
                             Text(
-                                "评分数据来自虎扑，当前版本仅供查看",
+                                "点击条目可打分与评论",
                                 fontSize = 11.sp, color = TextTertiary,
                                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
                             )
@@ -89,7 +95,7 @@ fun ScoreDetailScreen(
 }
 
 @Composable
-private fun ScoredItemRow(item: ScoredItem) {
+private fun ScoredItemRow(item: ScoredItem, onClick: (() -> Unit)?) {
     Surface(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
         shape = RoundedCornerShape(14.dp),
@@ -97,7 +103,10 @@ private fun ScoredItemRow(item: ScoredItem) {
         shadowElevation = 1.dp
     ) {
         Row(
-            Modifier.fillMaxWidth().padding(14.dp),
+            Modifier
+                .fillMaxWidth()
+                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+                .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box {
