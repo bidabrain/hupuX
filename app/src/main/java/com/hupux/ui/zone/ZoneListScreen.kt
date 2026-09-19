@@ -1,7 +1,9 @@
 package com.hupux.ui.zone
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,9 +34,13 @@ import com.hupux.data.model.ZoneCategory
 import com.hupux.ui.home.PillButton
 import com.hupux.ui.theme.*
 
+/** 「全部专区」网格列数。每格约 63dp，5 列时约 16% 的专区名会被截断；6 列会到 40%。 */
+private const val ZONE_GRID_COLUMNS = 5
+
 @Composable
 fun ZoneListScreen(
     onZoneClick: (Int, String) -> Unit,
+    onSearchClick: () -> Unit,
     scrollToTopTrigger: Int = 0,
     vm: ZoneListViewModel = koinViewModel()
 ) {
@@ -48,20 +55,19 @@ fun ZoneListScreen(
 
     Column(Modifier.fillMaxSize().background(AppBg)) {
         // ── Header ───────────────────────────────────────────────
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .background(HeaderBrush,
-                    RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
-                .statusBarsPadding()
-        ) {
+        Column(Modifier.fillMaxWidth().background(HeaderBg).statusBarsPadding()) {
             Row(
-                Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 20.dp),
+                Modifier.fillMaxWidth().height(52.dp).padding(start = 20.dp, end = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("发现专区", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold,
-                    color = Color.White)
+                    color = TextPrimary)
+                Spacer(Modifier.weight(1f))
+                IconButton(onClick = onSearchClick) {
+                    Icon(Icons.Outlined.Search, contentDescription = "搜索", tint = TextPrimary)
+                }
             }
+            HorizontalDivider(thickness = 0.5.dp, color = DividerColor)
         }
         Spacer(Modifier.height(12.dp))
 
@@ -117,17 +123,28 @@ fun ZoneListScreen(
                             }
                         }
 
-                        // ── 全部专区 ─────────────────────────────
+                        // ── 全部专区（5 列网格）─────────────────────
                         otherCat.forEach { cat ->
                             item {
                                 SectionCard(title = cat.name) {
-                                    cat.zones.forEach { zone ->
-                                        ZoneRow(
-                                            zone       = zone,
-                                            isFollowed = zone.topicId in followedIds,
-                                            onClick    = { onZoneClick(zone.topicId, zone.topicName) },
-                                            onFollow   = { vm.toggleFollow(zone) }
-                                        )
+                                    Column(Modifier.padding(horizontal = 4.dp, vertical = 6.dp)) {
+                                        cat.zones.chunked(ZONE_GRID_COLUMNS).forEach { rowZones ->
+                                            Row(Modifier.fillMaxWidth()) {
+                                                rowZones.forEach { zone ->
+                                                    ZoneGridCell(
+                                                        zone       = zone,
+                                                        isFollowed = zone.topicId in followedIds,
+                                                        modifier   = Modifier.weight(1f),
+                                                        onClick    = { onZoneClick(zone.topicId, zone.topicName) },
+                                                        onLongClick = { vm.toggleFollow(zone) }
+                                                    )
+                                                }
+                                                // 末行补空位，避免最后几个被拉宽
+                                                repeat(ZONE_GRID_COLUMNS - rowZones.size) {
+                                                    Spacer(Modifier.weight(1f))
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -200,56 +217,56 @@ private fun HotIcon(zone: Zone, onClick: () -> Unit) {
     }
 }
 
-// ─── Zone list row ────────────────────────────────────────────────────────────
+// ─── Zone grid cell ───────────────────────────────────────────────────────────
+// 5 列网格：243 个专区用列表排要滑约 16000dp，网格压到约 3200dp。
+// 每格宽约 63dp，放不下「关注」按钮，所以：已关注用 logo 右下角标表示，
+// 长按可直接关注/取关，进专区详情页也仍有关注按钮。
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ZoneRow(
+private fun ZoneGridCell(
     zone: Zone,
     isFollowed: Boolean,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
-    onFollow: () -> Unit
+    onLongClick: () -> Unit
 ) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Column(
+        modifier = modifier
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .padding(vertical = 8.dp, horizontal = 2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        AsyncImage(model = zone.topicLogo, contentDescription = zone.topicName,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.size(46.dp).clip(CircleShape).background(AppBg))
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(zone.topicName, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = TextPrimary)
-            Spacer(Modifier.height(2.dp))
-            Text("${zone.count} 成员", fontSize = 12.sp, color = TextTertiary)
+        Box {
+            AsyncImage(
+                model = zone.topicLogo, contentDescription = zone.topicName,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(44.dp).clip(CircleShape).background(AppBg)
+            )
+            if (isFollowed) {
+                Box(
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .size(15.dp)
+                        .background(CardBg, CircleShape)
+                        .padding(1.dp)
+                        .background(HupuRed, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = "已关注",
+                        tint = Color.White, modifier = Modifier.size(9.dp))
+                }
+            }
         }
-        if (isFollowed) {
-            FollowedChip(onClick = onFollow)
-        } else {
-            FollowChip(onClick = onFollow)
-        }
+        Spacer(Modifier.height(5.dp))
+        Text(
+            zone.topicName, fontSize = 11.sp, color = TextPrimary,
+            textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
 // ─── Button chips ─────────────────────────────────────────────────────────────
-
-@Composable
-private fun FollowChip(onClick: () -> Unit) {
-    val chipBg = if (ThemeState.amoled) Color(0xFF2A2D3A) else HupuRed
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .height(30.dp)
-            .defaultMinSize(minWidth = 64.dp)
-            .background(chipBg, RoundedCornerShape(15.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp)
-    ) {
-        Text("+ 关注", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Color.White)
-    }
-}
 
 @Composable
 private fun FollowedChip(onClick: () -> Unit) {

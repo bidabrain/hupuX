@@ -26,7 +26,6 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 import kotlinx.coroutines.delay
-import com.hupux.ui.favorites.FavoritesScreen
 import com.hupux.ui.profile.UserFavoriteListScreen
 import com.hupux.ui.home.HomeScreen
 import com.hupux.ui.post.PostDetailScreen
@@ -52,11 +51,10 @@ private data class NavItem(
     val unselectedIcon: ImageVector
 )
 
+// 搜索移到首页/发现页顶部入口，本地收藏已移除（帖子收藏走虎扑账号，在「我的」里）
 private val navItems = listOf(
     NavItem("home",      "首页", Icons.Filled.Home,      Icons.Outlined.Home),
     NavItem("zone_list", "发现", Icons.Filled.GridView,  Icons.Outlined.GridView),
-    NavItem("search",    "搜索", Icons.Filled.Search,    Icons.Outlined.Search),
-    NavItem("favorites", "收藏", Icons.Filled.Bookmark,  Icons.Outlined.BookmarkBorder),
     NavItem("profile",   "我的", Icons.Filled.Person,    Icons.Outlined.Person)
 )
 
@@ -95,21 +93,19 @@ fun AppNavigation() {
         contentWindowInsets = WindowInsets(0),
         bottomBar = {
             if (showBottomBar) {
-                Box(
+                // 白底导航栏：只用顶部分割线分层，选中态靠红色图标+文字，不再用整块红背景和白胶囊
+                Column(
                     Modifier
                         .fillMaxWidth()
-                        .background(
-                            brush = NavBarBrush,
-                            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-                        )
-                        .navigationBarsPadding()
+                        .background(CardBg)
                 ) {
+                    HorizontalDivider(thickness = 0.5.dp, color = DividerColor)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment     = Alignment.CenterVertically
+                            .navigationBarsPadding()
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         navItems.forEach { item ->
                             val selected = currentRoute == item.route
@@ -128,50 +124,27 @@ fun AppNavigation() {
                                     }
                                 }
                             }
-                            Box(
-                                contentAlignment = Alignment.Center,
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(42.dp)
-                                    .shadow(
-                                        elevation    = if (selected) 6.dp else 2.dp,
-                                        shape        = RoundedCornerShape(21.dp),
-                                        ambientColor = Color.Black.copy(0.25f),
-                                        spotColor    = Color.Black.copy(0.25f)
-                                    )
-                                    .background(
-                                        brush = if (selected)
-                                            androidx.compose.ui.graphics.Brush.verticalGradient(
-                                                listOf(Color.White, Color(0xFFEEEEEE))
-                                            )
-                                        else
-                                            androidx.compose.ui.graphics.Brush.verticalGradient(
-                                                listOf(Color.White.copy(0.28f), Color.White.copy(0.14f))
-                                            ),
-                                        shape = RoundedCornerShape(21.dp)
-                                    )
-                                    .clip(RoundedCornerShape(21.dp))
+                                    .clip(RoundedCornerShape(12.dp))
                                     .clickable(onClick = navigate)
+                                    .padding(vertical = 6.dp)
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center
-                                ) {
-                                    Icon(
-                                        if (selected) item.selectedIcon else item.unselectedIcon,
-                                        contentDescription = item.label,
-                                        tint     = if (selected) HupuRed else Color.White,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(Modifier.width(5.dp))
-                                    Text(
-                                        item.label,
-                                        fontSize   = 13.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color      = if (selected) HupuRed else Color.White,
-                                        letterSpacing = 0.3.sp
-                                    )
-                                }
+                                Icon(
+                                    if (selected) item.selectedIcon else item.unselectedIcon,
+                                    contentDescription = item.label,
+                                    tint     = if (selected) HupuRed else TextSecondary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(Modifier.height(3.dp))
+                                Text(
+                                    item.label,
+                                    fontSize   = 12.sp,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                    color      = if (selected) HupuRed else TextSecondary
+                                )
                             }
                         }
                     }
@@ -191,20 +164,22 @@ fun AppNavigation() {
                         navController.navigate("topic/$tagId/${java.net.URLEncoder.encode(name, "UTF-8")}")
                     },
                     onSettingsClick    = { navController.navigate("settings") },
+                    onSearchClick      = { navController.navigate("search") },
                     scrollToTopTrigger = homeScrollTrigger
                 )
             }
             composable("zone_list") {
                 ZoneListScreen(
                     onZoneClick        = { id, name -> navController.navigate("zone/$id/$name") },
+                    onSearchClick      = { navController.navigate("search") },
                     scrollToTopTrigger = zoneScrollTrigger
                 )
             }
             composable("search") {
-                SearchScreen(onPostClick = { tid -> navController.navigate("post/$tid") })
-            }
-            composable("favorites") {
-                FavoritesScreen(onPostClick = { tid -> navController.navigate("post/$tid") })
+                SearchScreen(
+                    onPostClick = { tid -> navController.navigate("post/$tid") },
+                    onBack      = { navController.popBackStack() }
+                )
             }
             composable("profile") {
                 ProfileScreen(

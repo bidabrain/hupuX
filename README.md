@@ -20,6 +20,7 @@
 | 楼中楼递归展开 / 评论排序 | ✅ | ✅ | ✅ |
 | 登录（WebView / 粘贴 Cookie） | ✅ | ✅ | ✅ |
 | 点赞 / 收藏 / 推荐 / 回复（带图） | ✅ | ✅ | ✅ |
+| 深色 / AMOLED 省电主题 | ✅ | — | — |
 | 发帖（图片 / 视频，OSS 直传） | ✅ | ✅ | ⚠️ 只读 |
 | 我的 / 子列表 / 消息中心 | ✅ | ✅ | ✅ |
 | 图片全屏查看 / 长按保存相册 | ✅ | — | — |
@@ -32,19 +33,18 @@
 - **推荐**：从虎扑首页聚合热门帖子，顶部图片轮播展示图文内容
 - **热榜**：展示虎扑热榜话题（按热度排名），点击话题进入其帖子列表，再点帖子进入详情
 - **关注**：汇总所有已关注专区的最新动态
-- 右上角设置入口
+- 右上角：搜索 / 深色主题切换 / 设置入口
 
 ### 发现
 - 浏览全部专区分类（篮球、足球、综合等）
+- **5 列网格排布**：共 243 个专区，网格比列表节省约 5 倍纵向空间；已关注的专区 logo 右下角带对勾角标，**长按可直接关注 / 取关**
 - 进入专区查看帖子列表，支持加载更多
 - **关注专区（需要登录）**：专区详情页右上角「关注」按钮
 - **发帖（需要登录）**：进入任意专区后显示发帖入口，填写标题和正文即可发布；支持图片 / 视频上传
 
 ### 搜索
 - 关键词搜索帖子
-
-### 收藏
-- 一键收藏帖子，本地持久化存储，离线可用
+- Android 端入口在**首页 / 发现页顶栏的搜索图标**（不再占用底部导航位）
 
 ### 帖子详情
 - 正文完整显示图片（含虎扑自定义 `<center class="hupu-img">` 格式）与视频
@@ -103,7 +103,7 @@
 | 桌面端 REST（`my.hupu.com/pcmapi/`） | 个人资料、我的发帖/回帖/推荐、消息中心（需 Cookie） |
 | 虎扑图床 + 阿里云 OSS | 发帖 / 回复插图与视频上传（STS 临时凭证直传，OSS V1 手动签名） |
 
-详细 API 文档见 [`doc/api/`](doc/api/README.md)。
+详细 API 文档见 [`doc/api/`](doc/api/README.md)；界面设计规范（颜色 Token / 层级 / 导航 / 网格）见 [`doc/ui-design.md`](doc/ui-design.md)。
 
 ---
 
@@ -128,7 +128,7 @@ hupuX/
 └── ios/                       # iOS 模块（SwiftUI，独立 Xcode 工程）
     └── HupuX/HupuX/
         ├── HupuXApp.swift / RootView.swift    # 入口 + 底部 Tab
-        ├── HomeView / ZoneListView / SearchView / FavoritesView / ProfileView
+        ├── HomeView / ZoneListView / SearchView / ProfileView
         ├── PostDetailView / ZoneDetailView / TopicDetailView / MessageView
         ├── NewPostView / SettingsView / LoginWebView
         ├── HupuUploader.swift                 # 图片/视频 OSS 上传（CryptoKit 签名）

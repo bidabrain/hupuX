@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -49,6 +50,7 @@ fun HomeScreen(
     onPostClick: (String) -> Unit,
     onTopicClick: (Long, String) -> Unit = { _, _ -> },
     onSettingsClick: () -> Unit = {},
+    onSearchClick: () -> Unit = {},
     scrollToTopTrigger: Int = 0,
     vm: HomeViewModel = koinViewModel()
 ) {
@@ -93,10 +95,7 @@ fun HomeScreen(
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .background(
-                        HeaderBrush,
-                        RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
-                    )
+                    .background(HeaderBg)
                     .statusBarsPadding()
             ) {
                 Column {
@@ -105,22 +104,25 @@ fun HomeScreen(
                         Modifier
                             .fillMaxWidth()
                             .height(52.dp)
-                            .padding(horizontal = 20.dp),
+                            .padding(start = 20.dp, end = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text("虎扑", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold,
-                            color = Color.White)
+                            color = HupuRed)
                         Spacer(Modifier.weight(1f))
+                        IconButton(onClick = onSearchClick) {
+                            Icon(Icons.Outlined.Search, contentDescription = "搜索", tint = TextPrimary)
+                        }
                         IconButton(onClick = { ThemeState.toggle() }) {
                             Icon(
                                 if (ThemeState.amoled) Icons.Outlined.LightMode
                                 else Icons.Outlined.DarkMode,
                                 contentDescription = if (ThemeState.amoled) "关闭省电黑主题" else "开启省电黑主题",
-                                tint = Color.White
+                                tint = TextPrimary
                             )
                         }
                         IconButton(onClick = onSettingsClick) {
-                            Icon(Icons.Outlined.Settings, contentDescription = "设置", tint = Color.White)
+                            Icon(Icons.Outlined.Settings, contentDescription = "设置", tint = TextPrimary)
                         }
                     }
 
@@ -129,7 +131,7 @@ fun HomeScreen(
                         NewsBanner(state.bannerPosts, onPostClick)
                     } else if (state.isLoading) {
                         Box(Modifier.fillMaxWidth().height(220.dp)
-                            .background(Color.White.copy(alpha = 0.1f)))
+                            .background(BgGray))
                     }
 
                     // Plastic tabs
@@ -248,33 +250,36 @@ private fun NewsBanner(posts: List<Post>, onPostClick: (String) -> Unit) {
 private fun PlasticTabRow(selectedIndex: Int, followedCount: Int, onSelect: (Int) -> Unit) {
     val labels = listOf("推荐", "热榜",
         if (followedCount > 0) "关注 ($followedCount)" else "关注")
+    // 下划线式 Tab：不再用大面积色块胶囊，选中态靠红色文字 + 3dp 指示条
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+        horizontalArrangement = Arrangement.Start
     ) {
-        val darkLike = ThemeState.amoled || isSystemInDarkTheme()
-        // 选中：白塑料（黑底上醒目）；未选中：深色主题用深灰、浅色主题用红
-        val selectedBrush = Brush.verticalGradient(listOf(Color.White, Color(0xFFD8D8D8)))
-        val unselectedBrush = if (darkLike)
-            Brush.verticalGradient(listOf(Color(0xFF2A2D3A), Color(0xFF1D2028)))
-        else
-            Brush.verticalGradient(listOf(Color(0xFFFF3B4C), Color(0xFFBB0012)))
         labels.forEachIndexed { i, label ->
             val sel = i == selectedIndex
-            Box(
-                contentAlignment = Alignment.Center,
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
-                    .weight(1f)
-                    .height(36.dp)
-                    .shadow(if (sel) 6.dp else 2.dp, RoundedCornerShape(18.dp),
-                        ambientColor = Color.Black.copy(.25f), spotColor = Color.Black.copy(.25f))
-                    .background(
-                        if (sel) selectedBrush else unselectedBrush,
-                        RoundedCornerShape(18.dp))
+                    .clip(RoundedCornerShape(8.dp))
                     .clickable { onSelect(i) }
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
-                Text(label, fontSize = 14.sp, fontWeight = FontWeight.Bold,
-                    color = if (sel) TextSecondary else Color.White, letterSpacing = 0.5.sp)
+                Text(
+                    label,
+                    fontSize   = 15.sp,
+                    fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
+                    color      = if (sel) HupuRed else TextSecondary
+                )
+                Spacer(Modifier.height(5.dp))
+                Box(
+                    Modifier
+                        .width(20.dp)
+                        .height(3.dp)
+                        .background(
+                            if (sel) HupuRed else Color.Transparent,
+                            RoundedCornerShape(2.dp)
+                        )
+                )
             }
         }
     }
@@ -403,17 +408,18 @@ private fun FollowedFeed(
 
 @Composable
 fun PostCard(post: Post, onClick: () -> Unit) {
+    // 阴影压到 1dp：层级靠背景色 + 间距 + 字重表达，而不是靠一块块「浮起来」的卡片
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 5.dp)
+            .padding(horizontal = 16.dp, vertical = 6.dp)
             .clickable(onClick = onClick),
         shape         = RoundedCornerShape(16.dp),
         color         = CardBg,
-        shadowElevation = 4.dp,
+        shadowElevation = 1.dp,
         tonalElevation  = 0.dp
     ) {
-        Column(Modifier.padding(14.dp)) {
+        Column(Modifier.padding(16.dp)) {
             when {
                 post.images.size >= 3 -> ThreePicContent(post)
                 post.images.size == 1 -> OnePicContent(post)
@@ -427,26 +433,26 @@ fun PostCard(post: Post, onClick: () -> Unit) {
 
 @Composable
 private fun TextContent(post: Post) {
-    Text(post.title, fontSize = 15.sp, lineHeight = 22.sp,
+    Text(post.title, fontSize = 17.sp, fontWeight = FontWeight.Medium, lineHeight = 24.sp,
         maxLines = 3, overflow = TextOverflow.Ellipsis, color = TextPrimary)
 }
 
 @Composable
 private fun OnePicContent(post: Post) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(post.title, fontSize = 15.sp, lineHeight = 22.sp,
+        Text(post.title, fontSize = 17.sp, fontWeight = FontWeight.Medium, lineHeight = 24.sp,
             maxLines = 3, overflow = TextOverflow.Ellipsis,
             color = TextPrimary, modifier = Modifier.weight(1f))
         AsyncImage(model = post.images.first(), contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = Modifier.size(80.dp).clip(RoundedCornerShape(10.dp)))
+            modifier = Modifier.width(112.dp).height(70.dp).clip(RoundedCornerShape(12.dp)))
     }
 }
 
 @Composable
 private fun ThreePicContent(post: Post) {
     Column {
-        Text(post.title, fontSize = 15.sp, lineHeight = 22.sp,
+        Text(post.title, fontSize = 17.sp, fontWeight = FontWeight.Medium, lineHeight = 24.sp,
             maxLines = 2, overflow = TextOverflow.Ellipsis, color = TextPrimary)
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -464,15 +470,17 @@ private fun ThreePicContent(post: Post) {
 private fun PostStats(post: Post) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (post.label.isNotEmpty()) {
-            Surface(color = AppBg, shape = RoundedCornerShape(4.dp)) {
-                Text(post.label, fontSize = 11.sp, color = TextSecondary,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+            // 分类标签：浅红底 + 品牌红文字的轻量胶囊，不用深色实心块
+            Surface(color = TagBg, shape = RoundedCornerShape(999.dp)) {
+                Text(post.label, fontSize = 12.sp, color = HupuRed,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
             }
             Spacer(Modifier.width(8.dp))
         }
         Text("💬 ${post.replies}", fontSize = 12.sp, color = TextTertiary)
         Spacer(Modifier.width(10.dp))
-        Text("🔥 ${post.lights}", fontSize = 12.sp, color = TextTertiary)
+        // 热度用专门的高亮色，和普通互动数据拉开层级
+        Text("🔥 ${post.lights}", fontSize = 12.sp, color = HotColor)
     }
 }
 
@@ -500,7 +508,7 @@ private fun FollowedPostCard(post: Post, onClick: () -> Unit) {
                 Text(post.time, fontSize = 11.sp, color = TextTertiary)
             }
             Spacer(Modifier.height(7.dp))
-            Text(post.title, fontSize = 15.sp, lineHeight = 22.sp,
+            Text(post.title, fontSize = 17.sp, fontWeight = FontWeight.Medium, lineHeight = 24.sp,
                 maxLines = 2, overflow = TextOverflow.Ellipsis, color = TextPrimary)
             Spacer(Modifier.height(8.dp))
             Row {

@@ -2,7 +2,7 @@
 //  RootView.swift
 //  HupuX
 //
-//  底部 Tab 框架，对齐安卓底部导航：首页/发现/搜索/收藏/我的（红底白字）。
+//  底部 Tab 框架：首页/发现/搜索/我的。本地收藏已移除，帖子收藏走虎扑账号（在「我的」里）。
 //  目前仅首页有内容，其余为占位，后续逐屏补。
 //
 
@@ -42,8 +42,6 @@ struct RootView: View {
                 .tabItem { Label("发现", systemImage: "square.grid.2x2.fill") }
             SearchView()
                 .tabItem { Label("搜索", systemImage: "magnifyingglass") }
-            FavoritesView()
-                .tabItem { Label("收藏", systemImage: "bookmark.fill") }
             ProfileView()
                 .tabItem { Label("我的", systemImage: "person.fill") }
         }

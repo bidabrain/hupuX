@@ -6,7 +6,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.application
-import com.hupux.data.repository.FavoritesRepository
 import com.hupux.data.repository.FollowedZonesRepository
 import com.hupux.data.repository.HomeRepository
 import com.hupux.data.repository.MessageRepository
@@ -33,7 +32,6 @@ fun main() {
             App(
                 homeRepo       = koin.get<HomeRepository>(),
                 zoneRepo       = koin.get<ZoneRepository>(),
-                favRepo        = koin.get<FavoritesRepository>(),
                 followedRepo   = koin.get<FollowedZonesRepository>(),
                 profileRepo    = koin.get<ProfileRepository>(),
                 messageRepo    = koin.get<MessageRepository>(),

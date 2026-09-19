@@ -6,7 +6,6 @@ import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import com.hupux.data.CookieStorage
 import com.hupux.data.local.CookiePreferences
 import com.hupux.data.local.ResilientSqliteCallback
-import com.hupux.data.repository.FavoritesRepository
 import com.hupux.data.repository.FollowedZonesRepository
 import com.hupux.shared.db.HupuDatabase
 import com.hupux.data.repository.HomeRepository
@@ -18,7 +17,6 @@ import com.hupux.data.UpdateChecker
 import com.hupux.data.scraper.HupuDesktopScraper
 import com.hupux.data.scraper.HupuImageUploader
 import com.hupux.data.scraper.HupuScraper
-import com.hupux.ui.favorites.FavoritesViewModel
 import com.hupux.ui.home.HomeViewModel
 import com.hupux.ui.post.PostDetailViewModel
 import com.hupux.ui.profile.LoginWebViewViewModel
@@ -86,14 +84,12 @@ val appModule = module {
     single { ZoneRepository(get()) }
     single { ProfileRepository(get(), get<CookieStorage>()) }
     single { MessageRepository(get()) }
-    single { FavoritesRepository(get<HupuDatabase>()) }
     single { FollowedZonesRepository(get<HupuDatabase>()) }
     single { PostRepository(get(), get(), get<CookiePreferences>(), get()) }
 
     // ── ViewModels ────────────────────────────────────────────────────────────
     viewModel { HomeViewModel(get(), get(), get()) }
-    viewModel { FavoritesViewModel(get()) }
-    viewModel { PostDetailViewModel(get(), get(), get<CookiePreferences>()) }
+    viewModel { PostDetailViewModel(get(), get<CookiePreferences>()) }
     viewModel { LoginWebViewViewModel(get<CookiePreferences>()) }
     viewModel { MessageViewModel(get()) }
     viewModel { NewPostViewModel(get(), androidContext()) }

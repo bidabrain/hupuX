@@ -78,24 +78,17 @@ fun SettingsScreen(
 
     Column(Modifier.fillMaxSize().background(AppBg)) {
 
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .background(
-                    HeaderBrush,
-                    RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
-                )
-                .statusBarsPadding()
-        ) {
+        Column(Modifier.fillMaxWidth().background(HeaderBg).statusBarsPadding()) {
             Row(
                 Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.Filled.ArrowBack, contentDescription = "返回", tint = Color.White)
+                    Icon(Icons.Filled.ArrowBack, contentDescription = "返回", tint = TextPrimary)
                 }
-                Text("设置", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                Text("设置", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
             }
+            HorizontalDivider(thickness = 0.5.dp, color = DividerColor)
         }
 
         Column(

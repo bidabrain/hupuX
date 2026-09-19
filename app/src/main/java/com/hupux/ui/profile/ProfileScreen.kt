@@ -46,19 +46,14 @@ fun ProfileScreen(
 
     Column(Modifier.fillMaxSize().background(AppBg)) {
 
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .background(
-                    HeaderBrush,
-                    RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
-                )
-                .statusBarsPadding()
-                .height(52.dp)
-                .padding(horizontal = 20.dp),
-            contentAlignment = Alignment.CenterStart
-        ) {
-            Text("我的", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+        Column(Modifier.fillMaxWidth().background(HeaderBg).statusBarsPadding()) {
+            Box(
+                Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 20.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Text("我的", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+            }
+            HorizontalDivider(thickness = 0.5.dp, color = DividerColor)
         }
 
         when (val s = state) {

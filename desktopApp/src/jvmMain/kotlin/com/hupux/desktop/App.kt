@@ -18,7 +18,6 @@ import androidx.compose.ui.unit.sp
 import com.hupux.desktop.ui.theme.HupuRed
 import com.hupux.desktop.ui.theme.HupuXTheme
 import com.hupux.data.model.Zone
-import com.hupux.data.repository.FavoritesRepository
 import com.hupux.data.repository.FollowedZonesRepository
 import com.hupux.data.repository.HomeRepository
 import com.hupux.data.repository.MessageRepository
@@ -35,7 +34,6 @@ private sealed class Screen {
     object Home : Screen()
     object ZoneList : Screen()
     object Search : Screen()
-    object Favorites : Screen()
     object Profile : Screen()
     object Settings : Screen()
     object Messages : Screen()
@@ -53,7 +51,6 @@ private val tabs = listOf(
     Pair(Screen.Home,      "首页"),
     Pair(Screen.ZoneList,  "发现"),
     Pair(Screen.Search,    "搜索"),
-    Pair(Screen.Favorites, "收藏"),
     Pair(Screen.Profile,   "我的")
 )
 
@@ -61,7 +58,6 @@ private val tabs = listOf(
 fun App(
     homeRepo:       HomeRepository,
     zoneRepo:       ZoneRepository,
-    favRepo:        FavoritesRepository,
     followedRepo:   FollowedZonesRepository,
     profileRepo:    ProfileRepository,
     messageRepo:    MessageRepository,
@@ -82,8 +78,7 @@ fun App(
             is Screen.Home, is Screen.PostDetail, is Screen.TopicDetail -> 0
             is Screen.ZoneList, is Screen.ZoneDetail                -> 1
             is Screen.Search                                        -> 2
-            is Screen.Favorites                                     -> 3
-            else                                                    -> 4
+            else                                                    -> 3
         }
     }
 
@@ -192,7 +187,6 @@ fun App(
 
                 is Screen.Search -> SearchScreen(scraper) { tid -> push(Screen.PostDetail(tid)) }
 
-                is Screen.Favorites -> FavoritesScreen(favRepo) { tid -> push(Screen.PostDetail(tid)) }
 
                 is Screen.Profile -> ProfileScreen(
                     repo = profileRepo,

@@ -4,7 +4,6 @@ import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import com.hupux.data.CookieStorage
 import com.hupux.data.UpdateChecker
-import com.hupux.data.repository.FavoritesRepository
 import com.hupux.data.repository.FollowedZonesRepository
 import com.hupux.data.repository.HomeRepository
 import com.hupux.data.repository.MessageRepository
@@ -61,6 +60,5 @@ val desktopModule = module {
     single { ZoneRepository(get()) }
     single { ProfileRepository(get(), get<CookieStorage>()) }
     single { MessageRepository(get()) }
-    single { FavoritesRepository(get<HupuDatabase>()) }
     single { FollowedZonesRepository(get<HupuDatabase>()) }
 }

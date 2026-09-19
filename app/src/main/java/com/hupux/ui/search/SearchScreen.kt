@@ -9,7 +9,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,7 +26,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.hupux.ui.theme.AppBg
 import com.hupux.ui.theme.HupuRed
-import com.hupux.ui.theme.HeaderBrush
+import com.hupux.ui.theme.HeaderBg
+import com.hupux.ui.theme.TextPrimary
+import com.hupux.ui.theme.DividerColor
 import com.hupux.ui.theme.ThemeState
 
 private val POST_URL_REGEX = Regex("""m\.hupu\.com/bbs/(\d+)(?:\.html)?""")
@@ -62,7 +69,7 @@ private const val JS_DISABLE_DARK = """(function(){
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun SearchScreen(onPostClick: (String) -> Unit) {
+fun SearchScreen(onPostClick: (String) -> Unit, onBack: () -> Unit) {
     val onPostClickRef = rememberUpdatedState(onPostClick)
     val isDark         = ThemeState.amoled || isSystemInDarkTheme()
     val isDarkRef      = rememberUpdatedState(isDark)
@@ -77,22 +84,19 @@ fun SearchScreen(onPostClick: (String) -> Unit) {
     }
 
     Column(Modifier.fillMaxSize().background(bgColor)) {
-        // 顶栏
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .background(
-                    HeaderBrush,
-                    RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
-                )
-                .statusBarsPadding()
-        ) {
+        // 顶栏（搜索已从底部 tab 改为首页/发现页入口，这里需要返回按钮）
+        Column(Modifier.fillMaxWidth().background(HeaderBg).statusBarsPadding()) {
             Row(
-                Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 20.dp),
+                Modifier.fillMaxWidth().height(52.dp).padding(start = 4.dp, end = 20.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("搜索", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "返回", tint = TextPrimary)
+                }
+                Text("搜索", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
             }
+            HorizontalDivider(thickness = 0.5.dp, color = DividerColor)
         }
 
         AndroidView(

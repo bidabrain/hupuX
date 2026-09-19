@@ -123,8 +123,7 @@ fun PostDetailScreen(
         Box(
             Modifier
                 .fillMaxWidth()
-                .background(HeaderBrush,
-                    RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
+                .background(HeaderBg)
                 .statusBarsPadding()
         ) {
             Row(
@@ -132,10 +131,10 @@ fun PostDetailScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = Color.White)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = TextPrimary)
                 }
                 Text(s?.post?.topicName ?: "", fontSize = 16.sp, fontWeight = FontWeight.Medium,
-                    color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    color = TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f))
                 if (s != null) {
                     val context = LocalContext.current
@@ -148,17 +147,14 @@ fun PostDetailScreen(
                         }
                         context.startActivity(Intent.createChooser(intent, "分享到"))
                     }) {
-                        Icon(Icons.Default.Share, contentDescription = "分享", tint = Color.White)
-                    }
-                    IconButton(onClick = vm::toggleFavorite) {
-                        Icon(
-                            if (s.isFavorite) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                            contentDescription = "收藏",
-                            tint = if (s.isFavorite) Color(0xFFFFD700) else Color.White
-                        )
+                        Icon(Icons.Default.Share, contentDescription = "分享", tint = TextPrimary)
                     }
                 }
             }
+            HorizontalDivider(
+                Modifier.align(Alignment.BottomCenter),
+                thickness = 0.5.dp, color = DividerColor
+            )
         }
         Spacer(Modifier.height(8.dp))
 

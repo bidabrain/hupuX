@@ -4,10 +4,8 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hupux.data.local.CookiePreferences
-import com.hupux.data.local.FavoriteEntity
 import com.hupux.data.model.Comment
 import com.hupux.data.model.PostDetail
-import com.hupux.data.repository.FavoritesRepository
 import com.hupux.data.repository.PostRepository
 import com.hupux.ui.profile.ImageItem
 import kotlinx.coroutines.Job
@@ -22,7 +20,6 @@ sealed class PostDetailUiState {
     object Loading : PostDetailUiState()
     data class Success(
         val post: PostDetail,
-        val isFavorite: Boolean,
         val subRepliesMap: Map<String, List<Comment>> = emptyMap(),
         val replyStack: List<String> = emptyList(),
         val isLoadingSubReplies: Boolean = false,
@@ -61,7 +58,6 @@ sealed class PostDetailUiState {
 
 class PostDetailViewModel constructor(
     private val postRepo: PostRepository,
-    private val favRepo: FavoritesRepository,
     private val cookiePrefs: CookiePreferences
 ) : ViewModel() {
 
@@ -77,12 +73,10 @@ class PostDetailViewModel constructor(
             _state.value = PostDetailUiState.Loading
             runCatching { postRepo.getPost(tid) }
                 .onSuccess { post ->
-                    val fav = favRepo.isFavorite(tid)
                     // 从初始评论列表建立父子关系索引
                     val initialMap = buildSubRepliesMap(post.comments)
                     _state.value = PostDetailUiState.Success(
                         post          = post,
-                        isFavorite    = fav,
                         subRepliesMap = initialMap,
                         isRecommended = post.isRecommended
                     )
@@ -371,23 +365,6 @@ class PostDetailViewModel constructor(
                 val s2 = _state.value as? PostDetailUiState.Success ?: return@onFailure
                 _state.value = s2.copy(isRecommended = !newRecommended, isRecommending = false)
             }
-        }
-    }
-
-    fun toggleFavorite() {
-        val s = _state.value as? PostDetailUiState.Success ?: return
-        viewModelScope.launch {
-            favRepo.toggle(
-                FavoriteEntity(
-                    tid      = currentTid,
-                    title    = s.post.title,
-                    url      = "https://m.hupu.com/bbs/$currentTid.html",
-                    label    = s.post.topicName,
-                    replies  = s.post.replies,
-                    imageUrl = ""
-                )
-            )
-            _state.value = s.copy(isFavorite = !s.isFavorite)
         }
     }
 
