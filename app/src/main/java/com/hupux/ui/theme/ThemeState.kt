@@ -59,17 +59,17 @@ object ThemeState {
         fontSize = FontSizeLevel.from(p.getString(KEY_FONT, null))
     }
 
-    fun setMode(value: ThemeMode) {
+    fun updateMode(value: ThemeMode) {
         mode = value
         prefs?.edit()?.putString(KEY_MODE, value.name)?.apply()
     }
 
-    fun setAmoled(value: Boolean) {
+    fun updateAmoled(value: Boolean) {
         amoled = value
         prefs?.edit()?.putBoolean(KEY_AMOLED, value)?.apply()
     }
 
-    fun setFontSize(value: FontSizeLevel) {
+    fun updateFontSize(value: FontSizeLevel) {
         fontSize = value
         prefs?.edit()?.putString(KEY_FONT, value.name)?.apply()
     }

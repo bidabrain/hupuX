@@ -221,7 +221,7 @@ fun SettingsScreen(
                     OptionRow(
                         options  = ThemeMode.entries.map { it.label },
                         selected = ThemeMode.entries.indexOf(ThemeState.mode),
-                        onSelect = { ThemeState.setMode(ThemeMode.entries[it]) }
+                        onSelect = { ThemeState.updateMode(ThemeMode.entries[it]) }
                     )
 
                     // 纯黑仅在实际处于深色时才有意义
@@ -234,7 +234,7 @@ fun SettingsScreen(
                             }
                             Switch(
                                 checked = ThemeState.amoled,
-                                onCheckedChange = { ThemeState.setAmoled(it) },
+                                onCheckedChange = { ThemeState.updateAmoled(it) },
                                 colors = SwitchDefaults.colors(checkedTrackColor = HupuRed)
                             )
                         }
@@ -249,7 +249,7 @@ fun SettingsScreen(
                     OptionRow(
                         options  = FontSizeLevel.entries.map { it.label },
                         selected = FontSizeLevel.entries.indexOf(ThemeState.fontSize),
-                        onSelect = { ThemeState.setFontSize(FontSizeLevel.entries[it]) }
+                        onSelect = { ThemeState.updateFontSize(FontSizeLevel.entries[it]) }
                     )
                     Spacer(Modifier.height(10.dp))
                     Text(
