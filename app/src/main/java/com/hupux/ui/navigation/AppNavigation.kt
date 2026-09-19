@@ -37,6 +37,8 @@ import com.hupux.ui.profile.UserRecommendListScreen
 import com.hupux.ui.profile.UserReplyListScreen
 import com.hupux.ui.profile.UserSpaceScreen
 import com.hupux.ui.profile.UserThreadListScreen
+import com.hupux.ui.score.ScoreDetailScreen
+import com.hupux.ui.score.ScoreScreen
 import com.hupux.ui.search.SearchScreen
 import com.hupux.ui.settings.SettingsScreen
 import com.hupux.ui.theme.*
@@ -53,9 +55,10 @@ private data class NavItem(
 
 // 搜索移到首页/发现页顶部入口，本地收藏已移除（帖子收藏走虎扑账号，在「我的」里）
 private val navItems = listOf(
-    NavItem("home",      "首页", Icons.Filled.Home,      Icons.Outlined.Home),
-    NavItem("zone_list", "发现", Icons.Filled.GridView,  Icons.Outlined.GridView),
-    NavItem("profile",   "我的", Icons.Filled.Person,    Icons.Outlined.Person)
+    NavItem("home",      "首页", Icons.Filled.Home,       Icons.Outlined.Home),
+    NavItem("zone_list", "发现", Icons.Filled.GridView,   Icons.Outlined.GridView),
+    NavItem("score",     "评分", Icons.Filled.Star,       Icons.Outlined.StarBorder),
+    NavItem("profile",   "我的", Icons.Filled.Person,     Icons.Outlined.Person)
 )
 
 @Composable
@@ -68,6 +71,7 @@ fun AppNavigation() {
     // 双击同一 tab 时递增，触发对应页面滚到顶部
     var homeScrollTrigger by remember { mutableStateOf(0) }
     var zoneScrollTrigger by remember { mutableStateOf(0) }
+    var scoreScrollTrigger by remember { mutableStateOf(0) }
 
     // 二次返回退出
     val context = LocalContext.current
@@ -115,6 +119,7 @@ fun AppNavigation() {
                                     when (item.route) {
                                         "home"      -> homeScrollTrigger++
                                         "zone_list" -> zoneScrollTrigger++
+                                        "score"     -> scoreScrollTrigger++
                                     }
                                 } else {
                                     navController.navigate(item.route) {
@@ -173,6 +178,27 @@ fun AppNavigation() {
                     onZoneClick        = { id, name -> navController.navigate("zone/$id/$name") },
                     onSearchClick      = { navController.navigate("search") },
                     scrollToTopTrigger = zoneScrollTrigger
+                )
+            }
+            composable("score") {
+                ScoreScreen(
+                    onMatchClick = { bizType, bizNo ->
+                        navController.navigate("score_detail/$bizType/$bizNo")
+                    },
+                    scrollToTopTrigger = scoreScrollTrigger
+                )
+            }
+            composable(
+                "score_detail/{bizType}/{bizNo}",
+                arguments = listOf(
+                    navArgument("bizType") { type = NavType.StringType },
+                    navArgument("bizNo")   { type = NavType.StringType }
+                )
+            ) { entry ->
+                ScoreDetailScreen(
+                    bizType = entry.arguments?.getString("bizType") ?: "",
+                    bizNo   = entry.arguments?.getString("bizNo") ?: "",
+                    onBack  = { navController.popBackStack() }
                 )
             }
             composable("search") {
