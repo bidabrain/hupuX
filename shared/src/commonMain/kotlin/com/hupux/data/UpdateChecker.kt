@@ -1,14 +1,22 @@
 package com.hupux.data
 
-import com.hupux.data.scraper.parseJsonObject
-import com.hupux.data.scraper.str
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
 
-/** CI 在推送 main 后用 `v<appVersion>` 打 tag 发 release，所以最新版本号就是 latest release 的 tag。 */
-private const val LATEST_RELEASE_API = "https://api.github.com/repos/bidabrain/hupuX/releases/latest"
+/**
+ * CI 在推送 main 后用 `v<appVersion>` 打 tag 发 release，所以最新版本号就是最新 release 的 tag。
+ *
+ * 这里刻意**不用** `api.github.com`：GitHub 对未认证的 API 调用限流到
+ * **每个 IP 每小时 60 次**，同一网络下的其它请求（比如 CI 轮询）会把配额吃光，
+ * 用户就会看到「API rate limit exceeded for <IP>」。
+ * release 的 atom feed 是静态文件，不受该限制。
+ */
+private const val RELEASES_ATOM = "https://github.com/bidabrain/hupuX/releases.atom"
+
+/** atom 里每个 entry 的链接形如 .../releases/tag/v1.8.7，第一个即最新 */
+private val TAG_REGEX = Regex("""releases/tag/([^"<\s]+)""")
 
 const val GITHUB_RELEASES_URL = "https://github.com/bidabrain/hupuX/releases/latest"
 
@@ -32,32 +40,22 @@ class UpdateChecker(private val client: HttpClient) {
     /** @param currentVersion 形如 "1.7.0"，带不带 v 前缀都行 */
     suspend fun check(currentVersion: String): UpdateCheckResult {
         val body = try {
-            client.get(LATEST_RELEASE_API) {
-                header("Accept", "application/vnd.github+json")
-                // GitHub API 强制要求 User-Agent，否则 403
+            client.get(RELEASES_ATOM) {
+                header("Accept", "application/atom+xml")
                 header("User-Agent", "hupuX-app")
             }.bodyAsText()
         } catch (e: Exception) {
             return failed(e.message ?: "网络请求失败")
         }
 
-        val root = try {
-            parseJsonObject(body)
-        } catch (_: Exception) {
-            return failed("返回内容无法解析")
-        }
-
-        val tag = root.str("tag_name")
-        if (tag.isNullOrBlank()) {
-            // GitHub 的错误响应（限流、仓库无 release 等）会带 message 字段
-            return failed(root.str("message") ?: "未获取到版本信息")
-        }
+        val tag = TAG_REGEX.find(body)?.groupValues?.get(1)
+        if (tag.isNullOrBlank()) return failed("未获取到版本信息")
 
         val latest = normalize(tag)
         return UpdateCheckResult(
             latest     = latest,
             hasUpdate  = compareVersions(latest, normalize(currentVersion)) > 0,
-            releaseUrl = root.str("html_url") ?: GITHUB_RELEASES_URL,
+            releaseUrl = "https://github.com/bidabrain/hupuX/releases/tag/$tag",
             error      = null
         )
     }

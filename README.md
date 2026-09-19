@@ -79,6 +79,7 @@
 
 ### 设置 → 关于
 - **检查更新**：对比 GitHub 最新 release 的版本号，有新版可一键跳转下载页
+  （走 release 的 atom feed 而非 GitHub API——后者对未认证请求限流到每 IP 每小时 60 次）
 
 ---
 
