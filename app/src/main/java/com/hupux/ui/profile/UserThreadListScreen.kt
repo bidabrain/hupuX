@@ -26,6 +26,7 @@ import org.koin.androidx.compose.koinViewModel
 import coil3.compose.AsyncImage
 import com.hupux.data.model.UserThread
 import com.hupux.ui.home.PillButton
+import com.hupux.ui.components.HupuTopBar
 import com.hupux.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -37,25 +38,7 @@ fun UserThreadListScreen(
     vm: UserThreadListViewModel = koinViewModel()
 ) {
     Column(Modifier.fillMaxSize().background(AppBg)) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(listOf(HupuRed, Color(0xFFCC000E))),
-                    RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
-                )
-                .statusBarsPadding()
-        ) {
-            Row(
-                Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.Filled.ArrowBack, contentDescription = "返回", tint = Color.White)
-                }
-                Text("我的发帖", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
-            }
-        }
+        HupuTopBar(title = "我的发帖", onBack = onBack)
         UserThreadListBody(vm, onPostClick, Modifier.weight(1f))
     }
 }

@@ -724,7 +724,7 @@ private fun PostBodyWebView(html: String, modifier: Modifier = Modifier) {
     // 防止 LazyColumn 回收 item 后重进 composition 时高度重置为 200.dp 导致白色空档
     val heightState = rememberSaveable { mutableIntStateOf(200) }
     var heightDp by heightState
-    val isDark       = ThemeState.amoled || isSystemInDarkTheme()
+    val isDark       = isDarkTheme
     val textHex      = if (isDark) "#EBEBF0" else "#1A1A2E"
     val bgColor      = CardBg.toArgb()
     val onImageClick = LocalImageClick.current

@@ -9,6 +9,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.core.view.WindowCompat
 import com.hupux.ui.navigation.AppNavigation
 import com.hupux.ui.theme.HupuXTheme
+import com.hupux.ui.theme.isDarkTheme
 import com.hupux.ui.theme.ThemeState
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -18,8 +19,8 @@ class MainActivity : ComponentActivity() {
         val insetsController = WindowCompat.getInsetsController(window, window.decorView)
         setContent {
             HupuXTheme {
-                // AMOLED 纯黑同样按深色处理，状态栏/导航栏用浅色图标
-                val dark = ThemeState.amoled || isSystemInDarkTheme()
+                // 深色（含纯黑）时状态栏/导航栏用浅色图标
+                val dark = isDarkTheme
                 LaunchedEffect(dark) {
                     insetsController.isAppearanceLightStatusBars     = !dark
                     insetsController.isAppearanceLightNavigationBars = !dark

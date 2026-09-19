@@ -46,57 +46,50 @@ fun MessageScreen(
 
     Column(Modifier.fillMaxSize().background(AppBg)) {
         // Top bar
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(listOf(HupuRed, Color(0xFFCC000E))),
-                    RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
-                )
-                .statusBarsPadding()
-        ) {
-            Column {
-                Row(
-                    Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = Color.White)
-                    }
-                    Text("消息", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+        Column(Modifier.fillMaxWidth().background(HeaderBg).statusBarsPadding()) {
+            Row(
+                Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = TextPrimary)
                 }
-                // Tab row
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    val darkLike = ThemeState.amoled || isSystemInDarkTheme()
-                    val selectedBrush = Brush.verticalGradient(listOf(Color.White, Color(0xFFD8D8D8)))
-                    val unselectedBrush = if (darkLike)
-                        Brush.verticalGradient(listOf(Color(0xFF2A2D3A), Color(0xFF1D2028)))
-                    else
-                        Brush.verticalGradient(listOf(Color(0xFFFF3B4C), Color(0xFFBB0012)))
-                    TABS.forEach { (key, label) ->
-                        val selected = state.selectedTab == key
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(36.dp)
-                                .shadow(if (selected) 6.dp else 2.dp, RoundedCornerShape(18.dp),
-                                    ambientColor = Color.Black.copy(.25f), spotColor = Color.Black.copy(.25f))
-                                .background(
-                                    if (selected) selectedBrush else unselectedBrush,
-                                    RoundedCornerShape(18.dp))
-                                .clickable { vm.selectTab(key) }
-                        ) {
-                            Text(label, fontSize = 13.sp, fontWeight = FontWeight.Bold,
-                                color = if (selected) TextSecondary else Color.White)
-                        }
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
+                Text("消息", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
             }
+            // Tab row：下划线式，与首页保持一致
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.Start
+            ) {
+                TABS.forEach { (key, label) ->
+                    val selected = state.selectedTab == key
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { vm.selectTab(key) }
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            label,
+                            fontSize   = 15.sp,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                            color      = if (selected) HupuRed else TextSecondary
+                        )
+                        Spacer(Modifier.height(5.dp))
+                        Box(
+                            Modifier
+                                .width(20.dp)
+                                .height(3.dp)
+                                .background(
+                                    if (selected) HupuRed else Color.Transparent,
+                                    RoundedCornerShape(2.dp)
+                                )
+                        )
+                    }
+                }
+            }
+            HorizontalDivider(thickness = 0.5.dp, color = DividerColor)
         }
 
         val tab = state.tabs[state.selectedTab] ?: MessageViewModel.TabState()

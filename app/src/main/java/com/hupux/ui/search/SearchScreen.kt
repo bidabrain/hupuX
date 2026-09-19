@@ -29,7 +29,7 @@ import com.hupux.ui.theme.HupuRed
 import com.hupux.ui.theme.HeaderBg
 import com.hupux.ui.theme.TextPrimary
 import com.hupux.ui.theme.DividerColor
-import com.hupux.ui.theme.ThemeState
+import com.hupux.ui.theme.isDarkTheme
 
 private val POST_URL_REGEX = Regex("""m\.hupu\.com/bbs/(\d+)(?:\.html)?""")
 
@@ -71,7 +71,7 @@ private const val JS_DISABLE_DARK = """(function(){
 @Composable
 fun SearchScreen(onPostClick: (String) -> Unit, onBack: () -> Unit) {
     val onPostClickRef = rememberUpdatedState(onPostClick)
-    val isDark         = ThemeState.amoled || isSystemInDarkTheme()
+    val isDark         = isDarkTheme
     val isDarkRef      = rememberUpdatedState(isDark)
     val bgColor        = AppBg
 

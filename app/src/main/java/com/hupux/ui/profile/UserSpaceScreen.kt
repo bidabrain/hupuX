@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.koin.androidx.compose.koinViewModel
+import com.hupux.ui.components.HupuTopBar
 import com.hupux.ui.theme.*
 
 /**
@@ -36,25 +37,7 @@ fun UserSpaceScreen(
     var tab by remember { mutableStateOf(0) }   // 0=发帖 1=回帖
 
     Column(Modifier.fillMaxSize().background(AppBg)) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(listOf(HupuRed, Color(0xFFCC000E))),
-                    RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
-                )
-                .statusBarsPadding()
-        ) {
-            Row(
-                Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.Filled.ArrowBack, contentDescription = "返回", tint = Color.White)
-                }
-                Text("用户主页", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
-            }
-        }
+        HupuTopBar(title = "用户主页", onBack = onBack)
 
         Spacer(Modifier.height(10.dp))
         UserSpacePills(tab) { tab = it }
@@ -71,7 +54,7 @@ fun UserSpaceScreen(
 @Composable
 private fun UserSpacePills(selectedIndex: Int, onSelect: (Int) -> Unit) {
     val labels = listOf("发帖", "回帖")
-    val darkLike = ThemeState.amoled || isSystemInDarkTheme()
+    val darkLike = isDarkTheme
     val selBrush = Brush.verticalGradient(listOf(Color.White, Color(0xFFD8D8D8)))
     val unselBrush = if (darkLike)
         Brush.verticalGradient(listOf(Color(0xFF2A2D3A), Color(0xFF1D2028)))

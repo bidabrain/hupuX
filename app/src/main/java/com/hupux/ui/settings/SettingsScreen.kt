@@ -9,6 +9,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -206,6 +207,60 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(24.dp))
 
+            // ── 外观 ────────────────────────────────────────────────
+            Surface(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp), color = CardBg, shadowElevation = 4.dp
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("外观", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+
+                    Spacer(Modifier.height(14.dp))
+                    Text("主题", fontSize = 14.sp, color = TextSecondary)
+                    Spacer(Modifier.height(8.dp))
+                    OptionRow(
+                        options  = ThemeMode.entries.map { it.label },
+                        selected = ThemeMode.entries.indexOf(ThemeState.mode),
+                        onSelect = { ThemeState.setMode(ThemeMode.entries[it]) }
+                    )
+
+                    // 纯黑仅在实际处于深色时才有意义
+                    if (isDarkTheme) {
+                        Spacer(Modifier.height(14.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text("纯黑背景", fontSize = 14.sp, color = TextPrimary)
+                                Text("AMOLED 屏省电、防烧屏", fontSize = 12.sp, color = TextTertiary)
+                            }
+                            Switch(
+                                checked = ThemeState.amoled,
+                                onCheckedChange = { ThemeState.setAmoled(it) },
+                                colors = SwitchDefaults.colors(checkedTrackColor = HupuRed)
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(10.dp))
+                    HorizontalDivider(color = DividerColor)
+                    Spacer(Modifier.height(14.dp))
+
+                    Text("显示字号", fontSize = 14.sp, color = TextSecondary)
+                    Spacer(Modifier.height(8.dp))
+                    OptionRow(
+                        options  = FontSizeLevel.entries.map { it.label },
+                        selected = FontSizeLevel.entries.indexOf(ThemeState.fontSize),
+                        onSelect = { ThemeState.setFontSize(FontSizeLevel.entries[it]) }
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        "示例：这是当前字号下的正文效果",
+                        fontSize = 15.sp, color = TextPrimary
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+
             // ── 支持开发者 ──────────────────────────────────────────
             Surface(
                 Modifier.fillMaxWidth(),
@@ -319,6 +374,43 @@ fun SettingsScreen(
             }
 
             Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+/** 分段选择器：一行等宽选项，选中态为品牌红底白字 */
+@Composable
+private fun OptionRow(
+    options: List<String>,
+    selected: Int,
+    onSelect: (Int) -> Unit
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(BgGray)
+            .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        options.forEachIndexed { i, label ->
+            val sel = i == selected
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (sel) HupuRed else Color.Transparent)
+                    .clickable { onSelect(i) }
+                    .padding(vertical = 8.dp)
+            ) {
+                Text(
+                    label,
+                    fontSize   = 13.sp,
+                    fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
+                    color      = if (sel) Color.White else TextSecondary
+                )
+            }
         }
     }
 }

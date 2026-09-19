@@ -5,7 +5,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 
 // ── 品牌色（不随主题变化）────────────────────────────────────────────────────
 val HupuRed     = Color(0xFFE60012)
@@ -99,15 +102,30 @@ val HeaderBg      @Composable get() = MaterialTheme.colorScheme.surface
 
 // ── 主题入口 ──────────────────────────────────────────────────────────────────
 
+/** 当前是否处于深色（含纯黑）外观。WebView 注入暗色样式等场景用它判断。 */
+val isDarkTheme: Boolean
+    @Composable get() = when (ThemeState.mode) {
+        ThemeMode.LIGHT  -> false
+        ThemeMode.DARK   -> true
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+    }
+
 @Composable
 fun HupuXTheme(content: @Composable () -> Unit) {
+    val dark   = isDarkTheme
     val scheme = when {
-        ThemeState.amoled     -> AmoledScheme
-        isSystemInDarkTheme() -> DarkScheme
-        else                  -> LightScheme
+        dark && ThemeState.amoled -> AmoledScheme
+        dark                      -> DarkScheme
+        else                      -> LightScheme
     }
-    MaterialTheme(
-        colorScheme = scheme,
-        content     = content
-    )
+    // 全局字号：只改 fontScale，不动 density，因此只放大文字不放大图标和间距
+    val base = LocalDensity.current
+    CompositionLocalProvider(
+        LocalDensity provides Density(base.density, base.fontScale * ThemeState.fontSize.scale)
+    ) {
+        MaterialTheme(
+            colorScheme = scheme,
+            content     = content
+        )
+    }
 }

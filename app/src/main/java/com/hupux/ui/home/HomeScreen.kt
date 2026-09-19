@@ -113,14 +113,6 @@ fun HomeScreen(
                         IconButton(onClick = onSearchClick) {
                             Icon(Icons.Outlined.Search, contentDescription = "搜索", tint = TextPrimary)
                         }
-                        IconButton(onClick = { ThemeState.toggle() }) {
-                            Icon(
-                                if (ThemeState.amoled) Icons.Outlined.LightMode
-                                else Icons.Outlined.DarkMode,
-                                contentDescription = if (ThemeState.amoled) "关闭省电黑主题" else "开启省电黑主题",
-                                tint = TextPrimary
-                            )
-                        }
                         IconButton(onClick = onSettingsClick) {
                             Icon(Icons.Outlined.Settings, contentDescription = "设置", tint = TextPrimary)
                         }

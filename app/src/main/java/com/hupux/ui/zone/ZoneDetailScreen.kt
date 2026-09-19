@@ -47,16 +47,15 @@ fun ZoneDetailScreen(
             android.graphics.Color.parseColor(state.zoneDetail?.bgColor ?: "#EA0E20").let { Color(it) }
         }.getOrDefault(HupuRed)
     }
-    val onHeader = if (headerBg.luminance() > 0.4f) TextPrimary else Color.White
+    val onHeader = TextPrimary   // 顶栏改白底后不再取专区主色，文字统一用主文字色
 
     Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().background(AppBg)) {
-        // ── Header (colored zone banner) ─────────────────────────
+        // ── Header（改版后不再用专区主色铺满，改白底 + 分割线）──────
         Box(
             Modifier
                 .fillMaxWidth()
-                .background(Brush.verticalGradient(listOf(headerBg, headerBg.copy(alpha = 0.85f))),
-                    RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
+                .background(HeaderBg)
                 .statusBarsPadding()
         ) {
             Column {

@@ -1,9 +1,7 @@
 package com.hupux.ui.zone
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -11,6 +9,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.*
@@ -136,7 +135,7 @@ fun ZoneListScreen(
                                                         isFollowed = zone.topicId in followedIds,
                                                         modifier   = Modifier.weight(1f),
                                                         onClick    = { onZoneClick(zone.topicId, zone.topicName) },
-                                                        onLongClick = { vm.toggleFollow(zone) }
+                                                        onToggleFollow = { vm.toggleFollow(zone) }
                                                     )
                                                 }
                                                 // 末行补空位，避免最后几个被拉宽
@@ -222,18 +221,17 @@ private fun HotIcon(zone: Zone, onClick: () -> Unit) {
 // 每格宽约 63dp，放不下「关注」按钮，所以：已关注用 logo 右下角标表示，
 // 长按可直接关注/取关，进专区详情页也仍有关注按钮。
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ZoneGridCell(
     zone: Zone,
     isFollowed: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
-    onLongClick: () -> Unit
+    onToggleFollow: () -> Unit
 ) {
     Column(
         modifier = modifier
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .clickable(onClick = onClick)
             .padding(vertical = 8.dp, horizontal = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -241,21 +239,25 @@ private fun ZoneGridCell(
             AsyncImage(
                 model = zone.topicLogo, contentDescription = zone.topicName,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.size(44.dp).clip(CircleShape).background(AppBg)
+                modifier = Modifier.size(42.dp).clip(CircleShape).background(AppBg)
             )
-            if (isFollowed) {
-                Box(
-                    Modifier
-                        .align(Alignment.BottomEnd)
-                        .size(15.dp)
-                        .background(CardBg, CircleShape)
-                        .padding(1.dp)
-                        .background(HupuRed, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Check, contentDescription = "已关注",
-                        tint = Color.White, modifier = Modifier.size(9.dp))
-                }
+            // 右上角关注徽标：未关注是红底「+」，已关注是灰底「✓」，可直接点击切换。
+            // （点格子其余部分才是进专区）
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .background(if (isFollowed) BgGray else HupuRed)
+                    .clickable(onClick = onToggleFollow),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    if (isFollowed) Icons.Default.Check else Icons.Default.Add,
+                    contentDescription = if (isFollowed) "取消关注" else "关注",
+                    tint = if (isFollowed) TextSecondary else Color.White,
+                    modifier = Modifier.size(13.dp)
+                )
             }
         }
         Spacer(Modifier.height(5.dp))
