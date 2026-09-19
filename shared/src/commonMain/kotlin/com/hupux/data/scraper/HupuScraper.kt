@@ -392,14 +392,20 @@ class HupuScraper(private val client: HttpClient) {
             val doc = Ksoup.parseBodyFragment(html)
             // 标准懒加载
             doc.select("img").forEach { img ->
-                val actual = img.attr("data-src").takeIf { it.isNotEmpty() }
+                val actual = img.attr("data-gif").takeIf { it.isNotEmpty() }
+                    ?: img.attr("data-src").takeIf { it.isNotEmpty() }
                     ?: img.attr("data-original").takeIf { it.isNotEmpty() }
                     ?: img.attr("data-lazy-src").takeIf { it.isNotEmpty() }
                 if (actual != null) img.attr("src", actual)
             }
             // hupu 自定义图片节点：<center class="hupu-img" src="..."> → <img src="...">
+            //
+            // data-gif 必须排在 src 前面：动图节点的 src 是 OSS 转出来的**静态 jpg**
+            // （`....gif?x-oss-process=image/resize,w_2048/format,jpg`，实测 content-type
+            // 就是 image/jpeg），用它的话 GIF 在正文里是不会动的；data-gif 才是原始动图。
             doc.select("center.hupu-img, [data-hupu-node='image'] center").forEach { center ->
-                val src = center.attr("src").takeIf { it.isNotEmpty() }
+                val src = center.attr("data-gif").takeIf { it.isNotEmpty() }
+                    ?: center.attr("src").takeIf { it.isNotEmpty() }
                     ?: center.attr("data_url").takeIf { it.isNotEmpty() }
                     ?: center.attr("data-origin").takeIf { it.isNotEmpty() }
                     ?: return@forEach

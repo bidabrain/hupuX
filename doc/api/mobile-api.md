@@ -139,6 +139,20 @@ Accept-Language: zh-CN,zh;q=0.9
 - 懒加载图片 `<img data-src="...">` → 需调 `fixLazyImages()` 转为标准 `<img src>`
 - 虎扑自定义图片节点 `<center class="hupu-img" src="...">` → 同样需要处理
 
+#### ⚠️ 动图节点的 `src` 是静态图，别用它
+
+动图的 `<center class="hupu-img">` 上挂着三个地址，**`src` 是被 OSS 转成的静态 JPEG**：
+
+| 属性 | 地址 | 实测 content-type / 大小 |
+|---|---|---|
+| `data-gif` | `….gif` | `image/gif` · 1.28 MB（会动）|
+| `data_url` | `….gif` | 同上 |
+| `src` | `….gif?x-oss-process=image/resize,w_2048/format,jpg` | `image/jpeg` · 14 KB（**不动**）|
+
+所以取图时 `data-gif` 必须排在 `src` 前面，否则正文里的 GIF 是静止的。
+首页列表的缩略图用的是另一份 `source` 字段（`…/resize,w_600/format,webp`，
+`image/webp` 会动），这就是「列表里会动、点进去不动」的由来。
+
 ### ⚠️ 正文不一定是 HTML：嵌入卡片
 
 有的帖子这个字段**根本不是 HTML，而是一段 JSON**，描述一张嵌入卡片：

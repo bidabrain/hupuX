@@ -658,7 +658,9 @@ private fun fixLazyImages(html: String): String {
     return try {
         val doc = Jsoup.parseBodyFragment(html)
         doc.select("img").forEach { img ->
-            val actual = img.attr("data-src").takeIf { it.isNotEmpty() }
+            // data-gif 排在最前：虎扑给动图的 src 是 OSS 转出来的静态 jpg
+            val actual = img.attr("data-gif").takeIf { it.isNotEmpty() }
+                ?: img.attr("data-src").takeIf { it.isNotEmpty() }
                 ?: img.attr("data-original").takeIf { it.isNotEmpty() }
                 ?: img.attr("data-lazy-src").takeIf { it.isNotEmpty() }
             if (actual != null) img.attr("src", actual)
