@@ -194,6 +194,21 @@ xcodebuild -project HupuX.xcodeproj -scheme HupuX \
 
 ---
 
+## 发布流程（CI）
+
+推送到 `main` 后由 GitHub Actions 全自动完成，**不需要手动改版本号**：
+
+1. 纯文档改动（`**.md` / `doc/**` / 仓库配图）**不触发** CI；
+2. 触发后先算出新版本号（默认 patch +1，如本次推送自己改了 `appVersion` 则以手动值为准）；
+3. 用该版本号构建 Android / macOS(ARM+Intel) / Windows / Linux / iOS 六个产物；
+4. **全部成功后**才把版本号写回 `gradle.properties` 与 iOS 的 `project.pbxproj`，
+   并发布 GitHub Release `v<版本号>`。构建失败则仓库保持不变，不会留下没有 release 的版本号。
+
+想发 minor/major 版本时，手动把 `gradle.properties` 的 `appVersion` 改成目标版本再推即可
+（`appVersionCode` 忘了改也没关系，CI 会自动 +1，保证 Android 能覆盖安装）。
+
+---
+
 ## Star History
 
 <a href="https://www.star-history.com/?type=date&repos=bidabrain%2FhupuX">

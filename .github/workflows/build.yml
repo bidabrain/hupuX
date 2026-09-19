@@ -1,16 +1,113 @@
 name: Build
 
+# 只有「应用本体」改动才会跑：纯文档 / README / 仓库配图改动直接不触发，
+# 免得白白占 CI 额度、也不会平白升一个版本号。
 on:
   push:
     branches: [ main ]
     tags: [ 'v*' ]
+    paths-ignore:
+      - '**.md'
+      - 'doc/**'
+      - 'LICENSE'
+      - 'UI.png'
+      - 'screenshot.png'
+      - 'icon.png'
   pull_request:
     branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'doc/**'
+      - 'LICENSE'
+      - 'UI.png'
+      - 'screenshot.png'
+      - 'icon.png'
+
+# 同一分支上的多次推送排队执行，避免两个 run 同时回写版本号打架
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
+  # ── 决定这次要构建/发布的版本号 ────────────────────────────────────────────
+  # 只算不写：版本号通过命令行参数注入各平台构建，全部成功后才由 release job 回写仓库。
+  # 这样构建失败时仓库里不会留下一个「有版本号没 release」的提交。
+  version:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      version:     ${{ steps.calc.outputs.version }}
+      versionCode: ${{ steps.calc.outputs.versionCode }}
+      bumped:      ${{ steps.calc.outputs.bumped }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute version
+        id: calc
+        run: |
+          set -euo pipefail
+          # 从某个提交里读版本字段
+          read_at() { git show "$1:gradle.properties" 2>/dev/null | grep "^$2=" | cut -d= -f2 || true; }
+
+          PUSHED=$(read_at "$GITHUB_SHA" appVersion)
+          PUSHED_CODE=$(read_at "$GITHUB_SHA" appVersionCode)
+
+          # 非 main 推送（PR 等）不升版本，按现状构建
+          if [ "${{ github.event_name }}" != "push" ] || [ "${{ github.ref }}" != "refs/heads/main" ]; then
+            echo "非 main 推送，沿用当前版本 $PUSHED"
+            { echo "version=$PUSHED"; echo "versionCode=$PUSHED_CODE"; echo "bumped=false"; } >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # 自动升版本以 origin/main 的最新状态为基线（而不是本次推送的提交），
+          # 这样「构建期间又推了一次」时，后一个 run 能看到前一个 run 回写的版本号，不会撞号。
+          git fetch origin main --quiet
+          BASE=$(read_at origin/main appVersion)
+          BASE_CODE=$(read_at origin/main appVersionCode)
+          [ -n "$BASE" ] || BASE=$PUSHED
+          [ -n "$BASE_CODE" ] || BASE_CODE=$PUSHED_CODE
+
+          # 推送前的版本，用于判断这次推送是不是「手动改版」。
+          # 比较的是推送前后的提交本身，而不是 origin/main，
+          # 否则上一轮 CI 回写的版本号会被误判成手动改版。
+          BEFORE="${{ github.event.before }}"
+          PREV=""; PREV_CODE=""
+          if [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
+            PREV=$(read_at "$BEFORE" appVersion)
+            PREV_CODE=$(read_at "$BEFORE" appVersionCode)
+          fi
+
+          # 版本号：手动改过就用手动的，否则 patch +1
+          if [ -n "$PREV" ] && [ "$PREV" != "$PUSHED" ]; then
+            VERSION=$PUSHED
+            echo "版本号：本次推送手动指定 $PREV -> $PUSHED"
+          else
+            IFS=. read -r MAJOR MINOR PATCH <<< "$BASE"
+            VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+            echo "版本号：自动 $BASE -> $VERSION"
+          fi
+
+          # versionCode 单独判断：手动改版时如果忘了同步改它，这里补上 +1，
+          # 否则 Android 会用同一个 versionCode 出包，装不上（必须递增）。
+          if [ -n "$PREV_CODE" ] && [ "$PREV_CODE" != "$PUSHED_CODE" ]; then
+            CODE=$PUSHED_CODE
+            echo "versionCode：本次推送手动指定 $PREV_CODE -> $PUSHED_CODE"
+          else
+            CODE=$((BASE_CODE + 1))
+            echo "versionCode：自动 $BASE_CODE -> $CODE"
+          fi
+
+          # 两者只要和仓库里现有的不一致，就需要在发布前回写
+          BUMPED=false
+          if [ "$VERSION" != "$PUSHED" ] || [ "$CODE" != "$PUSHED_CODE" ]; then BUMPED=true; fi
+          { echo "version=$VERSION"; echo "versionCode=$CODE"; echo "bumped=$BUMPED"; } >> $GITHUB_OUTPUT
+
   # ── Android APK ───────────────────────────────────────────────────────────────
   android:
     name: Android APK
+    needs: version
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,7 +122,10 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Build release APK
-        run: ./gradlew :app:assembleRelease
+        run: >-
+          ./gradlew :app:assembleRelease
+          -PappVersion=${{ needs.version.outputs.version }}
+          -PappVersionCode=${{ needs.version.outputs.versionCode }}
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -36,6 +136,7 @@ jobs:
   # ── macOS ARM .dmg ────────────────────────────────────────────────────────────
   macos:
     name: macOS DMG (Apple Silicon)
+    needs: version
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -50,7 +151,10 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Package DMG
-        run: ./gradlew :desktopApp:packageDmg
+        run: >-
+          ./gradlew :desktopApp:packageDmg
+          -PappVersion=${{ needs.version.outputs.version }}
+          -PappVersionCode=${{ needs.version.outputs.versionCode }}
 
       - name: Rename DMG
         run: mv desktopApp/build/compose/binaries/main/dmg/*.dmg desktopApp/build/compose/binaries/main/dmg/HupuX-arm64.dmg
@@ -64,6 +168,7 @@ jobs:
   # ── macOS Intel .dmg ──────────────────────────────────────────────────────────
   macos-intel:
     name: macOS DMG (Intel)
+    needs: version
     runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v4
@@ -78,7 +183,10 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Package DMG
-        run: ./gradlew :desktopApp:packageDmg
+        run: >-
+          ./gradlew :desktopApp:packageDmg
+          -PappVersion=${{ needs.version.outputs.version }}
+          -PappVersionCode=${{ needs.version.outputs.versionCode }}
 
       - name: Rename DMG
         run: mv desktopApp/build/compose/binaries/main/dmg/*.dmg desktopApp/build/compose/binaries/main/dmg/HupuX-intel.dmg
@@ -92,6 +200,7 @@ jobs:
   # ── Windows .msi ──────────────────────────────────────────────────────────────
   windows:
     name: Windows MSI
+    needs: version
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -106,7 +215,10 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Package MSI
-        run: ./gradlew :desktopApp:packageMsi
+        run: >-
+          ./gradlew :desktopApp:packageMsi
+          -PappVersion=${{ needs.version.outputs.version }}
+          -PappVersionCode=${{ needs.version.outputs.versionCode }}
 
       - name: Upload MSI
         uses: actions/upload-artifact@v4
@@ -117,6 +229,7 @@ jobs:
   # ── Linux .deb ────────────────────────────────────────────────────────────────
   linux:
     name: Linux DEB
+    needs: version
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -131,7 +244,10 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Package DEB
-        run: ./gradlew :desktopApp:packageDeb
+        run: >-
+          ./gradlew :desktopApp:packageDeb
+          -PappVersion=${{ needs.version.outputs.version }}
+          -PappVersionCode=${{ needs.version.outputs.versionCode }}
 
       - name: Upload DEB
         uses: actions/upload-artifact@v4
@@ -144,6 +260,7 @@ jobs:
   # 用户需用自己的 Apple ID 自行签名侧载（Sideloadly / AltStore），或用 Xcode 直装。
   ios:
     name: iOS (unsigned IPA)
+    needs: version
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -162,12 +279,16 @@ jobs:
       - name: Set up Gradle cache
         uses: gradle/actions/setup-gradle@v3
 
+      # iOS 的版本号存在 project.pbxproj 里，与 gradle.properties 无联动，
+      # 这里用命令行 build setting 覆盖，保证 IPA 与其它平台版本一致。
       - name: Build unsigned .app (device arm64)
         run: |
           cd ios/HupuX
           xcodebuild -project HupuX.xcodeproj -scheme HupuX \
             -configuration Release -sdk iphoneos \
             -derivedDataPath build \
+            MARKETING_VERSION=${{ needs.version.outputs.version }} \
+            CURRENT_PROJECT_VERSION=${{ needs.version.outputs.versionCode }} \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
             build
 
@@ -184,22 +305,36 @@ jobs:
           name: ios-ipa
           path: ios/HupuX/build/Build/Products/Release-iphoneos/HupuX-unsigned.ipa
 
-  # ── GitHub Release（推送到 main 时触发）──────────────────────────────────────
+  # ── 回写版本号 + 发 GitHub Release（推送到 main 且全平台构建成功时）──────────
   release:
     name: Publish Release
-    needs: [ android, macos, macos-intel, windows, linux, ios ]
+    needs: [ version, android, macos, macos-intel, windows, linux, ios ]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Read version
-        id: version
+      # 全平台都构建成功了，此时才把版本号写回仓库。
+      # 用 GITHUB_TOKEN 推送不会再触发 workflow（GitHub 的防递归规则），[skip ci] 是双保险。
+      - name: Bump version in repo
+        if: needs.version.outputs.bumped == 'true'
         run: |
-          VERSION=$(grep '^appVersion=' gradle.properties | cut -d= -f2)
-          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+          VERSION=${{ needs.version.outputs.version }}
+          CODE=${{ needs.version.outputs.versionCode }}
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          sed -i "s/^appVersion=.*/appVersion=$VERSION/"          gradle.properties
+          sed -i "s/^appVersionCode=.*/appVersionCode=$CODE/"     gradle.properties
+          sed -i "s/MARKETING_VERSION = .*;/MARKETING_VERSION = $VERSION;/g"            ios/HupuX/HupuX.xcodeproj/project.pbxproj
+          sed -i "s/CURRENT_PROJECT_VERSION = .*;/CURRENT_PROJECT_VERSION = $CODE;/g"   ios/HupuX/HupuX.xcodeproj/project.pbxproj
+          git add gradle.properties ios/HupuX/HupuX.xcodeproj/project.pbxproj
+          git commit -m "chore: 版本号升至 $VERSION [skip ci]"
+          git pull --rebase origin main
+          git push origin HEAD:main
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -209,8 +344,9 @@ jobs:
       - name: Create or update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: ${{ steps.version.outputs.tag }}
+          tag_name: v${{ needs.version.outputs.version }}
+          name: v${{ needs.version.outputs.version }}
+          target_commitish: main
           files: |
             artifacts/android-apk/*.apk
             artifacts/macos-dmg-arm/*.dmg
