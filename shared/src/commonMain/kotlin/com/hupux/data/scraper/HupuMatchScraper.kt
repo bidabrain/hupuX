@@ -18,10 +18,18 @@ private const val SCORE_API = "https://games.mobileapi.hupu.com/1/8.0.99/bplcomm
 private const val MOBILE_UA =
     "Mozilla/5.0 (Linux; Android 12; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36"
 
-/** 赛程支持的分区。虎扑只对这几个下发数据（football / esports 等返回空）。 */
+/**
+ * 赛程分区。businessId 是**按赛事**而非按运动划分的（`epl` 只含英超）。
+ *
+ * 无效的 businessId 不会报错，只返回空的 dayGameData，因此无法靠探测穷举——
+ * 下面这些是实测有数据的；`laliga` / `seriea` / `bundesliga` / `ucl` / `csl`
+ * 等常见写法均返回空，虎扑对这些联赛用的 id 尚未找到。
+ */
 enum class MatchTag(val businessId: String, val label: String) {
     NBA("nba", "NBA"),
     CBA("cba", "CBA"),
+    EPL("epl", "英超"),
+    WORLD_CUP("worldcup", "世界杯"),
     LOL("lol", "英雄联盟"),
     KOG("kog", "王者荣耀")
 }

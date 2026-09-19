@@ -10,7 +10,7 @@
 GET https://match-api.hupu.com/1/8.2.10/matchallapi/bff/standard/getScheduleListByTagForH5
       ?businessType=common
       &datasource=navigation
-      &businessId=<nba|cba|lol|kog>
+      &businessId=<nba|cba|epl|worldcup|lol|kog>
 Header: User-Agent 用移动端 UA，Referer: https://bbs.hupu.com/
 ```
 
@@ -18,8 +18,17 @@ Header: User-Agent 用移动端 UA，Referer: https://bbs.hupu.com/
 
 ### businessId
 
-实测 **`nba` / `cba` / `lol` / `kog` 有数据**；`football` / `soccer` / `esports` / `all`
-返回空（`size=197` 的空壳）。完整清单未找到——参数名暗示存在一个导航列表接口，但未探到。
+businessId 是**按赛事**而非按运动划分的：`epl` 只含「英超联赛」，`worldcup` 只含世界杯各轮次。
+
+实测**有数据**：`nba` / `cba` / `epl`（英超，201 场）/ `worldcup`（100 场）/ `lol` / `kog`。
+
+实测**返回空**：`football` / `soccer` / `laliga` / `seriea` / `bundesliga` / `ligue1` / `ucl` /
+`uel` / `csl` / `cfa` / `euro` / `championship` / `afc` 等 30+ 种常见写法。
+
+> ⚠️ **无法靠探测穷举**：无效 id 不报错，只返回 `dayGameData: []`，和「有效但无数据」
+> 完全无法区分（`businessId=xxxxx` 与 `businessId=laliga` 响应一模一样）。
+> 也没找到导航列表接口——在同前缀下探了 8 个可能的路径名全部 `No static resource`。
+> 所以西甲/意甲/德甲等联赛的 id 目前是未知的，需要抓一次官方 App 的流量才能确定。
 
 ### 响应结构
 
@@ -58,7 +67,8 @@ BASE = https://games.mobileapi.hupu.com/1/8.0.99/bplcommentapi/bpl/score_tree
 Header: Referer: https://m.hupu.com/
 ```
 
-评分是**树状**的：比赛节点（`basketball_match`）→ 条目节点（`basketball_item`，即球员/教练/裁判）。
+评分是**树状**的：比赛节点（`basketball_match` / `football_match` …）→ 条目节点
+（`basketball_item` / `football_item`，即球员/教练/裁判）。足球同样有评分，结构一致。
 
 ### 取节点自身（含父子链接）
 

@@ -318,8 +318,12 @@ jobs:
     permissions:
       contents: write
     steps:
+      # 关键：检出 main 的最新 HEAD，而不是触发本次运行的那个提交。
+      # 否则「在旧提交上改版本号 → 再 rebase 到 main」会和上一轮 CI 自己的
+      # 版本号回写提交改到同一行，必然冲突。
       - uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
 
       # 全平台都构建成功了，此时才把版本号写回仓库。
@@ -335,10 +339,14 @@ jobs:
           sed -i "s/^appVersionCode=.*/appVersionCode=$CODE/"     gradle.properties
           sed -i "s/MARKETING_VERSION = .*;/MARKETING_VERSION = $VERSION;/g"            ios/HupuX/HupuX.xcodeproj/project.pbxproj
           sed -i "s/CURRENT_PROJECT_VERSION = .*;/CURRENT_PROJECT_VERSION = $CODE;/g"   ios/HupuX/HupuX.xcodeproj/project.pbxproj
-          git add gradle.properties ios/HupuX/HupuX.xcodeproj/project.pbxproj
-          git commit -m "chore: 版本号升至 $VERSION [skip ci]"
-          git pull --rebase origin main
-          git push origin HEAD:main
+          # 版本号可能已被并发的另一轮写成同样的值，这时无需提交，也不该失败
+          if git diff --quiet; then
+            echo "版本号已是 $VERSION，跳过回写"
+          else
+            git add gradle.properties ios/HupuX/HupuX.xcodeproj/project.pbxproj
+            git commit -m "chore: 版本号升至 $VERSION [skip ci]"
+            git push origin HEAD:main
+          fi
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
