@@ -7,7 +7,18 @@
 
 ---
 
-<img src="screenshot.png" width="600" alt="首页截图">
+<table>
+  <tr>
+    <td><img src="doc/screenshots/home.jpg" width="260" alt="首页：今日比分横条 + 推荐流"></td>
+    <td><img src="doc/screenshots/discover.jpg" width="260" alt="发现：关注的专区 + 专区网格"></td>
+    <td><img src="doc/screenshots/score.jpg" width="260" alt="评分：赛程与球员评分"></td>
+  </tr>
+  <tr>
+    <td align="center">首页</td>
+    <td align="center">发现</td>
+    <td align="center">评分</td>
+  </tr>
+</table>
 
 ---
 
