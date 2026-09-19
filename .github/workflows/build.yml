@@ -128,8 +128,8 @@ jobs:
       - name: Build release APK
         run: >-
           ./gradlew :app:assembleRelease
-          -PappVersion=${{ needs.version.outputs.version }}
-          -PappVersionCode=${{ needs.version.outputs.versionCode }}
+          "-PappVersion=${{ needs.version.outputs.version }}"
+          "-PappVersionCode=${{ needs.version.outputs.versionCode }}"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -157,8 +157,8 @@ jobs:
       - name: Package DMG
         run: >-
           ./gradlew :desktopApp:packageDmg
-          -PappVersion=${{ needs.version.outputs.version }}
-          -PappVersionCode=${{ needs.version.outputs.versionCode }}
+          "-PappVersion=${{ needs.version.outputs.version }}"
+          "-PappVersionCode=${{ needs.version.outputs.versionCode }}"
 
       - name: Rename DMG
         run: mv desktopApp/build/compose/binaries/main/dmg/*.dmg desktopApp/build/compose/binaries/main/dmg/HupuX-arm64.dmg
@@ -189,8 +189,8 @@ jobs:
       - name: Package DMG
         run: >-
           ./gradlew :desktopApp:packageDmg
-          -PappVersion=${{ needs.version.outputs.version }}
-          -PappVersionCode=${{ needs.version.outputs.versionCode }}
+          "-PappVersion=${{ needs.version.outputs.version }}"
+          "-PappVersionCode=${{ needs.version.outputs.versionCode }}"
 
       - name: Rename DMG
         run: mv desktopApp/build/compose/binaries/main/dmg/*.dmg desktopApp/build/compose/binaries/main/dmg/HupuX-intel.dmg
@@ -221,8 +221,8 @@ jobs:
       - name: Package MSI
         run: >-
           ./gradlew :desktopApp:packageMsi
-          -PappVersion=${{ needs.version.outputs.version }}
-          -PappVersionCode=${{ needs.version.outputs.versionCode }}
+          "-PappVersion=${{ needs.version.outputs.version }}"
+          "-PappVersionCode=${{ needs.version.outputs.versionCode }}"
 
       - name: Upload MSI
         uses: actions/upload-artifact@v4
@@ -250,8 +250,8 @@ jobs:
       - name: Package DEB
         run: >-
           ./gradlew :desktopApp:packageDeb
-          -PappVersion=${{ needs.version.outputs.version }}
-          -PappVersionCode=${{ needs.version.outputs.versionCode }}
+          "-PappVersion=${{ needs.version.outputs.version }}"
+          "-PappVersionCode=${{ needs.version.outputs.versionCode }}"
 
       - name: Upload DEB
         uses: actions/upload-artifact@v4
