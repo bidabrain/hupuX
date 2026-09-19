@@ -40,11 +40,29 @@ fun ScoreScreen(
     val state by vm.state.collectAsState()
     val listState = rememberLazyListState()
 
-    LaunchedEffect(scrollToTopTrigger) {
-        if (scrollToTopTrigger > 0) listState.animateScrollToItem(0)
+    // 赛程横跨整个赛季，第一场往往是几个月前的，所以默认停在「今天」而不是列表顶部。
+    // 索引要和下面 LazyColumn 的排布对齐：每天 = 1 个日期标题 + N 张比赛卡。
+    val anchorIndex = remember(state.days, state.anchorMatchId) {
+        var i = 0
+        var fallback = -1          // 没有锚点时退回第一个「今天」
+        for (day in state.days) {
+            val headerIndex = i    // 定位到日期标题，让锚点那天整体露出来
+            if (day.isToday && fallback < 0) fallback = headerIndex
+            i++
+            if (state.anchorMatchId.isNotEmpty() &&
+                day.matches.any { it.matchId == state.anchorMatchId }
+            ) return@remember headerIndex
+            i += day.matches.size
+        }
+        fallback.coerceAtLeast(0)
     }
-    // 切分区后回到顶部
-    LaunchedEffect(state.tag) { listState.scrollToItem(0) }
+
+    // 再点一次底部「评分」时回到今天——这个列表里「今天」才是有用的位置，顶部是几个月前
+    LaunchedEffect(scrollToTopTrigger) {
+        if (scrollToTopTrigger > 0) listState.animateScrollToItem(anchorIndex)
+    }
+    // 首次加载和切分区后定位到今天
+    LaunchedEffect(state.tag, anchorIndex) { listState.scrollToItem(anchorIndex) }
 
     Column(Modifier.fillMaxSize().background(AppBg)) {
         // ── 顶栏 + 分区 Tab ───────────────────────────────────────
@@ -115,9 +133,11 @@ fun ScoreScreen(
                 ) {
                     state.days.forEach { day ->
                         item(key = "day-${day.date}") {
+                            // 「今天」标红，进来就能一眼看出落点在哪
                             Text(
                                 day.label.ifEmpty { day.date },
-                                fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary,
+                                fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                                color = if (day.isToday) HupuRed else TextSecondary,
                                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
                             )
                         }

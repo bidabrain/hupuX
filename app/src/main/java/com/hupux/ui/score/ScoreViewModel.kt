@@ -3,6 +3,7 @@ package com.hupux.ui.score
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hupux.data.model.MatchDay
+import com.hupux.data.model.MatchSchedule
 import com.hupux.data.model.MatchScoreBoard
 import com.hupux.data.scraper.HupuMatchScraper
 import com.hupux.data.scraper.MatchTag
@@ -14,6 +15,8 @@ import kotlinx.coroutines.launch
 data class ScoreUiState(
     val tag: MatchTag = MatchTag.NBA,
     val days: List<MatchDay> = emptyList(),
+    /** 虎扑给的定位锚点 matchId，界面据此滚到今天附近；为空表示没给 */
+    val anchorMatchId: String = "",
     val isLoading: Boolean = false,
     val error: String? = null
 )
@@ -26,7 +29,7 @@ class ScoreViewModel constructor(
     val state = _state.asStateFlow()
 
     /** 已加载过的分区缓存，切 tab 时不重复联网 */
-    private val cache = mutableMapOf<MatchTag, List<MatchDay>>()
+    private val cache = mutableMapOf<MatchTag, MatchSchedule>()
 
     init { load(MatchTag.NBA) }
 
@@ -34,7 +37,15 @@ class ScoreViewModel constructor(
         if (_state.value.tag == tag && _state.value.days.isNotEmpty()) return
         val cached = cache[tag]
         if (cached != null) {
-            _state.update { it.copy(tag = tag, days = cached, isLoading = false, error = null) }
+            _state.update {
+                it.copy(
+                    tag           = tag,
+                    days          = cached.days,
+                    anchorMatchId = cached.anchorMatchId,
+                    isLoading     = false,
+                    error         = null
+                )
+            }
         } else {
             load(tag)
         }
@@ -44,11 +55,15 @@ class ScoreViewModel constructor(
         _state.update { it.copy(tag = tag, isLoading = true, error = null) }
         viewModelScope.launch {
             runCatching { scraper.fetchSchedule(tag) }
-                .onSuccess { days ->
-                    cache[tag] = days
+                .onSuccess { schedule ->
+                    cache[tag] = schedule
                     _state.update {
                         if (it.tag != tag) it            // 期间又切了 tab，丢弃本次结果
-                        else it.copy(days = days, isLoading = false)
+                        else it.copy(
+                            days          = schedule.days,
+                            anchorMatchId = schedule.anchorMatchId,
+                            isLoading     = false
+                        )
                     }
                 }
                 .onFailure { e ->

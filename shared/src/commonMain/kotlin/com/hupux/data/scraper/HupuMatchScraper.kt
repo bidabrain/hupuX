@@ -4,6 +4,7 @@ import com.hupux.data.CookieStorage
 import com.hupux.data.model.HomeMatch
 import com.hupux.data.model.MatchDay
 import com.hupux.data.model.MatchItem
+import com.hupux.data.model.MatchSchedule
 import com.hupux.data.model.MatchScoreBoard
 import com.hupux.data.model.MatchSide
 import com.hupux.data.model.ScoreComment
@@ -95,16 +96,21 @@ class HupuMatchScraper(
             header("Referer", referer)
         }.bodyAsText()
 
-    /** 拉取某个分区的赛程，按日期分组 */
-    suspend fun fetchSchedule(tag: MatchTag): List<MatchDay> {
+    /**
+     * 拉取某个分区的赛程，按日期分组。
+     *
+     * 返回的 `anchorMatchId` 是虎扑自己给的定位锚点（指向今天附近那场比赛）——
+     * 赛程横跨整个赛季（英超实测 53 天、CBA 67 天），不用它界面就会停在几个月前的第一场。
+     */
+    suspend fun fetchSchedule(tag: MatchTag): MatchSchedule {
         val body = fetch(
             "$MATCH_API/getScheduleListByTagForH5" +
                 "?businessType=common&datasource=navigation&businessId=${tag.businessId}",
             "https://bbs.hupu.com/"
         )
-        val result = parseJsonObject(body).obj("result") ?: return emptyList()
-        val days   = result.arr("dayGameData") ?: return emptyList()
-        return days.mapNotNull { dayEl ->
+        val result = parseJsonObject(body).obj("result") ?: return MatchSchedule.Empty
+        val days   = result.arr("dayGameData") ?: return MatchSchedule.Empty
+        val parsed = days.mapNotNull { dayEl ->
             val day = dayEl.obj
             val matches = (day.arr("matchData") ?: EmptyJsonArray).mapNotNull { parseMatch(it.obj) }
             if (matches.isEmpty()) null
@@ -114,6 +120,10 @@ class HupuMatchScraper(
                 matches = matches
             )
         }
+        return MatchSchedule(
+            days          = parsed,
+            anchorMatchId = result.str("anchorMatchId")?.takeIf { it != "0" } ?: ""
+        )
     }
 
     private fun parseMatch(o: JsonObject): MatchItem? {

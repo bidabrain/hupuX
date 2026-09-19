@@ -40,10 +40,29 @@ data class MatchItem(
 data class MatchDay(
     /** 2026-06-04 */
     val date: String,
-    /** 6月4日 周四 */
+    /** 6月4日 周四；当天虎扑给的是「今天 周六」 */
     val label: String,
     val matches: List<MatchItem>
-)
+) {
+    val isToday: Boolean get() = label.startsWith("今天")
+}
+
+/**
+ * 一个分区的完整赛程。
+ *
+ * 赛程横跨整个赛季（英超实测 53 天、CBA 67 天），从几个月前一直排到几个月后，
+ * 所以列表不能从头开始看——[anchorMatchId] 是虎扑自己给的定位锚点，
+ * 指向「今天附近」那场比赛，界面进来就滚到它。
+ */
+data class MatchSchedule(
+    val days: List<MatchDay>,
+    /** 定位锚点的 matchId；"0" 或空表示没给 */
+    val anchorMatchId: String
+) {
+    companion object {
+        val Empty = MatchSchedule(emptyList(), "")
+    }
+}
 
 /** 单个被评分的对象（球员 / 教练 / 裁判） */
 data class ScoredItem(

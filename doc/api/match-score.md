@@ -45,9 +45,10 @@ businessId 是**按赛事**而非按运动划分的：`epl` 只含「英超联�
 ### 响应结构
 
 ```
+result.anchorMatchId            定位锚点（见下），"0" 表示没给
 result.dayGameData[]            按日期分组
   ├ dayTime      "2026-06-04"
-  ├ dateBlock    "6月4日 周四"
+  ├ dateBlock    "6月4日 周四"；当天是「今天 周六」
   └ matchData[]
       ├ matchId / matchStatus / matchStatusDesc
       ├ matchStartTimeStamp（毫秒，字符串）
@@ -65,6 +66,16 @@ result.dayGameData[]            按日期分组
 ```
 
 `matchStatus` 观测到三种：`COMPLETED` / `NOTSTARTED` / `PENDING`。
+
+#### anchorMatchId：别忘了它，否则列表停在几个月前
+
+接口一次返回**整个赛季**的赛程——英超实测 53 天（4 月到 12 月）、CBA 67 天——
+从头渲染的话进来看到的是几个月前的比赛，要滑很久才能到今天。
+
+`result.anchorMatchId` 就是虎扑自己给的定位锚点，指向「今天附近」那场比赛。
+实测每个分区都有值（`nba` / `cba` / `epl` / `lpl` / `lck` / `kog` / `worldcup` / `tennis`
+全部非 0），即使那天没有比赛也会给一个最近的。当天的 `dateBlock` 还会直接写成
+「今天 周六」，可以据此兜底。
 
 > ⚠️ **实时比分未验证**：抓取时正值 NBA 休赛期，500+ 场全是 COMPLETED / NOTSTARTED，
 > 没有一场进行中，所以 `midGameStageInfo` / `liveSourceInfos` 的实际结构未知。
@@ -142,7 +153,7 @@ data.pageResult.data[]          被评分的条目
 
 `shared/src/commonMain/kotlin/com/hupux/data/scraper/HupuMatchScraper.kt`
 
-- `fetchSchedule(tag: MatchTag): List<MatchDay>` —— 赛程，按日期分组
+- `fetchSchedule(tag: MatchTag): MatchSchedule` —— 赛程，按日期分组，附带定位锚点
 - `fetchScoreBoard(itemBizType, itemBizNo): MatchScoreBoard` —— 整场评分榜
 - `fetchItemDetail(bizType, bizNo): ScoreItemDetail` —— 单个评分对象（含我的打分）
 - `fetchComments(bizType, bizNo, cursor)` —— 评论列表（时间游标翻页）
@@ -153,7 +164,7 @@ data.pageResult.data[]          被评分的条目
 
 Android UI 在 `app/src/main/java/com/hupux/ui/score/`，底部导航第 3 项「评分」：
 
-- `ScoreScreen` —— 赛程列表
+- `ScoreScreen` —— 赛程列表，进来自动定位到「今天」（标红），再点底部 Tab 也回到今天
 - `ScoreDetailScreen` —— 整场评分榜，点条目进入详情
 - `ScoreItemScreen` —— 单个对象详情：五星打分、取消评分、评论列表、发评论/回复、点亮
 
