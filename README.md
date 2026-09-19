@@ -207,6 +207,10 @@ xcodebuild -project HupuX.xcodeproj -scheme HupuX \
 想发 minor/major 版本时，手动把 `gradle.properties` 的 `appVersion` 改成目标版本再推即可
 （`appVersionCode` 忘了改也没关系，CI 会自动 +1，保证 Android 能覆盖安装）。
 
+> ⚠️ 提交信息里**不要出现方括号包起来的 skip-ci 指令**（`skip ci` / `ci skip` 那两种写法）。
+> GitHub 见到就会跳过整条流水线，于是既不构建也不发版——连"解释这个机制"时顺手写进提交信息
+> 都会中招。CI 自己回写版本号的那条提交是故意带它的，用来防止递归触发。
+
 ---
 
 ## Star History
