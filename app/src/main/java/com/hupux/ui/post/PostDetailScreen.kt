@@ -86,6 +86,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -119,14 +120,11 @@ fun PostDetailScreen(
         viewerUrl = full
     }) {
 
-    Column(Modifier.fillMaxSize().background(AppBg)) {
+    HazeTopBarScaffold(
+        modifier = Modifier.background(AppBg),
+        topBar = { barModifier ->
         // ── Top bar ───────────────────────────────────────────────
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .background(HeaderBg)
-                .statusBarsPadding()
-        ) {
+        Box(barModifier.statusBarsPadding()) {
             Row(
                 Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -157,8 +155,8 @@ fun PostDetailScreen(
                 thickness = 0.5.dp, color = DividerColor
             )
         }
-        Spacer(Modifier.height(8.dp))
-
+        }
+    ) { topPadding ->
         Box(Modifier.fillMaxSize()) {
             when (val st = state) {
                 is PostDetailUiState.Loading -> CircularProgressIndicator(
@@ -171,7 +169,7 @@ fun PostDetailScreen(
                     Spacer(Modifier.height(12.dp))
                     PillButton("重试", onClick = { vm.load(tid) })
                 }
-                is PostDetailUiState.Success -> PostContent(st, vm, onOpenUser)
+                is PostDetailUiState.Success -> PostContent(st, vm, onOpenUser, topPadding)
             }
         }
     }
@@ -241,9 +239,14 @@ fun PostDetailScreen(
 private fun PostContent(
     s: PostDetailUiState.Success,
     vm: PostDetailViewModel,
-    onOpenUser: (puid: String) -> Unit = {}
+    onOpenUser: (puid: String) -> Unit = {},
+    /** 顶栏浮在内容之上，顶部留白按量到的栏高补 */
+    contentTopPadding: Dp = 0.dp
 ) {
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(top = contentTopPadding + 8.dp, bottom = 24.dp)
+    ) {
         item { PostBodyCard(
             post          = s.post,
             isRecommended = s.isRecommended,

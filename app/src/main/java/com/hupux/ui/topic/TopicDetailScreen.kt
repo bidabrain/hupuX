@@ -48,14 +48,11 @@ fun TopicDetailScreen(
     }
     val onHeader = TextPrimary   // 顶栏改白底后不再取专区主色，文字统一用主文字色
 
-    Column(Modifier.fillMaxSize().background(AppBg)) {
+    HazeTopBarScaffold(
+        modifier = Modifier.background(AppBg),
+        topBar = { barModifier ->
         // ── Header ────────────────────────────────────────────────
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .background(HeaderBg)
-                .statusBarsPadding()
-        ) {
+        Box(barModifier.statusBarsPadding()) {
             Column {
                 Row(
                     Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 4.dp),
@@ -97,9 +94,8 @@ fun TopicDetailScreen(
                 }
             }
         }
-
-        Spacer(Modifier.height(8.dp))
-
+        }
+    ) { topPadding ->
         // ── Thread list ───────────────────────────────────────────
         Box(Modifier.fillMaxSize()) {
             when {
@@ -114,7 +110,7 @@ fun TopicDetailScreen(
                     PillButton("重试", onClick = vm::load)
                 }
                 else -> LazyColumn(Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 16.dp)) {
+                    contentPadding = PaddingValues(top = topPadding + 8.dp, bottom = 16.dp)) {
                     itemsIndexed(state.posts, key = { _, post -> post.tid }) { index, post ->
                         if (index == state.posts.size - 3 && state.nextPage != null)
                             LaunchedEffect(state.nextPage) { vm.loadMore() }

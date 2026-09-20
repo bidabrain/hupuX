@@ -1,14 +1,22 @@
 package com.hupux.ui.theme
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -76,6 +84,39 @@ fun Modifier.hazeBar(shape: Shape = RectangleShape): Modifier = hazeChild(
         fallbackTint    = HazeTint(CardBg.copy(alpha = 0.95f))
     )
 )
+
+/**
+ * 自绘顶栏页面的通用骨架：顶栏浮在内容之上，内容铺满、滚到它下面。
+ *
+ * 这些页面各写各的顶栏，高度还不一样（有的带 Tab 行），算不出来只能量；
+ * 量到的高度通过 [content] 的参数回传，内容据此补顶部留白。
+ * 首帧高度还是 0，会有一帧内容压在顶栏下，随即校正。
+ *
+ * @param topBar 接收一个已经挂好「量高度 + 毛玻璃」的 Modifier，自己接着链 statusBarsPadding 等
+ * @param content 接收顶栏高度，把它加进自己的 contentPadding
+ */
+@Composable
+fun HazeTopBarScaffold(
+    modifier: Modifier = Modifier,
+    topBar: @Composable (Modifier) -> Unit,
+    content: @Composable (topPadding: Dp) -> Unit
+) {
+    HazeScope {
+        var topBarHeight by remember { mutableStateOf(0.dp) }
+        val density = LocalDensity.current
+        Box(modifier.fillMaxSize()) {
+            // 内容先声明 → 先绘制；顶栏后声明 → 覆在上面，且两者是兄弟，
+            // 不会踩到 Haze「haze 与 hazeChild 不能互为祖先后代」那条限制
+            Box(Modifier.fillMaxSize().hazeSource()) { content(topBarHeight) }
+            topBar(
+                Modifier
+                    .fillMaxWidth()
+                    .onSizeChanged { topBarHeight = with(density) { it.height.toDp() } }
+                    .hazeBar()
+            )
+        }
+    }
+}
 
 /**
  * `HupuTopBar` 的总高度：状态栏 + 52dp 内容 + 0.5dp 分割线。

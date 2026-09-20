@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.koin.androidx.compose.koinViewModel
@@ -44,9 +45,10 @@ fun ProfileScreen(
 ) {
     val state by vm.state.collectAsState()
 
-    Column(Modifier.fillMaxSize().background(AppBg)) {
-
-        Column(Modifier.fillMaxWidth().background(HeaderBg).statusBarsPadding()) {
+    HazeTopBarScaffold(
+        modifier = Modifier.background(AppBg),
+        topBar = { barModifier ->
+        Column(barModifier.statusBarsPadding()) {
             Box(
                 Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 20.dp),
                 contentAlignment = Alignment.CenterStart
@@ -55,7 +57,8 @@ fun ProfileScreen(
             }
             HorizontalDivider(thickness = 0.5.dp, color = DividerColor)
         }
-
+        }
+    ) { topPadding ->
         when (val s = state) {
             is ProfileViewModel.State.NotLoggedIn -> NotLoggedInContent(onNavigateToLogin)
             is ProfileViewModel.State.Loading     -> Box(Modifier.fillMaxSize(), Alignment.Center) {
@@ -68,7 +71,7 @@ fun ProfileScreen(
                     PillButton("重试", onClick = vm::loadProfile)
                 }
             }
-            is ProfileViewModel.State.Success     -> ProfileContent(s.profile, s.followedZones, s.favoriteCountStr, s.unreadMessageCount, onPostsClick, onThreadsClick, onRecommendClick, onZoneClick, onMessagesClick, onFavoritesClick)
+            is ProfileViewModel.State.Success     -> ProfileContent(s.profile, s.followedZones, s.favoriteCountStr, s.unreadMessageCount, onPostsClick, onThreadsClick, onRecommendClick, onZoneClick, onMessagesClick, onFavoritesClick, topPadding)
         }
     }
 }
@@ -99,12 +102,15 @@ private fun ProfileContent(
     onRecommendClick: (uid: String) -> Unit,
     onZoneClick: (Int, String) -> Unit,
     onMessagesClick: () -> Unit,
-    onFavoritesClick: () -> Unit
+    onFavoritesClick: () -> Unit,
+    /** 顶栏浮在内容之上，顶部留白按调用方量到的栏高补 */
+    contentTopPadding: Dp = 0.dp
 ) {
     Column(
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
+            .padding(top = contentTopPadding)
             // 内容要滚到底部导航栏下面，毛玻璃才有东西可模糊；底部留白自己补回来
             .padding(bottom = LocalBottomBarHeight.current)
     ) {

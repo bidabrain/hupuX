@@ -64,9 +64,11 @@ fun ScoreScreen(
     // 首次加载和切分区后定位到今天
     LaunchedEffect(state.tag, anchorIndex) { listState.scrollToItem(anchorIndex) }
 
-    Column(Modifier.fillMaxSize().background(AppBg)) {
+    HazeTopBarScaffold(
+        modifier = Modifier.background(AppBg),
+        topBar = { barModifier ->
         // ── 顶栏 + 分区 Tab ───────────────────────────────────────
-        Column(Modifier.fillMaxWidth().background(HeaderBg).statusBarsPadding()) {
+        Column(barModifier.statusBarsPadding()) {
             Row(
                 Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 20.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -107,7 +109,8 @@ fun ScoreScreen(
             }
             HorizontalDivider(thickness = 0.5.dp, color = DividerColor)
         }
-
+        }
+    ) { topPadding ->
         Box(Modifier.fillMaxSize()) {
             when {
                 state.isLoading && state.days.isEmpty() -> CircularProgressIndicator(
@@ -129,7 +132,10 @@ fun ScoreScreen(
                 else -> LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(top = 12.dp, bottom = 16.dp + LocalBottomBarHeight.current)
+                    contentPadding = PaddingValues(
+                        top    = topPadding + 12.dp,
+                        bottom = 16.dp + LocalBottomBarHeight.current
+                    )
                 ) {
                     state.days.forEach { day ->
                         item(key = "day-${day.date}") {

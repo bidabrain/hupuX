@@ -77,9 +77,10 @@ fun SettingsScreen(
         }
     }
 
-    Column(Modifier.fillMaxSize().background(AppBg)) {
-
-        Column(Modifier.fillMaxWidth().background(HeaderBg).statusBarsPadding()) {
+    HazeTopBarScaffold(
+        modifier = Modifier.background(AppBg),
+        topBar = { barModifier ->
+        Column(barModifier.statusBarsPadding()) {
             Row(
                 Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -91,11 +92,14 @@ fun SettingsScreen(
             }
             HorizontalDivider(thickness = 0.5.dp, color = DividerColor)
         }
-
+        }
+    ) { topPadding ->
         Column(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
+                // 顶栏浮在内容之上，顶部留白按量到的栏高补
+                .padding(top = topPadding)
                 .padding(16.dp)
         ) {
             Spacer(Modifier.height(8.dp))

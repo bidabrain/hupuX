@@ -50,14 +50,11 @@ fun ZoneDetailScreen(
     val onHeader = TextPrimary   // 顶栏改白底后不再取专区主色，文字统一用主文字色
 
     Box(Modifier.fillMaxSize()) {
-    Column(Modifier.fillMaxSize().background(AppBg)) {
+    HazeTopBarScaffold(
+        modifier = Modifier.background(AppBg),
+        topBar = { barModifier ->
         // ── Header（改版后不再用专区主色铺满，改白底 + 分割线）──────
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .background(HeaderBg)
-                .statusBarsPadding()
-        ) {
+        Box(barModifier.statusBarsPadding()) {
             Column {
                 // Back bar
                 Row(
@@ -118,9 +115,8 @@ fun ZoneDetailScreen(
                 }
             }
         }
-
-        Spacer(Modifier.height(8.dp))
-
+        }
+    ) { topPadding ->
         // ── Post list ─────────────────────────────────────────────
         Box(Modifier.fillMaxSize()) {
             when {
@@ -135,7 +131,7 @@ fun ZoneDetailScreen(
                     PillButton("重试", onClick = vm::load)
                 }
                 else -> LazyColumn(Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 16.dp)) {
+                    contentPadding = PaddingValues(top = topPadding + 8.dp, bottom = 16.dp)) {
                     itemsIndexed(state.posts, key = { _, post -> post.tid }) { index, post ->
                         if (index == state.posts.size - 3 && state.nextCursor != null)
                             LaunchedEffect(state.nextCursor) { vm.loadMore() }

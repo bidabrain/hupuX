@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.koin.androidx.compose.koinViewModel
@@ -44,9 +45,10 @@ fun MessageScreen(
 ) {
     val state by vm.state.collectAsState()
 
-    Column(Modifier.fillMaxSize().background(AppBg)) {
-        // Top bar
-        Column(Modifier.fillMaxWidth().background(HeaderBg).statusBarsPadding()) {
+    HazeTopBarScaffold(
+        modifier = Modifier.background(AppBg),
+        topBar = { barModifier ->
+        Column(barModifier.statusBarsPadding()) {
             Row(
                 Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -91,13 +93,15 @@ fun MessageScreen(
             }
             HorizontalDivider(thickness = 0.5.dp, color = DividerColor)
         }
-
+        }
+    ) { topPadding ->
         val tab = state.tabs[state.selectedTab] ?: MessageViewModel.TabState()
         MessageTabContent(
             tab       = tab,
             onLoadMore = vm::loadMore,
             onRetry   = vm::refresh,
-            onPostClick = onPostClick
+            onPostClick = onPostClick,
+            contentTopPadding = topPadding
         )
     }
 }
@@ -107,7 +111,9 @@ private fun MessageTabContent(
     tab: MessageViewModel.TabState,
     onLoadMore: () -> Unit,
     onRetry: () -> Unit,
-    onPostClick: (String) -> Unit
+    onPostClick: (String) -> Unit,
+    /** 顶栏浮在内容之上，顶部留白由调用方把量到的栏高传进来 */
+    contentTopPadding: Dp = 0.dp
 ) {
     val listState = rememberLazyListState()
 
@@ -139,7 +145,7 @@ private fun MessageTabContent(
             }
         else -> LazyColumn(
             state = listState,
-            contentPadding = PaddingValues(top = 12.dp, bottom = 16.dp)
+            contentPadding = PaddingValues(top = 12.dp + contentTopPadding, bottom = 16.dp)
         ) {
             items(tab.items, key = { "${it.tid}_${it.pid}_${it.updateTime}" }) { item ->
                 MessageCard(item, onClick = { onPostClick(item.tid.toString()) })

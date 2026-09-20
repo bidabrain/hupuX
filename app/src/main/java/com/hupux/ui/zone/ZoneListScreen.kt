@@ -52,9 +52,11 @@ fun ZoneListScreen(
         if (scrollToTopTrigger > 0) listState.animateScrollToItem(0)
     }
 
-    Column(Modifier.fillMaxSize().background(AppBg)) {
+    HazeTopBarScaffold(
+        modifier = Modifier.background(AppBg),
+        topBar = { barModifier ->
         // ── Header ───────────────────────────────────────────────
-        Column(Modifier.fillMaxWidth().background(HeaderBg).statusBarsPadding()) {
+        Column(barModifier.statusBarsPadding()) {
             Row(
                 Modifier.fillMaxWidth().height(52.dp).padding(start = 20.dp, end = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -68,8 +70,8 @@ fun ZoneListScreen(
             }
             HorizontalDivider(thickness = 0.5.dp, color = DividerColor)
         }
-        Spacer(Modifier.height(12.dp))
-
+        }
+    ) { topPadding ->
         Box(Modifier.fillMaxSize()) {
             when (val s = state) {
                 is ZoneListUiState.Loading -> CircularProgressIndicator(
@@ -87,7 +89,10 @@ fun ZoneListScreen(
                     val otherCat = s.categories.filter { it.categoryId != 0 }
 
                     LazyColumn(state = listState, modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = 16.dp + LocalBottomBarHeight.current)) {
+                        contentPadding = PaddingValues(
+                            top    = topPadding + 12.dp,
+                            bottom = 16.dp + LocalBottomBarHeight.current
+                        )) {
 
                         // ── 我的关注 ─────────────────────────────
                         if (followed.isNotEmpty()) {
