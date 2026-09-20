@@ -87,7 +87,7 @@ fun ZoneListScreen(
                     val otherCat = s.categories.filter { it.categoryId != 0 }
 
                     LazyColumn(state = listState, modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = 16.dp)) {
+                        contentPadding = PaddingValues(bottom = 16.dp + LocalBottomBarHeight.current)) {
 
                         // ── 我的关注 ─────────────────────────────
                         if (followed.isNotEmpty()) {

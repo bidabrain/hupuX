@@ -18,13 +18,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
+import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.delay
 import com.hupux.ui.profile.UserFavoriteListScreen
 import com.hupux.ui.home.HomeScreen
@@ -93,6 +96,17 @@ fun AppNavigation() {
         }
     }
 
+    // 毛玻璃：内容整体作为模糊源，底栏作为浮在其上的 haze child。
+    // 底栏高度量出来往下传，供各 tab 的列表补底部 contentPadding——内容要真的
+    // 滚到栏下面，毛玻璃才有东西可模糊。
+    val hazeState = remember { HazeState() }
+    var bottomBarHeight by remember { mutableStateOf(0.dp) }
+    val density = LocalDensity.current
+
+    CompositionLocalProvider(
+        LocalHazeState provides hazeState,
+        LocalBottomBarHeight provides if (showBottomBar) bottomBarHeight else 0.dp
+    ) {
     Scaffold(
         containerColor = AppBg,
         contentWindowInsets = WindowInsets(0),
@@ -102,7 +116,8 @@ fun AppNavigation() {
                 Column(
                     Modifier
                         .fillMaxWidth()
-                        .background(CardBg)
+                        .onSizeChanged { bottomBarHeight = with(density) { it.height.toDp() } }
+                        .hazeBar()
                 ) {
                     HorizontalDivider(thickness = 0.5.dp, color = DividerColor)
                     Row(
@@ -161,7 +176,12 @@ fun AppNavigation() {
         NavHost(
             navController    = navController,
             startDestination = "home",
-            modifier         = Modifier.padding(innerPadding)
+            // 刻意不吃 innerPadding 的底部：内容铺满、滚到底栏下面去，
+            // 底部留白改由各列表用 LocalBottomBarHeight 自己补
+            modifier         = Modifier
+                .padding(top = innerPadding.calculateTopPadding())
+                .fillMaxSize()
+                .hazeSource()
         ) {
             composable("home") {
                 HomeScreen(
@@ -355,5 +375,6 @@ fun AppNavigation() {
                 )
             }
         }
+    }
     }
 }

@@ -129,7 +129,7 @@ fun ScoreScreen(
                 else -> LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(top = 12.dp, bottom = 16.dp)
+                    contentPadding = PaddingValues(top = 12.dp, bottom = 16.dp + LocalBottomBarHeight.current)
                 ) {
                     state.days.forEach { day ->
                         item(key = "day-${day.date}") {

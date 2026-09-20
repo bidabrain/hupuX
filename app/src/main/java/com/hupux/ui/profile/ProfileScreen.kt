@@ -105,6 +105,8 @@ private fun ProfileContent(
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
+            // 内容要滚到底部导航栏下面，毛玻璃才有东西可模糊；底部留白自己补回来
+            .padding(bottom = LocalBottomBarHeight.current)
     ) {
         // Hero
         Box(Modifier.fillMaxWidth().height(200.dp)) {

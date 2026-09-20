@@ -174,7 +174,7 @@ fun HomeScreen(
                 state.selectedTab == 0 -> LazyColumn(
                     state = recommendListState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(top = 12.dp, bottom = 8.dp)
+                    contentPadding = PaddingValues(top = 12.dp, bottom = 8.dp + LocalBottomBarHeight.current)
                 ) {
                     items(state.recommendPosts, key = { it.tid }) { post ->
                         PostCard(post = post, onClick = { onPostClick(post.tid) })
@@ -324,7 +324,7 @@ private fun HotFeed(
             PillButton("重试", onClick = onRetry)
         }
         else -> LazyColumn(state = listState, modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 12.dp, bottom = 8.dp)) {
+            contentPadding = PaddingValues(top = 12.dp, bottom = 8.dp + LocalBottomBarHeight.current)) {
             items(items, key = { it.tagId }) { item ->
                 HotItemCard(item, onClick = { onTopicClick(item.tagId, item.tagName) })
             }
@@ -394,7 +394,7 @@ private fun FollowedFeed(
             }
         }
         else -> LazyColumn(state = listState, modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 12.dp, bottom = 8.dp)) {
+            contentPadding = PaddingValues(top = 12.dp, bottom = 8.dp + LocalBottomBarHeight.current)) {
             item {
                 Row(Modifier.padding(horizontal = 18.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically) {
