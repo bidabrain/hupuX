@@ -1,5 +1,6 @@
 package com.hupux.ui.theme
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -98,6 +99,15 @@ fun Modifier.hazeBar(shape: Shape = RectangleShape): Modifier = hazeChild(
 @Composable
 fun HazeTopBarScaffold(
     modifier: Modifier = Modifier,
+    /**
+     * 是否启用毛玻璃；false 时退回不透明顶栏，布局结构不变。
+     *
+     * 帖子详情要传 false：那一页的正文是 WebView，战报帖里可能有几十张动图
+     * （实测有 33 张）在持续重绘，而 haze 每帧都要把内容录进一个 GraphicsLayer。
+     * WebView 这种由平台绘制的 View 录进去本来就不可靠，叠上持续失效就会看到
+     * 正文一直在闪，而且每帧重录整块内容纯属白烧性能。
+     */
+    hazed: Boolean = true,
     topBar: @Composable (Modifier) -> Unit,
     content: @Composable (topPadding: Dp) -> Unit
 ) {
@@ -107,12 +117,16 @@ fun HazeTopBarScaffold(
         Box(modifier.fillMaxSize()) {
             // 内容先声明 → 先绘制；顶栏后声明 → 覆在上面，且两者是兄弟，
             // 不会踩到 Haze「haze 与 hazeChild 不能互为祖先后代」那条限制
-            Box(Modifier.fillMaxSize().hazeSource()) { content(topBarHeight) }
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .then(if (hazed) Modifier.hazeSource() else Modifier)
+            ) { content(topBarHeight) }
             topBar(
                 Modifier
                     .fillMaxWidth()
                     .onSizeChanged { topBarHeight = with(density) { it.height.toDp() } }
-                    .hazeBar()
+                    .then(if (hazed) Modifier.hazeBar() else Modifier.background(HeaderBg))
             )
         }
     }

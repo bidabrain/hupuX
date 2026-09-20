@@ -181,7 +181,11 @@ fun AppNavigation() {
             modifier         = Modifier
                 .padding(top = innerPadding.calculateTopPadding())
                 .fillMaxSize()
-                .hazeSource()
+                // 只在有底栏时才挂模糊源：HazeNode.draw() 是**无条件**每帧把整块内容
+                // 录进 GraphicsLayer 的，有没有 hazeChild 都录。没底栏的页面（帖子详情、
+                // 搜索、设置…）挂着纯属白烧性能，帖子详情里那个带几十张动图的 WebView
+                // 还会因此一直闪。
+                .then(if (showBottomBar) Modifier.hazeSource() else Modifier)
         ) {
             composable("home") {
                 HomeScreen(

@@ -122,6 +122,8 @@ fun PostDetailScreen(
 
     HazeTopBarScaffold(
         modifier = Modifier.background(AppBg),
+        // 正文是 WebView，战报帖里几十张动图在持续重绘，套进 haze 源会一直闪
+        hazed = false,
         topBar = { barModifier ->
         // ── Top bar ───────────────────────────────────────────────
         Box(barModifier.statusBarsPadding()) {
