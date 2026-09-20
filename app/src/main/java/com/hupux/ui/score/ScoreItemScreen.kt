@@ -350,7 +350,9 @@ private fun CommentInputBar(
     onCancelReply: () -> Unit,
     onSend: () -> Unit
 ) {
-    Column(Modifier.fillMaxWidth().hazeBar()) {
+    // imePadding 放在 hazeBar 前面：先把整条栏顶到键盘上方，毛玻璃背景才不会
+    // 延伸到键盘后面那块看不见的区域
+    Column(Modifier.fillMaxWidth().imePadding().hazeBar()) {
         HorizontalDivider(thickness = 0.5.dp, color = DividerColor)
         if (replyingTo != null) {
             Row(

@@ -97,6 +97,9 @@ fun SettingsScreen(
         Column(
             Modifier
                 .fillMaxSize()
+                // 放在 verticalScroll 前面：让可滚动视口止于键盘上沿，
+                // 输入框获得焦点时才能被自动滚进可见区
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 // 顶栏浮在内容之上，顶部留白按量到的栏高补
                 .padding(top = topPadding)

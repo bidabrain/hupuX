@@ -1052,6 +1052,9 @@ private fun ReplySheet(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
+            // enableEdgeToEdge 下窗口不再为键盘 resize，键盘高度只通过
+            // WindowInsets.ime 汇报，不加这句输入框会被键盘盖住
+            .imePadding()
             .navigationBarsPadding()
     ) {
         Text(

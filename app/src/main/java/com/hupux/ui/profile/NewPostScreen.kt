@@ -124,6 +124,8 @@ fun NewPostScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(CardBg)
+                        // 键盘弹出时整条工具栏顶到键盘上方
+                        .imePadding()
                         .navigationBarsPadding()
                         .padding(horizontal = 4.dp, vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
