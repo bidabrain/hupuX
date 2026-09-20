@@ -136,6 +136,9 @@ jobs:
         with:
           name: android-apk
           path: app/build/outputs/apk/release/*.apk
+          # 传的都是已经压过的二进制，默认还会再 zip 一遍（level 6）纯属白费：
+          # 上传更慢，也更容易撞上 CreateArtifact 超时。0 = 只打包不压缩。
+          compression-level: 0
 
   # ── macOS ARM .dmg ────────────────────────────────────────────────────────────
   macos:
@@ -168,6 +171,9 @@ jobs:
         with:
           name: macos-dmg-arm
           path: desktopApp/build/compose/binaries/main/dmg/HupuX-arm64.dmg
+          # 传的都是已经压过的二进制，默认还会再 zip 一遍（level 6）纯属白费：
+          # 上传更慢，也更容易撞上 CreateArtifact 超时。0 = 只打包不压缩。
+          compression-level: 0
 
   # ── macOS Intel .dmg ──────────────────────────────────────────────────────────
   macos-intel:
@@ -200,6 +206,9 @@ jobs:
         with:
           name: macos-dmg-intel
           path: desktopApp/build/compose/binaries/main/dmg/HupuX-intel.dmg
+          # 传的都是已经压过的二进制，默认还会再 zip 一遍（level 6）纯属白费：
+          # 上传更慢，也更容易撞上 CreateArtifact 超时。0 = 只打包不压缩。
+          compression-level: 0
 
   # ── Windows .msi ──────────────────────────────────────────────────────────────
   windows:
@@ -229,6 +238,9 @@ jobs:
         with:
           name: windows-msi
           path: desktopApp/build/compose/binaries/main/msi/*.msi
+          # 传的都是已经压过的二进制，默认还会再 zip 一遍（level 6）纯属白费：
+          # 上传更慢，也更容易撞上 CreateArtifact 超时。0 = 只打包不压缩。
+          compression-level: 0
 
   # ── Linux .deb ────────────────────────────────────────────────────────────────
   linux:
@@ -258,6 +270,9 @@ jobs:
         with:
           name: linux-deb
           path: desktopApp/build/compose/binaries/main/deb/*.deb
+          # 传的都是已经压过的二进制，默认还会再 zip 一遍（level 6）纯属白费：
+          # 上传更慢，也更容易撞上 CreateArtifact 超时。0 = 只打包不压缩。
+          compression-level: 0
 
   # ── iOS 未签名 IPA ────────────────────────────────────────────────────────────
   # 说明：未加入 Apple Developer Program，产物为「未签名」IPA，无法直接安装到 iPhone，
@@ -308,6 +323,9 @@ jobs:
         with:
           name: ios-ipa
           path: ios/HupuX/build/Build/Products/Release-iphoneos/HupuX-unsigned.ipa
+          # 传的都是已经压过的二进制，默认还会再 zip 一遍（level 6）纯属白费：
+          # 上传更慢，也更容易撞上 CreateArtifact 超时。0 = 只打包不压缩。
+          compression-level: 0
 
   # ── 回写版本号 + 发 GitHub Release（推送到 main 且全平台构建成功时）──────────
   release:
