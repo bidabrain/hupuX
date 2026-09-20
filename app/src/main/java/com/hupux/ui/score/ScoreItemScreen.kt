@@ -49,10 +49,15 @@ fun ScoreItemScreen(
         }
     }
 
+    HazeScope {
     Scaffold(
         containerColor = AppBg,
         snackbarHost = { SnackbarHost(snackbar) },
-        topBar = { HupuTopBar(title = state.detail?.name ?: "评分", onBack = onBack) },
+        // 内容要铺满、滚到顶栏与输入栏下面，毛玻璃才有东西可模糊
+        contentWindowInsets = WindowInsets(0),
+        topBar = {
+            HupuTopBar(title = state.detail?.name ?: "评分", onBack = onBack, hazed = true)
+        },
         bottomBar = {
             CommentInputBar(
                 value      = state.draft,
@@ -64,7 +69,8 @@ fun ScoreItemScreen(
             )
         }
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
+        // 刻意不吃 padding：留白改由列表的 contentPadding 补回来
+        Box(Modifier.fillMaxSize().hazeSource()) {
             when {
                 state.isLoading -> CircularProgressIndicator(
                     Modifier.align(Alignment.Center), color = HupuRed)
@@ -80,7 +86,10 @@ fun ScoreItemScreen(
 
                 else -> LazyColumn(
                     Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(vertical = 12.dp)
+                    contentPadding = PaddingValues(
+                        top    = 12.dp + padding.calculateTopPadding(),
+                        bottom = 12.dp + padding.calculateBottomPadding()
+                    )
                 ) {
                     state.detail?.let { d ->
                         item { ItemHeader(d, onRate = { showRating = true }) }
@@ -130,6 +139,7 @@ fun ScoreItemScreen(
             onPick    = { stars -> vm.submitScore(stars); showRating = false },
             onCancelScore = { vm.cancelScore(); showRating = false }
         )
+    }
     }
 }
 
@@ -340,7 +350,7 @@ private fun CommentInputBar(
     onCancelReply: () -> Unit,
     onSend: () -> Unit
 ) {
-    Column(Modifier.fillMaxWidth().background(CardBg)) {
+    Column(Modifier.fillMaxWidth().hazeBar()) {
         HorizontalDivider(thickness = 0.5.dp, color = DividerColor)
         if (replyingTo != null) {
             Row(

@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.koin.androidx.compose.koinViewModel
@@ -46,8 +47,15 @@ fun UserRecommendListScreen(
     }
     LaunchedEffect(shouldLoadMore) { if (shouldLoadMore) vm.load() }
 
-    Column(Modifier.fillMaxSize().background(AppBg)) {
-        HupuTopBar(title = "我的推荐", onBack = onBack)
+    HazeScope {
+    Box(Modifier.fillMaxSize().background(AppBg)) {
+        HupuTopBar(
+            title = "我的推荐", onBack = onBack, hazed = true,
+            modifier = Modifier.zIndex(1f)
+        )
+        // 内容滚到顶栏下面。hazeSource 挂在这一层（顶栏的兄弟）而不是外层 Box：
+        // Haze 不允许 haze 与 hazeChild 互为祖先后代，挂外层会直接崩。
+        Box(Modifier.fillMaxSize().hazeSource()) {
 
         when {
             state.isLoading && state.items.isEmpty() ->
@@ -64,7 +72,7 @@ fun UserRecommendListScreen(
                 }
             else -> LazyColumn(
                 state = listState,
-                contentPadding = PaddingValues(top = 12.dp, bottom = 16.dp)
+                contentPadding = PaddingValues(top = 12.dp + hupuTopBarHeight, bottom = 16.dp)
             ) {
                 items(state.items, key = { it.tid }) { post ->
                     RecommendCard(post, onClick = { onPostClick(post.tid.toString()) })
@@ -85,6 +93,8 @@ fun UserRecommendListScreen(
                 }
             }
         }
+        }
+    }
     }
 }
 

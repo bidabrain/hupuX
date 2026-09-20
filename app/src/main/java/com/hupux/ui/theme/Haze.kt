@@ -4,7 +4,9 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
@@ -35,6 +37,22 @@ val LocalBottomBarHeight = compositionLocalOf { 0.dp }
 /** 标记「这块内容是要被模糊的背景」。放在滚动列表 / 内容容器上。 */
 @Composable
 fun Modifier.hazeSource(): Modifier = haze(LocalHazeState.current)
+
+/**
+ * 在页面内部新开一层毛玻璃作用域。
+ *
+ * **必须新开，不能复用根部那层**：Haze 在 `HazeChildNode.draw()` 里直接
+ * `require(!state.contentDrawing)`，即同一个 HazeState 的 haze 与 hazeChild
+ * 不允许互为祖先后代，否则运行时崩。根部那层 haze 挂在 NavHost 上，页面里的
+ * 顶栏是它的后代，只能自己开一层：顶栏和内容在这层里是兄弟，就合法了。
+ *
+ * 底栏不受影响——它在 Scaffold 的 bottomBar 里，是 NavHost 的兄弟，仍用根部那层。
+ */
+@Composable
+fun HazeScope(content: @Composable () -> Unit) {
+    val state = remember { HazeState() }
+    CompositionLocalProvider(LocalHazeState provides state, content = content)
+}
 
 /**
  * 悬浮栏的毛玻璃背景。

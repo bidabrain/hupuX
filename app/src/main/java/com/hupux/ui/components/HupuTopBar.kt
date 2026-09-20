@@ -22,6 +22,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hupux.ui.theme.DividerColor
+import com.hupux.ui.theme.HazeScope
+import com.hupux.ui.theme.hazeBar
+import com.hupux.ui.theme.hazeSource
 import com.hupux.ui.theme.HeaderBg
 import com.hupux.ui.theme.TextPrimary
 
@@ -38,9 +41,23 @@ import com.hupux.ui.theme.TextPrimary
 fun HupuTopBar(
     title: String,
     onBack: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+    /**
+     * 是否用毛玻璃背景。
+     *
+     * 只有「内容已改成滚到顶栏下面、并且在同一个 [HazeScope] 里挂了 [hazeSource]」
+     * 的页面才能传 true —— Haze 找不到配对的模糊源时 hazeChild 什么都不画，
+     * 顶栏会变成全透明。没改造的页面保持默认 false，走原来的不透明底色。
+     */
+    hazed: Boolean = false,
     actions: @Composable RowScope.() -> Unit = {}
 ) {
-    Column(Modifier.fillMaxWidth().background(HeaderBg).statusBarsPadding()) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .then(if (hazed) Modifier.hazeBar() else Modifier.background(HeaderBg))
+            .statusBarsPadding()
+    ) {
         Row(
             Modifier
                 .fillMaxWidth()

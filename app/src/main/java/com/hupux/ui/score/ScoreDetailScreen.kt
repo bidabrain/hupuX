@@ -15,6 +15,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -36,10 +37,15 @@ fun ScoreDetailScreen(
     val state by vm.state.collectAsState()
     LaunchedEffect(bizType, bizNo) { vm.load(bizType, bizNo) }
 
-    Column(Modifier.fillMaxSize().background(AppBg)) {
-        HupuTopBar(title = state.board?.title?.ifEmpty { "评分" } ?: "评分", onBack = onBack)
-
-        Box(Modifier.fillMaxSize()) {
+    HazeScope {
+    Box(Modifier.fillMaxSize().background(AppBg)) {
+        HupuTopBar(
+            title = state.board?.title?.ifEmpty { "评分" } ?: "评分", onBack = onBack, hazed = true,
+            modifier = Modifier.zIndex(1f)
+        )
+        // hazeSource 挂在内容这层（顶栏的兄弟）：Haze 不允许 haze 与 hazeChild
+        // 互为祖先后代，挂到外层 Box 上会直接崩
+        Box(Modifier.fillMaxSize().hazeSource()) {
             when {
                 state.isLoading -> CircularProgressIndicator(
                     Modifier.align(Alignment.Center), color = HupuRed)
@@ -61,7 +67,7 @@ fun ScoreDetailScreen(
                     val board = state.board!!
                     LazyColumn(
                         Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(top = 12.dp, bottom = 16.dp)
+                        contentPadding = PaddingValues(top = 12.dp + hupuTopBarHeight, bottom = 16.dp)
                     ) {
                         if (board.raterText.isNotEmpty()) {
                             item {
@@ -91,6 +97,7 @@ fun ScoreDetailScreen(
                 }
             }
         }
+    }
     }
 }
 

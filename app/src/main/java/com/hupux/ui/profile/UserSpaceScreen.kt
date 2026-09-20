@@ -15,6 +15,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.koin.androidx.compose.koinViewModel
@@ -36,10 +37,12 @@ fun UserSpaceScreen(
 ) {
     var tab by remember { mutableStateOf(0) }   // 0=发帖 1=回帖
 
-    Column(Modifier.fillMaxSize().background(AppBg)) {
-        HupuTopBar(title = "用户主页", onBack = onBack)
-
-        Spacer(Modifier.height(10.dp))
+    HazeScope {
+    Box(Modifier.fillMaxSize().background(AppBg)) {
+        // 这里保留 Column：下面的列表用了 weight(1f)，换成 Box 会失去权重语义。
+        // 顶栏改为浮在上面，所以第一个 Spacer 要把顶栏的高度让出来。
+        Column(Modifier.fillMaxSize().hazeSource()) {
+        Spacer(Modifier.height(hupuTopBarHeight + 10.dp))
         UserSpacePills(tab) { tab = it }
         Spacer(Modifier.height(6.dp))
 
@@ -47,6 +50,12 @@ fun UserSpaceScreen(
             0    -> UserThreadListBody(threadVm, onPostClick, Modifier.weight(1f))
             else -> UserReplyListBody(replyVm, onPostClick, Modifier.weight(1f))
         }
+        }
+        HupuTopBar(
+            title = "用户主页", onBack = onBack, hazed = true,
+            modifier = Modifier.zIndex(1f)
+        )
+    }
     }
 }
 
