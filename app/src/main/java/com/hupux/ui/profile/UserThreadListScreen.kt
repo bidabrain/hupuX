@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -40,14 +41,19 @@ fun UserThreadListScreen(
 ) {
     HazeScope {
     Box(Modifier.fillMaxSize().background(AppBg)) {
+        // 内容滚到顶栏下面，顶部留白由列表的 contentPadding 补。
+        // hazeSource 挂在内容上（顶栏的兄弟）：Haze 不允许 haze 与 hazeChild
+        // 互为祖先后代，挂到外层 Box 上会直接崩。
+        UserThreadListBody(
+            vm, onPostClick,
+            Modifier.fillMaxSize().hazeSource(),
+            contentTopPadding = hupuTopBarHeight
+        )
         HupuTopBar(
             title = "我的发帖", onBack = onBack, hazed = true,
             modifier = Modifier.zIndex(1f)
         )
-        // 内容滚到顶栏下面。hazeSource 挂在这一层（顶栏的兄弟）而不是外层 Box：
-        // Haze 不允许 haze 与 hazeChild 互为祖先后代，挂外层会直接崩。
-        Box(Modifier.fillMaxSize().hazeSource()) {
-        UserThreadListBody(vm, onPostClick, Modifier.weight(1f))
+    }
     }
 }
 
@@ -56,7 +62,9 @@ fun UserThreadListScreen(
 fun UserThreadListBody(
     vm: UserThreadListViewModel,
     onPostClick: (tid: String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** 顶栏浮在内容之上时由调用方传入，用来补列表顶部留白；嵌在别处时为 0 */
+    contentTopPadding: Dp = 0.dp
 ) {
     val state by vm.state.collectAsState()
     val listState = rememberLazyListState()
@@ -87,7 +95,7 @@ fun UserThreadListBody(
             else -> LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = 12.dp + hupuTopBarHeight, bottom = 16.dp)
+                contentPadding = PaddingValues(top = 12.dp + contentTopPadding, bottom = 16.dp)
             ) {
                 items(state.items, key = { it.tid }) { thread ->
                     ThreadCard(thread, onClick = { onPostClick(thread.tid.toString()) })
@@ -108,8 +116,6 @@ fun UserThreadListBody(
                 }
             }
         }
-        }
-    }
     }
 }
 
