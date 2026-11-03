@@ -67,6 +67,10 @@ Accept-Language: zh-CN,zh;q=0.9
 | count | String | 帖子数文字 |
 | cateId | Int | 所属分类 ID |
 
+> ⚠️ 这个列表**漏了整个「英雄联盟」分类**（桌面版 `bbs.hupu.com/all-lol`，cateId 40：主区 85 + 二十来个冷清的战队专区）。
+> `m.hupu.com/zone/85` 等专区页本身都能正常打开。客户端在 `HupuScraper.fetchZoneList` 里把主区 85 补到「游戏」分类（categoryId 7）第一个。
+> 桌面版 `all-lol` 页的 `window.$$data.pageData.category.topics` 时有时无，要取完整专区列表得用 `pageData.categories` 里 cateId 40 那一项。
+
 ---
 
 ## 3. 专区帖子列表（含分页）

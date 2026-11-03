@@ -12,6 +12,19 @@ import kotlinx.serialization.json.JsonObject
 
 private const val BASE_URL = "https://m.hupu.com"
 
+/**
+ * m.hupu.com/zone 漏了整个「英雄联盟」分类（桌面版 all-lol：主区 85 + 一堆冷清的战队专区），
+ * 只把主区补到游戏分类最前面（/zone/85 本身正常）
+ */
+private const val GAME_CATEGORY_ID = 7
+private val LOL_ZONE = Zone(
+    topicId = 85,
+    topicName = "英雄联盟",
+    topicLogo = "https://i1.hoopchina.com.cn/marketing-activity/25318-tby5pw.png",
+    count = "32.2万",
+    cateId = GAME_CATEGORY_ID
+)
+
 // 比赛战报（帖子正文是 iframe-match 卡片时用它取真正的内容），匿名可用
 private const val BATTLE_REPORT_API =
     "https://games.mobileapi.hupu.com/1/7.5.36/basketballapi/news/battleReport"
@@ -78,10 +91,12 @@ class HupuScraper(private val client: HttpClient) {
                     cateId = to.int_("cateId") ?: 0
                 )
             } ?: emptyList()
+            val categoryId = o.int_("categoryId") ?: 0
             ZoneCategory(
-                categoryId = o.int_("categoryId") ?: 0,
+                categoryId = categoryId,
                 name = o.str("name") ?: "",
-                zones = topics
+                zones = if (categoryId == GAME_CATEGORY_ID && topics.none { it.topicId == LOL_ZONE.topicId })
+                    listOf(LOL_ZONE) + topics else topics
             )
         }
     }
