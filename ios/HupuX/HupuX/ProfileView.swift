@@ -175,6 +175,8 @@ struct ProfileView: View {
             divider
             entryRow(icon: "hand.thumbsup", label: "我的推荐", route: .recommends(uid: p.uid))
             divider
+            entryRow(icon: "bookmark", label: "我的收藏", route: .favorites)
+            divider
             entryRow(icon: "bell", label: "消息中心", route: .messages)
         }
         .background(Theme.cardBg)

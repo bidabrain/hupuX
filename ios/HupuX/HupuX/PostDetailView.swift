@@ -30,6 +30,7 @@ struct PostDetailView: View {
     @State private var commentPage = 1
     @State private var hasMoreComments = false
     @State private var loadingMoreComments = false
+    @State private var viewerImage: ViewerImage?      // 全屏看图
 
     private var loggedIn: Bool { Deps.shared.cookieStorage.isLoggedIn }
     private var fid: String { desktop?.fid ?? "" }
@@ -109,6 +110,7 @@ struct PostDetailView: View {
         .sheet(item: $subReply) { ctx in
             SubRepliesSheet(tid: tid, parent: ctx.comment, useDesktop: canInteract)
         }
+        .fullScreenCover(item: $viewerImage) { ImageViewer(url: $0.url) }
         .task { await load() }
     }
 
@@ -176,7 +178,7 @@ struct PostDetailView: View {
 
             Divider()
 
-            HTMLBodyView(html: post.content, height: $bodyHeight)
+            HTMLBodyView(html: post.content, height: $bodyHeight) { viewerImage = ViewerImage($0) }
                 .frame(height: bodyHeight)
                 .padding(.top, 12)
         }
@@ -401,17 +403,27 @@ struct CommentCardView: View {
     var onLike: (() -> Void)? = nil
     var onReply: (() -> Void)? = nil
     var onSubReplies: (() -> Void)? = nil
+    @State private var viewerImage: ViewerImage?
+
+    /// 点头像/昵称进发言人主页（对齐安卓：有 puid 且是桌面版评论才能点）
+    private var userRoute: ProfileRoute? {
+        comment.authorPuid.isEmpty || comment.desktopPage <= 0 ? nil : .userSpace(uid: comment.authorPuid)
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            AsyncImage(url: URL(string: comment.avatar)) { phase in
-                if case .success(let img) = phase { img.resizable().scaledToFill() } else { Theme.placeholder }
+            userLink {
+                AsyncImage(url: URL(string: comment.avatar)) { phase in
+                    if case .success(let img) = phase { img.resizable().scaledToFill() } else { Theme.placeholder }
+                }
+                .frame(width: 34, height: 34).clipShape(Circle())
             }
-            .frame(width: 34, height: 34).clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 5) {
-                    Text(comment.username).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.textPrimary)
+                    userLink {
+                        Text(comment.username).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.textPrimary)
+                    }
                     if comment.isAuthor {
                         Text("楼主").font(.system(size: 10)).foregroundStyle(.white)
                             .padding(.horizontal, 4).padding(.vertical, 1)
@@ -444,6 +456,8 @@ struct CommentCardView: View {
                     }
                     .frame(maxWidth: 160, maxHeight: 200, alignment: .leading)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .contentShape(Rectangle())
+                    .onTapGesture { viewerImage = ViewerImage(url) }
                 }
 
                 HStack(spacing: 0) {
@@ -478,6 +492,15 @@ struct CommentCardView: View {
         .background(Theme.cardBg)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+        .fullScreenCover(item: $viewerImage) { ImageViewer(url: $0.url) }
+    }
+
+    @ViewBuilder private func userLink<V: View>(@ViewBuilder _ content: () -> V) -> some View {
+        if let userRoute {
+            NavigationLink(value: userRoute) { content() }.buttonStyle(.plain)
+        } else {
+            content()
+        }
     }
 
     @ViewBuilder private var likeButton: some View {
@@ -542,6 +565,7 @@ struct SubRepliesSheet: View {
             .navigationTitle("回复详情")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { dismiss() } } }
+            .hupuDestinations()
             .sheet(item: $deeper) { ctx in
                 SubRepliesSheet(tid: tid, parent: ctx.comment, useDesktop: useDesktop)
             }

@@ -8,6 +8,7 @@ import com.hupux.data.repository.MessageRepository
 import com.hupux.data.repository.ProfileRepository
 import com.hupux.data.repository.ZoneRepository
 import com.hupux.data.scraper.HupuDesktopScraper
+import com.hupux.data.scraper.HupuMatchScraper
 import com.hupux.data.scraper.HupuScraper
 import com.hupux.shared.db.HupuDatabase
 import io.ktor.client.HttpClient
@@ -36,6 +37,8 @@ class IosDependencies {
 
     val hupuScraper = HupuScraper(httpClient)
     val desktopScraper = HupuDesktopScraper(httpClient, cookieStorage)
+    /** 赛程 / 评分 / 首页今日比分；打分与评论走 cookie */
+    val matchScraper = HupuMatchScraper(httpClient, cookieStorage)
     val updateChecker = UpdateChecker(httpClient)
 
     val homeRepository = HomeRepository(hupuScraper)

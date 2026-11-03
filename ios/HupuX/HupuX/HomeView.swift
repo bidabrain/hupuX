@@ -2,7 +2,7 @@
 //  HomeView.swift
 //  HupuX
 //
-//  首页，对齐安卓 HomeScreen.kt：红色渐变顶栏 + 推荐/热榜/关注 tab。
+//  首页，对齐安卓 HomeScreen.kt：红色渐变顶栏 + 推荐/热榜/关注 tab，推荐流顶部有今日比分横条。
 //
 
 import SwiftUI
@@ -23,6 +23,11 @@ struct HomeView: View {
     @State private var selectedTab = 0   // 0 推荐, 1 热榜, 2 关注
     @State private var showSettings = false
 
+    @State private var homeMatches: [HomeMatch] = []
+    @State private var lastMatchFetch: Date?
+    @State private var matchFetching = false
+    @Environment(\.scenePhase) private var scenePhase
+
     private var bannerPosts: [Post] { Array(posts.filter { !$0.images.isEmpty }.prefix(5)) }
 
     var body: some View {
@@ -35,6 +40,9 @@ struct HomeView: View {
             .toolbar(.hidden, for: .navigationBar)
             .hupuDestinations()
             .task { if posts.isEmpty { await load() } }
+            .task { await refreshHomeMatches() }
+            // 比分会变，回到前台时刷新
+            .onChange(of: scenePhase) { if scenePhase == .active { Task { await refreshHomeMatches() } } }
         }
         .sheet(isPresented: $showSettings) { SettingsView() }
     }
@@ -122,6 +130,9 @@ struct HomeView: View {
             .padding().frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ScrollView {
+                if !homeMatches.isEmpty {
+                    TodayScoreStrip(matches: homeMatches).padding(.top, 10)
+                }
                 banner
                 LazyVStack(spacing: 10) {
                     ForEach(Array(posts.enumerated()), id: \.offset) { _, post in
@@ -135,6 +146,18 @@ struct HomeView: View {
             }
             .refreshable { await load() }
         }
+    }
+
+    /// 今日比分是锦上添花：失败静默留空，也不记时间，下次回前台还能立刻重试。2 分钟内不重复拉（同安卓）
+    private func refreshHomeMatches() async {
+        guard !matchFetching else { return }
+        if let last = lastMatchFetch, Date().timeIntervalSince(last) < 120 { return }
+        matchFetching = true
+        if let list = try? await Deps.shared.matchScraper.fetchHomeMatches(limit: 30) {
+            homeMatches = list
+            lastMatchFetch = Date()
+        }
+        matchFetching = false
     }
 
     // 顶部图片轮播（取前 5 张带图的推荐帖）

@@ -178,6 +178,8 @@ hupuX/
 - [x] Xcode 工程 `ios/HupuX/`，Run Script 调 `embedAndSignAppleFrameworkForXcode` 集成 framework
 - [x] 首页（推荐/热榜/关注 + 轮播）、发现、搜索、收藏、我的、专区/话题/帖子详情、消息、设置、登录、发帖
 - [x] 登录后切桌面版 API 解锁点赞/收藏/推荐/回复；图片/视频 OSS 上传（CryptoKit 签名）
+- [x] 补齐安卓后加的功能：评分 Tab（赛程 / 评分榜 / 打分评论）+ 首页今日比分、我的收藏、他人主页、图片全屏查看与保存
+- [ ] 尚未对齐：外观三选一（跟随系统 / 浅色 / 深色）+ 字号调节（iOS 只有 AMOLED 开关）、顶栏 / 底栏毛玻璃
 
 **技术说明：**
 - Kotlin `suspend` → Swift `async/await` 自动桥接，无需 SKIE；返回 Flow 的少数方法改用一次性 `getAllOnce()` 快照

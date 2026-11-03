@@ -16,6 +16,8 @@ enum ProfileRoute: Hashable {
     case threads(uid: String)     // 发帖记录
     case replies(uid: String)     // 回复记录
     case recommends(uid: String)  // 推荐记录
+    case favorites                // 我的收藏
+    case userSpace(uid: String)   // 他人主页（评论发言人 puid）
     case messages                 // 消息中心
 }
 
@@ -31,7 +33,15 @@ extension View {
                 case .threads(let uid):    UserThreadListView(uid: uid)
                 case .replies(let uid):    UserReplyListView(uid: uid)
                 case .recommends(let uid): UserRecommendListView(uid: uid)
+                case .favorites:           UserFavoriteListView()
+                case .userSpace(let uid):  UserSpaceView(uid: uid)
                 case .messages:            MessageView()
+                }
+            }
+            .navigationDestination(for: ScoreRoute.self) { route in
+                switch route {
+                case .board(let t, let n): ScoreBoardView(bizType: t, bizNo: n)
+                case .item(let t, let n):  ScoreItemView(bizType: t, bizNo: n)
                 }
             }
     }

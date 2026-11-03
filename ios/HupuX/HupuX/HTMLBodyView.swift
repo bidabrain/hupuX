@@ -2,7 +2,7 @@
 //  HTMLBodyView.swift
 //  HupuX
 //
-//  正文 HTML 渲染：WKWebView + 安卓同款 CSS，随图片加载自适应高度。
+//  正文 HTML 渲染：WKWebView + 安卓同款 CSS，随图片加载自适应高度；点图片回调 onImageTap。
 //
 
 import SwiftUI
@@ -11,11 +11,16 @@ import WebKit
 struct HTMLBodyView: UIViewRepresentable {
     let html: String
     @Binding var height: CGFloat
+    var onImageTap: ((String) -> Void)? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeUIView(context: Context) -> WKWebView {
-        let wv = WKWebView()
+        let config = WKWebViewConfiguration()
+        let ucc = config.userContentController
+        ucc.add(WeakMessageHandler(context.coordinator), name: "imgClick")
+        ucc.addUserScript(WKUserScript(source: Self.imgClickJS, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
+        let wv = WKWebView(frame: .zero, configuration: config)
         wv.scrollView.isScrollEnabled = false
         wv.isOpaque = false
         wv.backgroundColor = .clear
@@ -25,6 +30,7 @@ struct HTMLBodyView: UIViewRepresentable {
     }
 
     func updateUIView(_ wv: WKWebView, context: Context) {
+        context.coordinator.onImageTap = onImageTap
         if context.coordinator.loadedHTML != html {
             context.coordinator.loadedHTML = html
             wv.loadHTMLString(Self.page(html), baseURL: URL(string: "https://m.hupu.com/"))
@@ -49,9 +55,27 @@ struct HTMLBodyView: UIViewRepresentable {
         """
     }
 
-    final class Coordinator: NSObject {
+    // 动图优先取 data-gif：虎扑给动图的 src 是 OSS 转出来的静态 jpg（同安卓）
+    private static let imgClickJS = """
+    document.querySelectorAll('img').forEach(function(img){
+      img.style.cursor='pointer';
+      img.addEventListener('click', function(e){
+        e.stopPropagation();
+        var url=img.getAttribute('data-gif')||img.getAttribute('src')||img.getAttribute('data-src')||'';
+        if(url) window.webkit.messageHandlers.imgClick.postMessage(url);
+      });
+    });
+    """
+
+    final class Coordinator: NSObject, WKScriptMessageHandler {
         let parent: HTMLBodyView
         var loadedHTML: String?
+        var onImageTap: ((String) -> Void)?
+
+        func userContentController(_ ucc: WKUserContentController, didReceive message: WKScriptMessage) {
+            guard message.name == "imgClick", let url = message.body as? String, !url.isEmpty else { return }
+            onImageTap?(url)
+        }
         private var observation: NSKeyValueObservation?
 
         init(_ parent: HTMLBodyView) { self.parent = parent }
@@ -64,5 +88,14 @@ struct HTMLBodyView: UIViewRepresentable {
                 DispatchQueue.main.async { parent.height = h }
             }
         }
+    }
+}
+
+/// WKUserContentController 会强引用 handler，经弱引用转一道避免 WebView ↔ Coordinator 循环引用
+private final class WeakMessageHandler: NSObject, WKScriptMessageHandler {
+    weak var target: WKScriptMessageHandler?
+    init(_ target: WKScriptMessageHandler) { self.target = target }
+    func userContentController(_ ucc: WKUserContentController, didReceive message: WKScriptMessage) {
+        target?.userContentController(ucc, didReceive: message)
     }
 }

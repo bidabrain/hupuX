@@ -56,6 +56,8 @@ enum Theme {
     static var textSecondary: Color { amoled ? Color(hex: 0x8A90A0) : Color(hex: 0x6B7080) }
     static var textTertiary:  Color { amoled ? Color(hex: 0x5A6070) : Color(hex: 0xABB0BF) }
     static var placeholder:   Color { amoled ? Color(hex: 0x121212) : Color(hex: 0xF4F5FA) }
+    /// 热度 / 高分（深色下提亮，保证对比度）
+    static var hot:           Color { amoled ? Color(hex: 0xFF6B5E) : Color(hex: 0xF04438) }
 
     /// 顶栏品牌渐变色（AMOLED 下为纯黑，防大块红色烧屏）
     static var headerColors: [Color] { amoled ? [.black, .black] : [red, redDark] }

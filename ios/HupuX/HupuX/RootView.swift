@@ -2,7 +2,7 @@
 //  RootView.swift
 //  HupuX
 //
-//  底部 Tab 框架：首页/发现/搜索/我的。本地收藏已移除，帖子收藏走虎扑账号（在「我的」里）。
+//  底部 Tab 框架：首页/发现/评分/搜索/我的。本地收藏已移除，帖子收藏走虎扑账号（在「我的」里）。
 //  目前仅首页有内容，其余为占位，后续逐屏补。
 //
 
@@ -40,6 +40,8 @@ struct RootView: View {
                 .tabItem { Label("首页", systemImage: "house.fill") }
             ZoneListView()
                 .tabItem { Label("发现", systemImage: "square.grid.2x2.fill") }
+            ScoreView()
+                .tabItem { Label("评分", systemImage: "star.fill") }
             SearchView()
                 .tabItem { Label("搜索", systemImage: "magnifyingglass") }
             ProfileView()
