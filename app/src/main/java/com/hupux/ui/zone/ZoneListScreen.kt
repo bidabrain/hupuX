@@ -1,6 +1,7 @@
 package com.hupux.ui.zone
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -246,21 +247,25 @@ private fun ZoneGridCell(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.size(42.dp).clip(CircleShape).background(AppBg)
             )
-            // 右上角关注徽标：未关注是红底「+」，已关注是灰底「✓」，可直接点击切换。
-            // （点格子其余部分才是进专区）
+            // 右上角关注徽标，可直接点击切换（点格子其余部分才是进专区）。
+            // 绝大多数专区都没关注，所以未关注只用浅灰描边「+」，不抢眼；
+            // 已关注才用红底「✓」，满屏格子里一眼能找到自己关注的。
             Box(
                 Modifier
                     .align(Alignment.TopEnd)
                     .size(20.dp)
                     .clip(CircleShape)
-                    .background(if (isFollowed) BgGray else HupuRed)
+                    .then(
+                        if (isFollowed) Modifier.background(HupuRed)
+                        else Modifier.background(CardBg).border(1.dp, DividerColor, CircleShape)
+                    )
                     .clickable(onClick = onToggleFollow),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     if (isFollowed) Icons.Default.Check else Icons.Default.Add,
                     contentDescription = if (isFollowed) "取消关注" else "关注",
-                    tint = if (isFollowed) TextSecondary else Color.White,
+                    tint = if (isFollowed) Color.White else TextTertiary,
                     modifier = Modifier.size(13.dp)
                 )
             }
