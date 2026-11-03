@@ -11,6 +11,10 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 
 private const val BASE_URL = "https://m.hupu.com"
+private const val BBS_URL = "https://bbs.hupu.com"
+private const val DESKTOP_UA =
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+private val DESKTOP_DATA_REGEX = Regex("""window\.\${'$'}\${'$'}data=(\{.*?\})</script>""", RegexOption.DOT_MATCHES_ALL)
 
 /**
  * m.hupu.com/zone 漏了整个「英雄联盟」分类（桌面版 all-lol：主区 85 + 一堆冷清的战队专区），
@@ -35,12 +39,12 @@ private val NEXT_DATA_REGEX = Regex(
 
 class HupuScraper(private val client: HttpClient) {
 
-    private suspend fun fetch(url: String): String =
+    private suspend fun fetch(
+        url: String,
+        userAgent: String = "Mozilla/5.0 (Linux; Android 12; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36"
+    ): String =
         client.get(url) {
-            header(
-                "User-Agent",
-                "Mozilla/5.0 (Linux; Android 12; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36"
-            )
+            header("User-Agent", userAgent)
             header("Accept-Language", "zh-CN,zh;q=0.9")
         }.bodyAsText()
 
@@ -136,6 +140,38 @@ class HupuScraper(private val client: HttpClient) {
         val nextCursor = rawCursor?.takeIf { it.isNotEmpty() }?.let { "2|$it" }
         val posts = parseZoneThreads(threads, topicId)
         return ZonePage(zoneDetail, posts, nextCursor)
+    }
+
+    /**
+     * 专区帖子按发布时间倒序。移动版没有这个排序，走桌面版页面（移动 UA 会 404）。
+     * 页码从 1 开始；nextCursor 为下一页页码，没有更多时为 null。
+     * 桌面版没有推荐数，只有亮数（lights），所以 recommendNum 留 0、lights 填亮数。
+     */
+    suspend fun fetchZoneByPostTime(topicId: Int, page: Int = 1): ZonePage {
+        val emptyDetail = ZoneDetail(topicId, "", "", "", "", "", "#EA0E20")
+        val suffix = if (page > 1) "-$page" else ""
+        val html = fetch("$BBS_URL/$topicId-postdate$suffix", userAgent = DESKTOP_UA)
+        val json = DESKTOP_DATA_REGEX.find(html)?.groupValues?.get(1) ?: error("帖子列表解析失败")
+        val threads = parseJsonObject(json).obj("topic")?.obj("threads")
+            ?: return ZonePage(emptyDetail, emptyList(), null)
+        val posts = (threads.arr("list") ?: EmptyJsonArray).mapNotNull { el ->
+            val o = el.obj
+            val tid = o.str("tid") ?: return@mapNotNull null
+            Post(
+                tid      = tid,
+                title    = o.str("title") ?: "",
+                url      = "$BASE_URL/bbs/$tid.html",
+                lights   = o.int_("lights") ?: 0,
+                replies  = o.int_("replies") ?: 0,
+                username = o.obj("author")?.str("puname") ?: "",
+                time     = o.str("createdAtFormat") ?: "",
+                isVideo  = o.bool_("hasVideo") ?: false
+            )
+        }
+        val current = threads.int_("current") ?: page
+        val total = threads.int_("total") ?: current
+        val next = if (current < total && posts.isNotEmpty()) (current + 1).toString() else null
+        return ZonePage(emptyDetail, posts, next)
     }
 
     private fun parseZoneThreads(threads: JsonArray, topicId: Int): List<Post> =

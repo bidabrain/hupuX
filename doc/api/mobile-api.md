@@ -75,6 +75,9 @@ Accept-Language: zh-CN,zh;q=0.9
 
 ## 3. 专区帖子列表（含分页）
 
+> 这个接口只有一种顺序：**按最新回复**，没有排序参数（前端只传 `topicId / page / cursor`）。
+> 「按发布时间」要走桌面版 `bbs.hupu.com/{topicId}-postdate[-{page}]`，见 [desktop-api.md](desktop-api.md)。
+
 ### 首页（SSR）
 
 **URL：** `GET https://m.hupu.com/zone/{topicId}`

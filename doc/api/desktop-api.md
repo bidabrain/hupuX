@@ -494,6 +494,37 @@ slug → topicId 映射通过 `ZoneSlugMap.kt` 中的硬编码表查找，找不
 
 ---
 
+## 四、专区帖子列表（按发布时间 / 回复时间 / 24 小时榜）
+
+移动版专区接口只有「最新回复」一种顺序，按发布时间排要走桌面版专区页。**匿名可用，但必须用桌面 UA**（移动 UA 返回 404）。
+
+| 排序 | URL |
+|---|---|
+| 最新回复 | `GET https://bbs.hupu.com/{topicId}` |
+| 最新发布 | `GET https://bbs.hupu.com/{topicId}-postdate` |
+| 24 小时榜 | `GET https://bbs.hupu.com/{topicId}-hot` |
+
+- `{topicId}` 直接用数字即可（`/85-postdate`），也可用英文 slug（`/lol-postdate`），结果相同
+- 翻页：末尾加 `-{page}`，如 `/85-postdate-2`；每页 50 条，最多 20 页（共 1000 条）
+
+**数据路径：** HTML 内联 `window.$$data=` → `topic.threads`
+
+| 字段 | 说明 |
+|---|---|
+| current / total / size / count | 当前页 / 总页数 / 每页条数 / 总条数（上限 1000） |
+| list[].tid | 帖子 ID（字符串） |
+| list[].title | 标题 |
+| list[].replies / read | 回复数 / 浏览数 |
+| list[].lights | **亮数，不是推荐数**（同一帖移动版 recommendNum=8、这里 lights=25） |
+| list[].createdAt / createdAtFormat | 发布时间（毫秒）/ 「4分钟前」 |
+| list[].repliedAt | 最后回复时间（毫秒） |
+| list[].author.puid / puname | 作者 |
+| list[].hasVideo | 是否视频帖 |
+
+客户端实现：`HupuScraper.fetchZoneByPostTime`，经 `ZoneRepository.getZonePosts(topicId, cursor, ZoneSort.POST)` 调用，cursor 为页码。
+
+---
+
 ## 注意事项
 
 1. **分页 `pageStr`** 是不透明的游标字符串，直接从上次响应取用，不要自行构造

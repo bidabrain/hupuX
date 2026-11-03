@@ -41,6 +41,12 @@ data class ZoneDetail(
     val bgColor: String
 )
 
+/**
+ * 专区帖子排序。移动版接口只有「最新回复」一种顺序；
+ * 「最新发布」走桌面版 bbs.hupu.com/{topicId}-postdate-{page}（匿名可用，每页 50 条，最多 20 页）。
+ */
+enum class ZoneSort { REPLY, POST }
+
 data class ZonePage(
     val zoneDetail: ZoneDetail,
     val posts: List<Post>,

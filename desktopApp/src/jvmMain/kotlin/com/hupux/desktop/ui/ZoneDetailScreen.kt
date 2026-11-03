@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hupux.data.model.Post
 import com.hupux.data.model.Zone
+import com.hupux.data.model.ZoneSort
 import com.hupux.data.repository.FollowedZonesRepository
 import com.hupux.data.repository.ZoneRepository
 import com.hupux.data.scraper.HupuDesktopScraper
@@ -40,6 +41,7 @@ fun ZoneDetailScreen(
 ) {
     val topicId = zone.topicId
     val name    = zone.topicName
+    var sort by remember { mutableStateOf(ZoneSort.REPLY) }
     var posts by remember { mutableStateOf<List<Post>>(emptyList()) }
     var cursor by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(true) }
@@ -50,10 +52,13 @@ fun ZoneDetailScreen(
     val isFollowed = topicId in followedIds
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(topicId) {
+    // 切换排序时整份列表重拉（两种排序的 cursor 不能混用）
+    LaunchedEffect(topicId, sort) {
         loading = true
+        posts = emptyList()
+        cursor = null
         try {
-            val page = withContext(Dispatchers.IO) { repo.getZonePosts(topicId) }
+            val page = withContext(Dispatchers.IO) { repo.getZonePosts(topicId, null, sort) }
             posts = page.posts
             cursor = page.nextCursor
         } catch (_: Exception) {}
@@ -127,6 +132,16 @@ fun ZoneDetailScreen(
                 }
             }
         }
+        Row(Modifier.padding(horizontal = 16.dp).padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(ZoneSort.REPLY to "最新回复", ZoneSort.POST to "最新发布").forEach { (value, label) ->
+                FilterChip(
+                    selected = sort == value,
+                    onClick  = { sort = value },
+                    label    = { Text(label) }
+                )
+            }
+        }
         HorizontalDivider()
         Box(Modifier.fillMaxSize()) {
             if (loading) {
@@ -169,7 +184,7 @@ fun ZoneDetailScreen(
                                         scope.launch {
                                             loadingMore = true
                                             try {
-                                                val page = withContext(Dispatchers.IO) { repo.getZonePosts(topicId, cursor) }
+                                                val page = withContext(Dispatchers.IO) { repo.getZonePosts(topicId, cursor, sort) }
                                                 posts = posts + page.posts
                                                 cursor = page.nextCursor
                                             } catch (_: Exception) {}

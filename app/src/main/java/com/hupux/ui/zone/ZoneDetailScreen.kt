@@ -95,7 +95,7 @@ fun ZoneDetailScreen(
                 // Sort tabs (white pills on colored bg)
                 Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 14.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("全部", "精华").forEachIndexed { i, label ->
+                    listOf("最新回复", "最新发布", "精华").forEachIndexed { i, label ->
                         val sel = i == selectedSort
                         Box(
                             contentAlignment = Alignment.Center,
@@ -120,13 +120,13 @@ fun ZoneDetailScreen(
         // ── Post list ─────────────────────────────────────────────
         Box(Modifier.fillMaxSize()) {
             when {
-                state.isLoading -> CircularProgressIndicator(
+                state.showLoading -> CircularProgressIndicator(
                     Modifier.align(Alignment.Center), color = HupuRed)
-                state.error != null -> Column(
+                state.shownError != null -> Column(
                     Modifier.align(Alignment.Center),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(state.error!!, color = HupuRed)
+                    Text(state.shownError!!, color = HupuRed)
                     Spacer(Modifier.height(12.dp))
                     PillButton("重试", onClick = vm::load)
                 }
@@ -198,7 +198,11 @@ private fun ZonePostCard(post: Post, onClick: () -> Unit) {
                 if (post.isVote)  { Spacer(Modifier.width(4.dp)); TagChip("投票") }
                 Text("💬 ${post.replies}", fontSize = 12.sp, color = TextTertiary)
                 Spacer(Modifier.width(10.dp))
-                Text("👍 ${post.recommendNum}", fontSize = 12.sp, color = TextTertiary)
+                // 「最新发布」来自桌面版，只有亮数没有推荐数
+                if (post.lights > 0 && post.recommendNum == 0)
+                    Text("🔥 ${post.lights}", fontSize = 12.sp, color = TextTertiary)
+                else
+                    Text("👍 ${post.recommendNum}", fontSize = 12.sp, color = TextTertiary)
             }
         }
     }
